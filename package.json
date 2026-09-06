@@ -1,0 +1,36 @@
+{
+  "name": "parkhillfw",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260906.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/bun": "latest",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.2.2",
+    "wrangler": "^4.129.0"
+  },
+  "peerDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.7",
+    "lucide-vue-next": "^1.0.0",
+    "vue": "^3.5.42"
+  },
+  "scripts": {
+  "dev:worker": "wrangler dev",
+  "dev:vue": "vite",
+  "dev": "bun run dev:worker & bun run dev:vue",
+  "build": "vite build",
+  "deploy": "bun run build && wrangler deploy",
+  "db:generate": "drizzle-kit generate",
+  "db:migrate:local": "wrangler d1 migrations apply DB --local",
+  "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+  "test": "bun test"
+  }
+}

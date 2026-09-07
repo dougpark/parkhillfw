@@ -160,6 +160,35 @@ export const sessions = sqliteTable(
     ]
 );
 
+export const accessRequests = sqliteTable(
+    'access_requests',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        email: text('email').notNull(),
+        fullName: text('full_name').notNull(),
+        streetAddress: text('street_address').notNull(),
+        status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull().default('pending'),
+        reviewedByUserId: integer('reviewed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+        reviewedAt: integer('reviewed_at', { mode: 'timestamp' }),
+        notes: text('notes'),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        index('idx_access_requests_email').on(table.email),
+        index('idx_access_requests_status').on(table.status),
+    ]
+);
+
+export const magicLinkRateLimits = sqliteTable(
+    'magic_link_rate_limits',
+    {
+        email: text('email').primaryKey(),
+        minuteStartedAt: integer('minute_started_at', { mode: 'timestamp' }).notNull(),
+        dailyStartedAt: integer('daily_started_at', { mode: 'timestamp' }).notNull(),
+        dailyCount: integer('daily_count').notNull().default(0),
+    }
+);
+
 // ==========================================
 // 3. CONTENT & NAVIGATION (Pages, Menus, Messages)
 // ==========================================

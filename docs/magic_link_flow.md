@@ -1,3 +1,6 @@
+# Registration/Login Flow with Magic Link and Automatic Directory Resolution
+
+
 ## Automatic Resolution During Magic Link Authentication
 ## When the user completes the Magic Link authentication flow:
 

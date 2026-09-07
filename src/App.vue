@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Menu } from 'lucide-vue-next';
+import { LogIn } from 'lucide-vue-next';
 </script>
 
 <template>
@@ -9,14 +9,14 @@ import { Menu } from 'lucide-vue-next';
         <h1 class="text-lg sm:text-xl font-semibold tracking-tight text-[#1a73e8]">
           Park Hill Neighborhood
         </h1>
-        <!-- Admin menu placeholder; shown only to authorized editors/admins once auth UI exists -->
-        <button
-          type="button"
+        <RouterLink
+          to="/login"
           class="p-2 rounded-full hover:bg-[#f0f4f9] transition-colors text-[#444746]"
-          aria-label="Menu"
+          aria-label="Sign in"
+          title="Sign in"
         >
-          <Menu class="w-5 h-5" />
-        </button>
+          <LogIn class="w-5 h-5" />
+        </RouterLink>
       </div>
     </header>
 

@@ -1,39 +1,39 @@
 import type { MiddlewareHandler } from 'hono';
+import { drizzle } from 'drizzle-orm/d1';
+import { findUserBySession, SESSION_COOKIE } from '../lib/auth';
 
-// Mock user representing a logged-in admin resident during dev
-const DEV_MOCK_USER = {
-    id: 1,
-    email: 'parkdn@gmail.com',
-    role: 'admin',
-    householdId: 1,
+function getCookie(request: Request, name: string): string | null {
+    const cookies = request.headers.get('Cookie')?.split(';') ?? [];
+    const value = cookies.find((cookie) => cookie.trim().startsWith(`${name}=`));
+    return value ? decodeURIComponent(value.trim().slice(name.length + 1)) : null;
+}
+
+export const requireAuth = (): MiddlewareHandler => async (c, next) => {
+    if (c.env.DEV_BYPASS_AUTH === 'true') {
+        c.set('user', {
+            id: 1,
+            email: 'parkdn@gmail.com',
+            role: 'admin',
+            householdId: 1,
+            isAdmin: true,
+        });
+        return next();
+    }
+
+    const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
+    if (!rawSession) return c.json({ error: 'Unauthorized' }, 401);
+
+    const user = await findUserBySession(drizzle(c.env.DB), rawSession);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    c.set('user', user);
+    return next();
 };
 
-export const requireAuth = (): MiddlewareHandler => {
-    return async (c, next) => {
-        // 1. Check for Development Bypass Flag
-        const isDevBypass = c.env.DEV_BYPASS_AUTH === 'true';
-
-        if (isDevBypass) {
-            // Inject mock user and skip token validation
-            c.set('user', DEV_MOCK_USER);
-            return next();
-        }
-
-        // 2. Production Auth Logic (Session Cookie or Bearer Token)
-        const authHeader = c.req.header('Authorization');
-        const token = authHeader?.replace('Bearer ', '');
-
-        if (!token) {
-            return c.json({ error: 'Unauthorized: Missing authentication token' }, 401);
-        }
-
-        try {
-            // Verify JWT/Session Token here
-            const user = await verifyToken(token, c.env.JWT_SECRET);
-            c.set('user', user);
-            await next();
-        } catch {
-            return c.json({ error: 'Unauthorized: Invalid token' }, 401);
-        }
-    };
+export const requireAdmin = (): MiddlewareHandler => async (c, next) => {
+    const user = c.get('user') as { isAdmin?: boolean; isOwner?: boolean } | undefined;
+    if (!user?.isAdmin && !user?.isOwner) return c.json({ error: 'Forbidden' }, 403);
+    return next();
 };
+
+export { getCookie };

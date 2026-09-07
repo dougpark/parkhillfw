@@ -49,9 +49,14 @@ async function submitRequest() {
             Street address
             <input v-model="streetAddress" required class="mt-2 w-full rounded-xl border border-[#e1e3e1] px-4 py-3 focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" autocomplete="street-address" placeholder="1234 Example Terrace" />
           </label>
-          <button type="submit" :disabled="isSubmitting" class="w-full rounded-full bg-[#1a73e8] px-6 py-3 font-medium text-white hover:opacity-90 disabled:opacity-60">
-            {{ isSubmitting ? 'Submitting...' : 'Submit for review' }}
-          </button>
+          <div class="flex flex-col gap-3 sm:flex-row-reverse">
+            <button type="submit" :disabled="isSubmitting" class="flex-1 rounded-full bg-[#1a73e8] px-6 py-3 font-medium text-white hover:opacity-90 disabled:opacity-60">
+              {{ isSubmitting ? 'Submitting...' : 'Submit for review' }}
+            </button>
+            <button type="button" :disabled="isSubmitting" class="flex-1 rounded-full border border-[#1a73e8] px-6 py-3 font-medium text-[#1a73e8] hover:bg-[#e8f0fe] disabled:opacity-60" @click="switchAccount">
+              Use a different email
+            </button>
+          </div>
         </form>
         <p v-if="error" class="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
       </template>

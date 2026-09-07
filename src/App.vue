@@ -68,7 +68,10 @@ async function switchAccount() {
 async function loadAuthUser() {
   try {
     const response = await fetch('/api/auth/me');
-    if (!response.ok) return;
+    if (!response.ok) {
+      user.value = null;
+      return;
+    }
     const data = await response.json() as { user: AuthUser; matched: boolean };
     user.value = { ...data.user, matched: data.matched };
   } catch {

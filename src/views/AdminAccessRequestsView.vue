@@ -38,6 +38,12 @@ const notice = ref('');
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 const pendingRequests = computed(() => requests.value.filter((request) => request.status === 'pending'));
+const sortedRequests = computed(() => [...requests.value].sort((left, right) => {
+  const leftOpen = left.status === 'pending' ? 0 : 1;
+  const rightOpen = right.status === 'pending' ? 0 : 1;
+  if (leftOpen !== rightOpen) return leftOpen - rightOpen;
+  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+}));
 const selectedRequest = computed(() => requests.value.find((request) => request.id === selectedId.value) ?? null);
 
 async function loadRequests() {
@@ -139,11 +145,11 @@ onMounted(loadRequests);
     <p v-if="isLoading" class="py-10 text-center text-[#444746]">Loading requests...</p>
     <p v-else-if="!requests.length" class="rounded-3xl border border-[#e1e3e1] bg-white p-6 text-[#444746]">No access requests.</p>
 
-    <div v-else class="grid min-h-[34rem] overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm lg:grid-cols-[18rem_1fr]">
+    <div v-else class="grid min-h-136 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm lg:grid-cols-[18rem_1fr]">
       <aside class="border-b border-[#e1e3e1] bg-[#f0f4f9] p-3 lg:border-b-0 lg:border-r">
         <h3 class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[#444746]">Requests</h3>
         <button
-          v-for="request in requests"
+          v-for="request in sortedRequests"
           :key="request.id"
           type="button"
           class="mb-1 w-full rounded-2xl p-3 text-left transition-colors"

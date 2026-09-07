@@ -123,16 +123,24 @@ Explicit Data Schema & Relationships
 - Full Text Search: Use D1 FTS5 extension or indexed multi-column search query over directory entries.
 - Mobile Layout: Mobile-first responsive navigation bar collapsible into a slide-over menu panel. Admin view collapses two-column layout into tabbed navigation on screens < 768px.
 
+```javascript
+    // Pin exact versions — bare "codemirror@6" resolves to a mis-tagged CM5 republish.
+    // NOTE: deliberately NOT importing @codemirror/language separately here. Doing so (to
+    // get classHighlighter for stable tok-* CSS classes) resolves a different @lezer/highlight
+    // instance than the one @codemirror/lang-markdown's tags use, and crashes
+    // ("TypeError: Cannot read properties of undefined (reading 'scope')") inside
+    // @lezer/highlight's highlightRange during decoration build. minimalSetup's own bundled
+    // defaultHighlightStyle comes from the same resolution graph as `codemirror` core and
+    // works without error, so we rely on that instead (see CSS notes in notes.html).
+    const CM6_URLS = {
+        core: 'https://esm.sh/codemirror@6.0.2',
+        state: 'https://esm.sh/@codemirror/state@6',
+        view: 'https://esm.sh/@codemirror/view@6',
+        commands: 'https://esm.sh/@codemirror/commands@6',
+        markdown: 'https://esm.sh/@codemirror/lang-markdown@6',
+    }
+```
 
 ## Database
 
-### Directory
-[Database Schema](directory_schema.md)
-![Directory Schema](directory_schema.png)
-
-### Users
-[Database Schema](users_schema.md)
-
-
-## Magic Link
-[Magic Link Flow](magic_link_flow.md)
+[Database Schema](../src/db/schema.sql)

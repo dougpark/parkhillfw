@@ -362,6 +362,80 @@ app.get('/api/admin/directory', requireAuth(), requireAdmin(), async (c) => {
     return c.json(results);
 });
 
+app.get('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const q = c.req.query('q')?.trim();
+    const householdRows = q
+        ? await db.select({ id: households.id, streetAddress: households.streetAddress })
+            .from(households)
+            .leftJoin(residents, eq(residents.householdId, households.id))
+            .where(or(
+                like(households.streetAddress, `%${q}%`),
+                like(residents.firstName, `%${q}%`),
+                like(residents.lastName, `%${q}%`),
+                like(residents.email, `%${q}%`),
+            )).all()
+        : await db.select({ id: households.id, streetAddress: households.streetAddress }).from(households).all();
+    const uniqueHouseholds = [...new Map(householdRows.map((item) => [item.id, item])).values()];
+    return c.json(await Promise.all(uniqueHouseholds.map(async (household) => ({
+        ...household,
+        residents: await db.select({ id: residents.id, firstName: residents.firstName, lastName: residents.lastName, email: residents.email })
+            .from(residents).where(eq(residents.householdId, household.id)).all(),
+        children: await db.select({ id: children.id, name: children.name }).from(children)
+            .where(eq(children.householdId, household.id)).all(),
+    }))));
+});
+
+app.post('/api/admin/households/:householdId/vacate', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const householdId = Number(c.req.param('householdId'));
+    if (!Number.isInteger(householdId)) return c.json({ error: 'Invalid household ID.' }, 400);
+
+    const household = await db.select({ id: households.id, streetAddress: households.streetAddress })
+        .from(households).where(eq(households.id, householdId)).get();
+    if (!household) return c.json({ error: 'Household not found.' }, 404);
+
+    const householdResidents = await db.select({ id: residents.id, email: residents.email })
+        .from(residents).where(eq(residents.householdId, householdId)).all();
+    const residentIds = householdResidents.map((resident) => resident.id);
+    const residentEmails = householdResidents.flatMap((resident) => resident.email ? [normalizeEmail(resident.email)] : []);
+    const linkedUsers = residentIds.length
+        ? await db.select({ id: users.id }).from(users).where(inArray(users.residentId, residentIds)).all()
+        : [];
+    const userIds = linkedUsers.map((user) => user.id);
+    if (residentEmails.length) await db.delete(magicTokens).where(inArray(magicTokens.email, residentEmails));
+
+    if (userIds.length) {
+        const linkedUserEmails = await db.select({ email: users.email }).from(users).where(inArray(users.id, userIds)).all();
+        const linkedLoginEmails = await db.select({ email: userLoginEmails.email }).from(userLoginEmails)
+            .where(inArray(userLoginEmails.userId, userIds)).all();
+        const authEmails = [...new Set([
+            ...residentEmails,
+            ...linkedUserEmails.map((item) => normalizeEmail(item.email)),
+            ...linkedLoginEmails.map((item) => normalizeEmail(item.email)),
+        ])];
+        if (authEmails.length) await db.delete(magicTokens).where(inArray(magicTokens.email, authEmails));
+        await db.delete(sessions).where(inArray(sessions.userId, userIds));
+        await db.delete(userLoginEmails).where(inArray(userLoginEmails.userId, userIds));
+        await db.update(users).set({ residentId: null, linkStatus: 'unlinked', updatedAt: new Date() })
+            .where(inArray(users.id, userIds));
+    }
+    await db.delete(householdFavorites).where(eq(householdFavorites.householdId, householdId));
+    await db.delete(children).where(eq(children.householdId, householdId));
+    await db.delete(residents).where(eq(residents.householdId, householdId));
+    await db.update(households).set({
+        yearMovedIn: null,
+        parkHillMember: null,
+        securityMember: false,
+        pets: null,
+        photoKey: null,
+        notes: null,
+        updatedAt: new Date(),
+    }).where(eq(households.id, householdId));
+
+    return c.json({ cleared: true, streetAddress: household.streetAddress, residentsRemoved: residentIds.length, usersReset: userIds.length });
+});
+
 app.get('/api/admin/users', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
     const [userRows, alternateRows] = await Promise.all([

@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { ClipboardList, FileText, FolderTree, Users } from 'lucide-vue-next';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
+import AdminHouseholdResetView from './AdminHouseholdResetView.vue';
 
 const selectedFeature = ref('Access requests');
 
@@ -46,6 +47,9 @@ function selectFeature(label: string) {
 
       <div v-if="selectedFeature === 'Access requests'" class="p-6 sm:p-8">
         <AdminAccessRequestsView />
+      </div>
+      <div v-else-if="selectedFeature === 'Directory'" class="p-6 sm:p-8">
+        <AdminHouseholdResetView />
       </div>
       <div v-else class="p-6 sm:p-8">
         <div class="flex items-start justify-between gap-4">

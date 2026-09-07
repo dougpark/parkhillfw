@@ -7,6 +7,7 @@ const router = createRouter({
         {
             path: '/login',
             name: 'login',
+            meta: { guestOnly: true },
             component: () => import('../views/LoginView.vue'),
         },
         {
@@ -45,10 +46,15 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
-    if (!to.meta.requiresAdmin && !to.meta.requiresDirectory) return true;
+    if (!to.meta.requiresAdmin && !to.meta.requiresDirectory && !to.meta.guestOnly) return true;
 
     try {
         const response = await fetch('/api/auth/me');
+        if (to.meta.guestOnly) {
+            if (!response.ok) return true;
+            const data = await response.json() as { matched?: boolean };
+            return data.matched ? '/directory' : '/access-request';
+        }
         if (!response.ok) return '/login';
         const data = await response.json() as {
             matched?: boolean;

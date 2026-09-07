@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { LogIn, Pencil, ShieldCheck } from 'lucide-vue-next';
+import { Home, LogIn, Pencil, ShieldCheck } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
 interface AuthUser {
@@ -14,6 +14,7 @@ interface AuthUser {
 
 const user = ref<AuthUser | null>(null);
 const route = useRoute();
+const isAdminView = () => route.path.startsWith('/admin');
 
 const canAdmin = (authUser: AuthUser) => Boolean(
   authUser.isOwner || authUser.isAdmin || authUser.isPageEditor || authUser.isDirectoryEditor
@@ -38,9 +39,13 @@ watch(() => route.fullPath, loadAuthUser);
   <div class="min-h-screen bg-[#f0f4f9] text-[#1f1f1f] font-sans">
     <header class="sticky top-0 z-20 bg-white border-b border-[#e1e3e1]">
       <div class="max-w-5xl mx-auto flex items-center justify-between px-4 py-3 sm:px-8">
-        <h1 class="text-lg sm:text-xl font-semibold tracking-tight text-[#1a73e8]">
+        <RouterLink
+          to="/directory"
+          class="text-lg sm:text-xl font-semibold tracking-tight text-[#1a73e8]"
+          aria-label="Go to directory"
+        >
           Park Hill Neighborhood
-        </h1>
+        </RouterLink>
         <div class="flex items-center gap-2">
           <template v-if="user">
             <span class="max-w-32 truncate text-xs font-medium text-[#444746] sm:max-w-none sm:text-sm">{{ user.displayName }}</span>
@@ -55,11 +60,12 @@ watch(() => route.fullPath, loadAuthUser);
             </RouterLink>
             <RouterLink
               v-if="canAdmin(user)"
-              to="/admin"
+              :to="isAdminView() ? '/directory' : '/admin'"
               class="inline-flex items-center gap-1.5 rounded-full bg-[#1a73e8] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
-              <ShieldCheck class="h-4 w-4" />
-              <span>Admin</span>
+              <ShieldCheck v-if="!isAdminView()" class="h-4 w-4" />
+              <Home v-else class="h-4 w-4" />
+              <span>{{ isAdminView() ? 'Home' : 'Admin' }}</span>
             </RouterLink>
           </template>
           <RouterLink

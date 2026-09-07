@@ -1,25 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Home, LogIn, Pencil, ShieldCheck } from 'lucide-vue-next';
+import { Home, LogIn } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
 interface AuthUser {
   displayName: string;
-  isOwner?: boolean;
-  isAdmin?: boolean;
-  isPageEditor?: boolean;
-  isDirectoryEditor?: boolean;
   matched?: boolean;
 }
 
 const user = ref<AuthUser | null>(null);
 const route = useRoute();
-const isAdminView = () => route.path.startsWith('/admin');
-
-const canAdmin = (authUser: AuthUser) => Boolean(
-  authUser.isOwner || authUser.isAdmin || authUser.isPageEditor || authUser.isDirectoryEditor
-);
-
 async function loadAuthUser() {
   try {
     const response = await fetch('/api/auth/me');
@@ -50,15 +40,6 @@ watch(() => route.fullPath, loadAuthUser);
           <template v-if="user">
             <span class="max-w-32 truncate text-xs font-medium text-[#444746] sm:max-w-none sm:text-sm">{{ user.displayName }}</span>
             <RouterLink
-              v-if="user.matched"
-              to="/directory/edit"
-              class="rounded-full p-2 text-[#444746] transition-colors hover:bg-[#f0f4f9]"
-              aria-label="Edit directory"
-              title="Edit directory"
-            >
-              <Pencil class="h-4 w-4" />
-            </RouterLink>
-            <RouterLink
               to="/home"
               class="inline-flex items-center gap-1.5 rounded-full border border-[#1a73e8] px-3 py-1.5 text-sm font-medium text-[#1a73e8] transition-colors hover:bg-[#e8f0fe]"
               aria-label="Home"
@@ -66,14 +47,6 @@ watch(() => route.fullPath, loadAuthUser);
             >
               <Home class="h-4 w-4" />
               <span>Home</span>
-            </RouterLink>
-            <RouterLink
-              v-if="canAdmin(user) && !isAdminView()"
-              to="/admin"
-              class="inline-flex items-center gap-1.5 rounded-full bg-[#1a73e8] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            >
-              <ShieldCheck v-if="!isAdminView()" class="h-4 w-4" />
-              <span>Admin</span>
             </RouterLink>
           </template>
           <RouterLink

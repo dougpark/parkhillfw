@@ -1,7 +1,17 @@
 <script setup lang="ts">
-import { BookOpen, Pencil } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { BookOpen, Pencil, ShieldCheck } from 'lucide-vue-next';
 
-const navigationCards = [
+interface AuthUser {
+  isOwner?: boolean;
+  isAdmin?: boolean;
+  isPageEditor?: boolean;
+  isDirectoryEditor?: boolean;
+}
+
+const user = ref<AuthUser | null>(null);
+
+const baseCards = [
   {
     title: 'Directory',
     description: 'Search the neighborhood directory',
@@ -17,6 +27,22 @@ const navigationCards = [
     color: 'bg-[#e6f4ea] text-[#137333]',
   },
 ];
+
+const canAdmin = (authUser: AuthUser) => Boolean(
+  authUser.isOwner || authUser.isAdmin || authUser.isPageEditor || authUser.isDirectoryEditor
+);
+
+onMounted(async () => {
+  try {
+    const response = await fetch('/api/auth/me');
+    if (response.ok) {
+      const data = await response.json() as { user: AuthUser };
+      user.value = data.user;
+    }
+  } catch {
+    user.value = null;
+  }
+});
 </script>
 
 <template>
@@ -29,7 +55,19 @@ const navigationCards = [
 
     <div class="grid gap-4 sm:grid-cols-2">
       <RouterLink
-        v-for="card in navigationCards"
+        v-if="user && canAdmin(user)"
+        to="/admin"
+        class="group rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40"
+      >
+        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f3e8fd] text-[#7c4dff]">
+          <ShieldCheck class="h-6 w-6" />
+        </div>
+        <h3 class="mt-6 text-xl font-semibold text-[#1f1f1f]">Admin</h3>
+        <p class="mt-2 text-[#444746]">Manage neighborhood content and access</p>
+        <span class="mt-6 inline-block text-sm font-medium text-[#1a73e8] transition-transform group-hover:translate-x-1">Open <span aria-hidden="true">-&gt;</span></span>
+      </RouterLink>
+      <RouterLink
+        v-for="card in baseCards"
         :key="card.title"
         :to="card.to"
         class="group rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40"

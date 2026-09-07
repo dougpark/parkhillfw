@@ -7,7 +7,7 @@ const router = createRouter({
         {
             path: '/home',
             name: 'home',
-            meta: { requiresAuth: true },
+            meta: { requiresDirectory: true },
             component: () => import('../views/HomeView.vue'),
         },
         {
@@ -24,6 +24,7 @@ const router = createRouter({
         {
             path: '/access-request',
             name: 'access-request',
+            meta: { requiresAuth: true },
             component: () => import('../views/AccessRequestView.vue'),
         },
         {
@@ -40,6 +41,7 @@ const router = createRouter({
         {
             path: '/directory',
             name: 'directory',
+            meta: { requiresDirectory: true },
             component: () => import('../views/DirectoryView.vue'),
         },
         {

@@ -36,4 +36,10 @@ export const requireAdmin = (): MiddlewareHandler => async (c, next) => {
     return next();
 };
 
+export const requireDirectory = (): MiddlewareHandler => async (c, next) => {
+    const user = c.get('user') as { residentId?: number | null; householdId?: number } | undefined;
+    if (!user?.residentId && !user?.householdId) return c.json({ error: 'Directory access is pending approval.' }, 403);
+    return next();
+};
+
 export { getCookie };

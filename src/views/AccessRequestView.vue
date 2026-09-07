@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
 const fullName = ref('');
 const streetAddress = ref('');
 const isSubmitting = ref(false);
@@ -52,8 +49,7 @@ async function submitRequest() {
       </template>
       <template v-else>
         <h2 class="text-2xl font-semibold tracking-tight">Request submitted</h2>
-        <p class="mt-3 text-[#444746]">An administrator will review your name and address and connect your account to the directory.</p>
-        <button type="button" class="mt-6 rounded-full bg-[#1a73e8] px-6 py-3 font-medium text-white" @click="router.push('/directory')">Continue</button>
+        <p class="mt-3 text-[#444746]">Your account is being reviewed. An administrator will review your name and address and connect your account to the directory if they can verify your household.</p>
       </template>
     </div>
   </section>

@@ -40,6 +40,7 @@ watch(() => route.fullPath, loadAuthUser);
           <template v-if="user">
             <span class="max-w-32 truncate text-xs font-medium text-[#444746] sm:max-w-none sm:text-sm">{{ user.displayName }}</span>
             <RouterLink
+              v-if="user.matched"
               to="/home"
               class="inline-flex items-center gap-1.5 rounded-full border border-[#1a73e8] px-3 py-1.5 text-sm font-medium text-[#1a73e8] transition-colors hover:bg-[#e8f0fe]"
               aria-label="Home"

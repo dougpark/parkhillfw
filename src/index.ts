@@ -14,7 +14,7 @@ import {
 } from './db/schema';
 import { createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
 import { sendMagicLinkEmail } from './lib/email';
-import { getCookie, requireAdmin, requireAuth } from './middleware/auth';
+import { getCookie, requireAdmin, requireAuth, requireDirectory } from './middleware/auth';
 
 type Bindings = {
     DB: D1Database;
@@ -296,7 +296,7 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
     return c.json({ success: true });
 });
 
-app.post('/api/households/:householdId/favorite', requireAuth(), async (c) => {
+app.post('/api/households/:householdId/favorite', requireAuth(), requireDirectory(), async (c) => {
     const db = drizzle(c.env.DB);
     const userId = (c.get('user') as { id: number }).id;
     const householdId = Number(c.req.param('householdId'));
@@ -310,7 +310,7 @@ app.post('/api/households/:householdId/favorite', requireAuth(), async (c) => {
     return c.json({ favorited: true });
 });
 
-app.delete('/api/households/:householdId/favorite', requireAuth(), async (c) => {
+app.delete('/api/households/:householdId/favorite', requireAuth(), requireDirectory(), async (c) => {
     const db = drizzle(c.env.DB);
     const userId = (c.get('user') as { id: number }).id;
     const householdId = Number(c.req.param('householdId'));
@@ -328,7 +328,7 @@ app.get('/api/residents', requireAuth(), async (c) => {
     return c.json(data);
 });
 
-app.get('/api/directory', requireAuth(), async (c) => {
+app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim();
     const petSitting = c.req.query('petSitting') === 'true';

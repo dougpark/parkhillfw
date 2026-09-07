@@ -115,8 +115,18 @@ app.get('/api/auth/verify', async (c) => {
 });
 
 app.get('/api/auth/me', requireAuth(), async (c) => {
-    const user = c.get('user');
-    return c.json({ user, matched: Boolean((user as { residentId?: number | null }).residentId) });
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { id: number; email: string; residentId?: number | null };
+    const resident = user.residentId
+        ? await db.select({ firstName: residents.firstName, lastName: residents.lastName })
+            .from(residents).where(eq(residents.id, user.residentId)).get()
+        : await db.select({ firstName: residents.firstName, lastName: residents.lastName })
+            .from(residents).where(eq(residents.email, user.email)).get();
+    const displayName = resident ? `${resident.firstName} ${resident.lastName}` : user.email;
+    return c.json({
+        user: { ...user, displayName },
+        matched: Boolean(user.residentId || resident),
+    });
 });
 
 app.post('/api/auth/logout', async (c) => {

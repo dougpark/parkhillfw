@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex, primaryKey } from 'drizzle-orm/sqlite-core';
 
 // ==========================================
 // 1. DIRECTORY SUBSYSTEM (Normalized 3-Table)
@@ -109,6 +109,23 @@ export const users = sqliteTable(
     (table) => [
         uniqueIndex('idx_users_email_unique').on(table.email),
         index('idx_users_resident').on(table.residentId),
+    ]
+);
+
+export const householdFavorites = sqliteTable(
+    'household_favorites',
+    {
+        userId: integer('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        householdId: integer('household_id')
+            .notNull()
+            .references(() => households.id, { onDelete: 'cascade' }),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        primaryKey({ columns: [table.userId, table.householdId] }),
+        index('idx_household_favorites_household').on(table.householdId),
     ]
 );
 

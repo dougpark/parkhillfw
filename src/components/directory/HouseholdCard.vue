@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Shield, Home } from 'lucide-vue-next';
+import { Shield, Home, Star } from 'lucide-vue-next';
 
 interface Resident {
   id: number;
@@ -31,12 +31,17 @@ interface Household {
   securityMember: boolean | null;
   pets: string | null;
   notes: string | null;
+  isFavorite: boolean;
   residents: Resident[];
   children: Child[];
 }
 
-defineProps<{
+const props = defineProps<{
   household: Household;
+}>();
+
+const emit = defineEmits<{
+  'toggle-favorite': [householdId: number];
 }>();
 </script>
 
@@ -47,6 +52,15 @@ defineProps<{
         <h2 class="flex items-center gap-2 text-lg font-semibold text-[#1f1f1f]">
           <Home class="w-4 h-4 text-[#1a73e8]" />
           {{ household.streetAddress }}
+          <button
+            type="button"
+            class="rounded-full p-1 text-[#f4b400] hover:bg-[#fff8e1] transition-colors"
+            :aria-label="props.household.isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+            :title="props.household.isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+            @click.stop="emit('toggle-favorite', props.household.id)"
+          >
+            <Star class="w-4 h-4" :fill="props.household.isFavorite ? 'currentColor' : 'none'" />
+          </button>
         </h2>
         <p v-if="household.yearMovedIn || household.pets" class="mt-1 text-sm text-[#444746]">
           <span v-if="household.yearMovedIn">Moved In: {{ household.yearMovedIn }}</span>

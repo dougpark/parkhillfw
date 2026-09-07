@@ -33,6 +33,7 @@ interface Household {
   securityMember: boolean | null;
   pets: string | null;
   notes: string | null;
+  isFavorite: boolean;
   residents: Resident[];
   children: Child[];
 }
@@ -40,6 +41,7 @@ interface Household {
 const query = ref('');
 const petSitting = ref(false);
 const babysitting = ref(false);
+const favoritesOnly = ref(false);
 const households = ref<Household[]>([]);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
@@ -54,10 +56,11 @@ async function loadDirectory() {
     if (query.value) params.set('q', query.value);
     if (petSitting.value) params.set('petSitting', 'true');
     if (babysitting.value) params.set('babysitting', 'true');
+    if (favoritesOnly.value) params.set('favorites', 'true');
     const search = params.toString();
     const res = await fetch(`/api/directory${search ? `?${search}` : ''}`);
     if (!res.ok) throw new Error(`Request failed (${res.status})`);
-    households.value = await res.json();
+    households.value = await res.json() as Household[];
   } catch {
     error.value = 'Unable to load the directory. Please try again.';
   } finally {
@@ -65,7 +68,7 @@ async function loadDirectory() {
   }
 }
 
-watch([query, petSitting, babysitting], () => {
+watch([query, petSitting, babysitting, favoritesOnly], () => {
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(loadDirectory, 300);
 });
@@ -74,6 +77,27 @@ function clearCriteria() {
   query.value = '';
   petSitting.value = false;
   babysitting.value = false;
+  favoritesOnly.value = false;
+}
+
+async function toggleFavorite(householdId: number) {
+  const household = households.value.find((item) => item.id === householdId);
+  if (!household) return;
+
+  const previousValue = household.isFavorite;
+  household.isFavorite = !previousValue;
+
+  try {
+    const method = household.isFavorite ? 'POST' : 'DELETE';
+    const res = await fetch(`/api/households/${householdId}/favorite`, { method });
+    if (!res.ok) throw new Error('Favorite update failed');
+    if (!household.isFavorite && favoritesOnly.value) {
+      households.value = households.value.filter((item) => item.id !== householdId);
+    }
+  } catch {
+    household.isFavorite = previousValue;
+    error.value = 'Unable to update favorites. Please try again.';
+  }
 }
 
 onMounted(loadDirectory);
@@ -84,7 +108,7 @@ onMounted(loadDirectory);
     <div class="sticky top-14 z-10 -mx-4 bg-[#f0f4f9] px-4 py-3 sm:mx-0 sm:px-0">
       <BaseInput
         v-model="query"
-        :show-clear="Boolean(query || petSitting || babysitting)"
+        :show-clear="Boolean(query || petSitting || babysitting || favoritesOnly)"
         placeholder="Search residents, addresses, children..."
         @clear="clearCriteria"
       />
@@ -97,6 +121,10 @@ onMounted(loadDirectory);
           <input v-model="babysitting" type="checkbox" class="h-4 w-4 accent-[#1a73e8]" />
           Babysitter
         </label>
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <input v-model="favoritesOnly" type="checkbox" class="h-4 w-4 accent-[#1a73e8]" />
+          Favorites
+        </label>
       </div>
     </div>
 
@@ -105,7 +133,12 @@ onMounted(loadDirectory);
     <p v-else-if="!households.length" class="text-center text-[#444746] py-10">No households found.</p>
 
     <div v-else class="space-y-6">
-      <HouseholdCard v-for="household in households" :key="household.id" :household="household" />
+      <HouseholdCard
+        v-for="household in households"
+        :key="household.id"
+        :household="household"
+        @toggle-favorite="toggleFavorite"
+      />
     </div>
   </div>
 </template>

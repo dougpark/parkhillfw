@@ -5,6 +5,7 @@ import { magicTokens, sessions, users } from '../db/schema';
 export const SESSION_COOKIE = 'parkhill_session';
 const SESSION_DAYS = 400;
 const MAGIC_LINK_MINUTES = 15;
+const APPROVAL_LINK_HOURS = 48;
 
 export async function hashToken(token: string): Promise<string> {
     const bytes = new TextEncoder().encode(token);
@@ -20,12 +21,18 @@ export function createMagicToken(): string {
     return crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 }
 
-export async function createMagicLinkToken(db: ReturnType<typeof drizzle>, email: string) {
+export async function createMagicLinkToken(
+    db: ReturnType<typeof drizzle>,
+    email: string,
+    lifetimeMinutes = MAGIC_LINK_MINUTES,
+) {
     const rawToken = createMagicToken();
-    const expiresAt = new Date(Date.now() + MAGIC_LINK_MINUTES * 60_000);
+    const expiresAt = new Date(Date.now() + lifetimeMinutes * 60_000);
     await db.insert(magicTokens).values({ email, token: await hashToken(rawToken), expiresAt });
     return rawToken;
 }
+
+export const approvalLinkLifetimeMinutes = APPROVAL_LINK_HOURS * 60;
 
 export async function createSession(db: ReturnType<typeof drizzle>, userId: number) {
     const rawSession = crypto.randomUUID();

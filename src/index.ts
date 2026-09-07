@@ -13,7 +13,7 @@ import {
     userLoginEmails,
     users,
 } from './db/schema';
-import { createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
+import { approvalLinkLifetimeMinutes, createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
 import { getCookie, requireAdmin, requireAuth, requireDirectory } from './middleware/auth';
 
@@ -411,10 +411,11 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
     const requestId = Number(c.req.param('requestId'));
     const body = await c.req.json<{ status?: 'approved' | 'rejected'; residentId?: number; notes?: string }>();
     const admin = c.get('user') as { id: number };
-    if (!Number.isInteger(requestId) || !['approved', 'rejected'].includes(body.status ?? '')) {
+    const reviewStatus = body.status;
+    if (!Number.isInteger(requestId) || !reviewStatus || !['approved', 'rejected'].includes(reviewStatus)) {
         return c.json({ error: 'Invalid access request update.' }, 400);
     }
-    if (body.status === 'approved' && !Number.isInteger(body.residentId)) {
+    if (reviewStatus === 'approved' && !Number.isInteger(body.residentId)) {
         return c.json({ error: 'A resident must be selected for approval.' }, 400);
     }
 
@@ -425,10 +426,10 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
     const targetResident = body.residentId
         ? await db.select({ id: residents.id, householdId: residents.householdId }).from(residents).where(eq(residents.id, body.residentId)).get()
         : null;
-    if (body.status === 'approved' && !targetResident) return c.json({ error: 'Selected directory resident was not found.' }, 400);
+    if (reviewStatus === 'approved' && !targetResident) return c.json({ error: 'Selected directory resident was not found.' }, 400);
 
     let outcomeToken: string | null = null;
-    if (body.status === 'approved') {
+    if (reviewStatus === 'approved') {
         const user = await db.select().from(users).where(eq(users.email, normalizedRequestEmail)).get();
         if (!user) return c.json({ error: 'The requester account was not found.' }, 404);
         const alternateOwner = await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails)
@@ -436,16 +437,16 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
         if (alternateOwner && alternateOwner.userId !== user.id) return c.json({ error: 'This email is already assigned to another user.' }, 409);
         await db.insert(userLoginEmails).values({ userId: user.id, email: normalizedRequestEmail }).onConflictDoNothing();
         await db.update(users).set({ residentId: targetResident!.id, linkStatus: 'admin_linked', updatedAt: new Date() }).where(eq(users.id, user.id));
-        outcomeToken = await createMagicLinkToken(db, normalizedRequestEmail);
+        outcomeToken = await createMagicLinkToken(db, normalizedRequestEmail, approvalLinkLifetimeMinutes);
     }
     await db.update(accessRequests).set({
-        status: body.status,
+        status: reviewStatus,
         reviewedByUserId: admin.id,
         reviewedAt: new Date(),
         notes: body.notes ?? null,
     }).where(eq(accessRequests.id, requestId));
     try {
-        await sendAccessRequestOutcomeEmail(c.env.EMAIL, normalizedRequestEmail, body.status, outcomeToken, new URL(c.req.url).origin);
+        await sendAccessRequestOutcomeEmail(c.env.EMAIL, normalizedRequestEmail, reviewStatus, outcomeToken, new URL(c.req.url).origin);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Access request outcome email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });

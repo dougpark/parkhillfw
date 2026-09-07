@@ -30,6 +30,7 @@ const router = createRouter({
         {
             path: '/admin/access-requests',
             name: 'admin-access-requests',
+            meta: { requiresAdmin: true },
             component: () => import('../views/AdminAccessRequestsView.vue'),
         },
         {
@@ -37,6 +38,12 @@ const router = createRouter({
             name: 'admin',
             meta: { requiresAdmin: true },
             component: () => import('../views/AdminView.vue'),
+        },
+        {
+            path: '/admin/users',
+            name: 'admin-users',
+            meta: { requiresAdmin: true },
+            component: () => import('../views/AdminUsersView.vue'),
         },
         {
             path: '/directory',

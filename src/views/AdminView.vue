@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { ClipboardList, FileText, FolderTree, Users } from 'lucide-vue-next';
 
+const router = useRouter();
 const selectedFeature = ref('Access requests');
 
 const features = [
@@ -9,7 +11,16 @@ const features = [
   { label: 'Directory', description: 'Edit households and residents.', icon: Users },
   { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText },
   { label: 'Menus', description: 'Organize navigation and folders.', icon: FolderTree },
+  { label: 'Users', description: 'Manage users and Login Emails.', icon: Users },
 ];
+
+function selectFeature(label: string) {
+  if (label === 'Users') {
+    router.push('/admin/users');
+    return;
+  }
+  selectedFeature.value = label;
+}
 </script>
 
 <template>
@@ -28,7 +39,7 @@ const features = [
           type="button"
           class="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition-colors"
           :class="selectedFeature === feature.label ? 'bg-white text-[#1a73e8] shadow-sm' : 'text-[#444746] hover:bg-white/70'"
-          @click="selectedFeature = feature.label"
+          @click="selectFeature(feature.label)"
         >
           <component :is="feature.icon" class="mt-0.5 h-5 w-5 shrink-0" />
           <span>

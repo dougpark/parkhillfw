@@ -36,6 +36,13 @@
       "when": 1788803515604,
       "tag": "0004_rainy_romulus",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788817592635,
+      "tag": "0005_lyrical_wrecking_crew",
+      "breakpoints": true
     }
   ]
 }

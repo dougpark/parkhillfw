@@ -10,6 +10,7 @@ import {
     magicTokens,
     residents,
     sessions,
+    userLoginEmails,
     users,
 } from './db/schema';
 import { createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
@@ -92,6 +93,11 @@ app.get('/api/auth/verify', async (c) => {
 
     const email = normalizeEmail(token.email);
     let user = await db.select().from(users).where(eq(users.email, email)).get();
+    if (!user) {
+        const alternate = await db.select({ userId: userLoginEmails.userId })
+            .from(userLoginEmails).where(eq(userLoginEmails.email, email)).get();
+        if (alternate) user = await db.select().from(users).where(eq(users.id, alternate.userId)).get();
+    }
     if (!user) {
         const matchedResident = await db.select().from(residents).where(eq(residents.email, email)).get();
         user = await db.insert(users).values({
@@ -267,6 +273,50 @@ app.get('/api/admin/residents', requireAuth(), requireAdmin(), async (c) => {
         ? data.filter((resident) => `${resident.firstName} ${resident.lastName} ${resident.email ?? ''}`.toLowerCase().includes(q))
         : data;
     return c.json(filtered);
+});
+
+app.get('/api/admin/users', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const [userRows, alternateRows] = await Promise.all([
+        db.select().from(users).all(),
+        db.select().from(userLoginEmails).all(),
+    ]);
+    return c.json(userRows.map((user) => ({
+        ...user,
+        alternateEmails: alternateRows.filter((item) => item.userId === user.id).map((item) => item.email),
+    })));
+});
+
+app.put('/api/admin/users/:userId/login-emails', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const userId = Number(c.req.param('userId'));
+    const body = await c.req.json<{ alternateEmails?: string[] }>();
+    if (!Number.isInteger(userId) || !Array.isArray(body.alternateEmails)) {
+        return c.json({ error: 'Invalid login email update.' }, 400);
+    }
+
+    const user = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).get();
+    if (!user) return c.json({ error: 'User not found.' }, 404);
+
+    const emails = [...new Set(body.alternateEmails.map(normalizeEmail).filter((email) => email && email.includes('@')))]
+        .filter((email) => email !== normalizeEmail(user.email));
+    const existing = await db.select().from(userLoginEmails).where(eq(userLoginEmails.userId, userId)).all();
+    const keep = new Set(emails);
+    for (const email of emails) {
+        const primaryOwner = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).get();
+        const alternateOwner = await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails)
+            .where(eq(userLoginEmails.email, email)).get();
+        if ((primaryOwner && primaryOwner.id !== userId) || (alternateOwner && alternateOwner.userId !== userId)) {
+            return c.json({ error: `Login email ${email} is already assigned to another user.` }, 409);
+        }
+    }
+    for (const item of existing) {
+        if (!keep.has(item.email)) await db.delete(userLoginEmails).where(eq(userLoginEmails.id, item.id));
+    }
+    for (const email of emails) {
+        await db.insert(userLoginEmails).values({ userId, email }).onConflictDoNothing();
+    }
+    return c.json({ alternateEmails: emails });
 });
 
 app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin(), async (c) => {

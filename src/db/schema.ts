@@ -112,6 +112,22 @@ export const users = sqliteTable(
     ]
 );
 
+export const userLoginEmails = sqliteTable(
+    'user_login_emails',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        userId: integer('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        email: text('email').notNull(),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        uniqueIndex('idx_user_login_emails_email_unique').on(table.email),
+        index('idx_user_login_emails_user').on(table.userId),
+    ]
+);
+
 export const householdFavorites = sqliteTable(
     'household_favorites',
     {

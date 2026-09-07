@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, like, or, type SQL } from 'drizzle-orm';
+import { and, asc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 import {
     accessRequests,
     children,
@@ -113,6 +113,19 @@ app.get('/api/auth/verify', async (c) => {
         }
     }
 
+    if (user.residentId) {
+        const canonicalUser = await db.select().from(users)
+            .where(eq(users.residentId, user.residentId))
+            .orderBy(asc(users.id)).get();
+        if (canonicalUser && canonicalUser.id !== user.id) {
+            if (email !== normalizeEmail(canonicalUser.email)) {
+                await db.insert(userLoginEmails).values({ userId: canonicalUser.id, email })
+                    .onConflictDoNothing();
+            }
+            user = canonicalUser;
+        }
+    }
+
     const { rawSession, expiresAt } = await createSession(db, user.id);
     const secure = new URL(c.req.url).protocol === 'https:';
     const response = c.json({ matched: Boolean(user.residentId), userId: user.id });
@@ -137,36 +150,43 @@ app.get('/api/auth/me', requireAuth(), async (c) => {
 
 app.get('/api/account/login-emails', requireAuth(), async (c) => {
     const db = drizzle(c.env.DB);
-    const user = c.get('user') as { id: number };
+    const user = c.get('user') as { id: number; residentId?: number | null };
+    const accountUsers = user.residentId
+        ? await db.select({ id: users.id }).from(users).where(eq(users.residentId, user.residentId)).all()
+        : [{ id: user.id }];
     const loginEmails = await db.select({ email: userLoginEmails.email })
-        .from(userLoginEmails).where(eq(userLoginEmails.userId, user.id)).all();
+        .from(userLoginEmails).where(inArray(userLoginEmails.userId, accountUsers.map((item) => item.id))).all();
     return c.json({ emails: loginEmails.map((item) => item.email) });
 });
 
 app.put('/api/account/login-emails', requireAuth(), async (c) => {
     const db = drizzle(c.env.DB);
-    const user = c.get('user') as { id: number; email: string };
+    const user = c.get('user') as { id: number; email: string; residentId?: number | null };
+    const canonicalUser = user.residentId
+        ? await db.select().from(users).where(eq(users.residentId, user.residentId)).orderBy(asc(users.id)).get()
+        : await db.select().from(users).where(eq(users.id, user.id)).get();
+    if (!canonicalUser) return c.json({ error: 'User account not found.' }, 404);
     const body = await c.req.json<{ emails?: string[] }>();
     if (!Array.isArray(body.emails)) return c.json({ error: 'Invalid Login Email update.' }, 400);
 
     const emails = [...new Set(body.emails.map(normalizeEmail).filter((email) => email && email.includes('@')))]
-        .filter((email) => email !== normalizeEmail(user.email));
+        .filter((email) => email !== normalizeEmail(canonicalUser.email));
     for (const email of emails) {
         const primaryOwner = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).get();
         const alternateOwner = await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails)
             .where(eq(userLoginEmails.email, email)).get();
-        if ((primaryOwner && primaryOwner.id !== user.id) || (alternateOwner && alternateOwner.userId !== user.id)) {
+        if ((primaryOwner && primaryOwner.id !== canonicalUser.id) || (alternateOwner && alternateOwner.userId !== canonicalUser.id)) {
             return c.json({ error: `Login Email ${email} is already assigned to another user.` }, 409);
         }
     }
 
-    const existing = await db.select().from(userLoginEmails).where(eq(userLoginEmails.userId, user.id)).all();
+    const existing = await db.select().from(userLoginEmails).where(eq(userLoginEmails.userId, canonicalUser.id)).all();
     const keep = new Set(emails);
     for (const item of existing) {
         if (!keep.has(item.email)) await db.delete(userLoginEmails).where(eq(userLoginEmails.id, item.id));
     }
     for (const email of emails) {
-        await db.insert(userLoginEmails).values({ userId: user.id, email }).onConflictDoNothing();
+        await db.insert(userLoginEmails).values({ userId: canonicalUser.id, email }).onConflictDoNothing();
     }
     return c.json({ emails });
 });

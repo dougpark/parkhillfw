@@ -35,16 +35,23 @@ const router = createRouter({
             name: 'directory',
             component: () => import('../views/DirectoryView.vue'),
         },
+        {
+            path: '/directory/edit',
+            name: 'directory-edit',
+            meta: { requiresDirectory: true },
+            component: () => import('../views/DirectoryEditView.vue'),
+        },
     ],
 });
 
 router.beforeEach(async (to) => {
-    if (!to.meta.requiresAdmin) return true;
+    if (!to.meta.requiresAdmin && !to.meta.requiresDirectory) return true;
 
     try {
         const response = await fetch('/api/auth/me');
         if (!response.ok) return '/login';
         const data = await response.json() as {
+            matched?: boolean;
             user?: {
                 isOwner?: boolean;
                 isAdmin?: boolean;
@@ -52,6 +59,8 @@ router.beforeEach(async (to) => {
                 isDirectoryEditor?: boolean;
             };
         };
+        if (to.meta.requiresDirectory && !data.matched) return '/access-request';
+        if (to.meta.requiresDirectory) return true;
         const user = data.user;
         const authorized = Boolean(user?.isOwner || user?.isAdmin || user?.isPageEditor || user?.isDirectoryEditor);
         return authorized ? true : '/directory';

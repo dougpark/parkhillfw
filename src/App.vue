@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { LogIn, ShieldCheck } from 'lucide-vue-next';
+import { LogIn, Pencil, ShieldCheck } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
 interface AuthUser {
@@ -9,6 +9,7 @@ interface AuthUser {
   isAdmin?: boolean;
   isPageEditor?: boolean;
   isDirectoryEditor?: boolean;
+  matched?: boolean;
 }
 
 const user = ref<AuthUser | null>(null);
@@ -22,8 +23,8 @@ async function loadAuthUser() {
   try {
     const response = await fetch('/api/auth/me');
     if (!response.ok) return;
-    const data = await response.json() as { user: AuthUser };
-    user.value = data.user;
+    const data = await response.json() as { user: AuthUser; matched: boolean };
+    user.value = { ...data.user, matched: data.matched };
   } catch {
     user.value = null;
   }
@@ -43,6 +44,15 @@ watch(() => route.fullPath, loadAuthUser);
         <div class="flex items-center gap-2">
           <template v-if="user">
             <span class="max-w-32 truncate text-xs font-medium text-[#444746] sm:max-w-none sm:text-sm">{{ user.displayName }}</span>
+            <RouterLink
+              v-if="user.matched"
+              to="/directory/edit"
+              class="rounded-full p-2 text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+              aria-label="Edit directory"
+              title="Edit directory"
+            >
+              <Pencil class="h-4 w-4" />
+            </RouterLink>
             <RouterLink
               v-if="canAdmin(user)"
               to="/admin"

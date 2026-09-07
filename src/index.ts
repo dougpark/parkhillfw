@@ -156,6 +156,104 @@ app.post('/api/access-requests', requireAuth(), async (c) => {
     return c.json({ status: 'pending' });
 });
 
+app.get('/api/my-directory', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { email: string; residentId?: number | null; householdId?: number };
+    const resident = user.residentId
+        ? await db.select().from(residents).where(eq(residents.id, user.residentId)).get()
+        : user.householdId
+            ? await db.select().from(residents).where(eq(residents.householdId, user.householdId)).get()
+            : await db.select().from(residents).where(eq(residents.email, user.email)).get();
+    if (!resident) return c.json({ error: 'Your account is not linked to a directory household.' }, 403);
+
+    const household = await db.select().from(households).where(eq(households.id, resident.householdId)).get();
+    if (!household) return c.json({ error: 'Directory household not found.' }, 404);
+    const [householdResidents, householdChildren] = await Promise.all([
+        db.select().from(residents).where(eq(residents.householdId, household.id)).all(),
+        db.select().from(children).where(eq(children.householdId, household.id)).all(),
+    ]);
+    return c.json({ household, residents: householdResidents, children: householdChildren });
+});
+
+app.put('/api/my-directory', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { email: string; residentId?: number | null; householdId?: number };
+    const linkedResident = user.residentId
+        ? await db.select().from(residents).where(eq(residents.id, user.residentId)).get()
+        : user.householdId
+            ? await db.select().from(residents).where(eq(residents.householdId, user.householdId)).get()
+            : await db.select().from(residents).where(eq(residents.email, user.email)).get();
+    if (!linkedResident) return c.json({ error: 'Your account is not linked to a directory household.' }, 403);
+
+    const body = await c.req.json<{
+        household?: { streetAddress?: string; yearMovedIn?: number | null; parkHillMember?: string | null; securityMember?: boolean; pets?: string | null; notes?: string | null };
+        residents?: Array<{ id?: number; firstName: string; lastName: string; isPrimaryContact?: boolean; email?: string | null; phoneMobile?: string | null; phoneHome?: string | null; phoneWork?: string | null; occupation?: string | null }>;
+        children?: Array<{ id?: number; name: string; birthYear?: number | null; school?: string | null; occupation?: string | null; residenceLocation?: string | null; babysitting?: boolean; petSitting?: boolean; specialSkills?: string | null }>;
+    }>();
+    const householdId = linkedResident.householdId;
+    const household = body.household;
+    if (!household?.streetAddress?.trim()) return c.json({ error: 'Street address is required.' }, 400);
+
+    const currentResidents = await db.select({ id: residents.id }).from(residents).where(eq(residents.householdId, householdId)).all();
+    const residentIds = new Set(currentResidents.map((item) => item.id));
+    const submittedResidentIds = (body.residents ?? []).filter((item) => item.id !== undefined).map((item) => item.id as number);
+    if (!submittedResidentIds.includes(linkedResident.id)) return c.json({ error: 'Your own resident record must remain in the household.' }, 400);
+    if (submittedResidentIds.some((id) => !residentIds.has(id))) return c.json({ error: 'Invalid household resident.' }, 400);
+
+    const currentChildren = await db.select({ id: children.id }).from(children).where(eq(children.householdId, householdId)).all();
+    const childIds = new Set(currentChildren.map((item) => item.id));
+    const submittedChildIds = (body.children ?? []).filter((item) => item.id !== undefined).map((item) => item.id as number);
+    if (submittedChildIds.some((id) => !childIds.has(id))) return c.json({ error: 'Invalid household child.' }, 400);
+
+    await db.update(households).set({
+        streetAddress: household.streetAddress.trim(),
+        yearMovedIn: household.yearMovedIn ?? null,
+        parkHillMember: household.parkHillMember?.trim() || null,
+        securityMember: Boolean(household.securityMember),
+        pets: household.pets?.trim() || null,
+        notes: household.notes?.trim() || null,
+        updatedAt: new Date(),
+    }).where(eq(households.id, householdId));
+
+    for (const item of body.residents ?? []) {
+        const values = {
+            firstName: item.firstName.trim(),
+            lastName: item.lastName.trim(),
+            isPrimaryContact: Boolean(item.isPrimaryContact),
+            email: item.email?.trim() || null,
+            phoneMobile: item.phoneMobile?.trim() || null,
+            phoneHome: item.phoneHome?.trim() || null,
+            phoneWork: item.phoneWork?.trim() || null,
+            occupation: item.occupation?.trim() || null,
+        };
+        if (item.id) await db.update(residents).set(values).where(eq(residents.id, item.id));
+        else await db.insert(residents).values({ ...values, householdId });
+    }
+    for (const id of currentResidents.map((item) => item.id).filter((id) => !submittedResidentIds.includes(id))) {
+        await db.delete(residents).where(eq(residents.id, id));
+    }
+
+    for (const item of body.children ?? []) {
+        const values = {
+            name: item.name.trim(),
+            birthYear: item.birthYear ?? null,
+            school: item.school?.trim() || null,
+            occupation: item.occupation?.trim() || null,
+            residenceLocation: item.residenceLocation?.trim() || null,
+            babysitting: Boolean(item.babysitting),
+            petSitting: Boolean(item.petSitting),
+            specialSkills: item.specialSkills?.trim() || null,
+        };
+        if (item.id) await db.update(children).set(values).where(eq(children.id, item.id));
+        else await db.insert(children).values({ ...values, householdId });
+    }
+    for (const id of currentChildren.map((item) => item.id).filter((id) => !submittedChildIds.includes(id))) {
+        await db.delete(children).where(eq(children.id, id));
+    }
+
+    return c.json({ saved: true });
+});
+
 app.get('/api/admin/access-requests', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
     return c.json(await db.select().from(accessRequests).orderBy(accessRequests.createdAt).all());

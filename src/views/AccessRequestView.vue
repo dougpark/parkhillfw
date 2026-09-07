@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
 const fullName = ref('');
 const streetAddress = ref('');
 const isSubmitting = ref(false);
 const submitted = ref(false);
 const error = ref('');
+
+async function switchAccount() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  await router.push({ path: '/login', query: { switch: '1' } });
+}
 
 async function submitRequest() {
   isSubmitting.value = true;
@@ -50,6 +58,7 @@ async function submitRequest() {
       <template v-else>
         <h2 class="text-2xl font-semibold tracking-tight">Request submitted</h2>
         <p class="mt-3 text-[#444746]">Your account is being reviewed. An administrator will review your name and address and connect your account to the directory if they can verify your household.</p>
+        <button type="button" class="mt-6 rounded-full border border-[#1a73e8] px-6 py-3 font-medium text-[#1a73e8] hover:bg-[#e8f0fe]" @click="switchAccount">Use a different email</button>
       </template>
     </div>
   </section>

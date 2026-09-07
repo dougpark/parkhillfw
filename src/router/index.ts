@@ -59,7 +59,7 @@ router.beforeEach(async (to) => {
     try {
         const response = await fetch('/api/auth/me');
         if (to.meta.guestOnly) {
-            if (!response.ok) return true;
+            if (to.query.switch === '1' || !response.ok) return true;
             const data = await response.json() as { matched?: boolean };
             return data.matched ? '/directory' : '/access-request';
         }

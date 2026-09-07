@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Home, LogIn } from 'lucide-vue-next';
-import { useRoute } from 'vue-router';
+import { Home, LogIn, LogOut } from 'lucide-vue-next';
+import { useRoute, useRouter } from 'vue-router';
 
 interface AuthUser {
   displayName: string;
@@ -10,6 +10,13 @@ interface AuthUser {
 
 const user = ref<AuthUser | null>(null);
 const route = useRoute();
+const router = useRouter();
+
+async function switchAccount() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  user.value = null;
+  await router.push({ path: '/login', query: { switch: '1' } });
+}
 async function loadAuthUser() {
   try {
     const response = await fetch('/api/auth/me');
@@ -39,6 +46,15 @@ watch(() => route.fullPath, loadAuthUser);
         <div class="flex items-center gap-2">
           <template v-if="user">
             <span class="max-w-32 truncate text-xs font-medium text-[#444746] sm:max-w-none sm:text-sm">{{ user.displayName }}</span>
+            <button
+              type="button"
+              class="rounded-full p-2 text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+              aria-label="Switch account"
+              title="Switch account"
+              @click="switchAccount"
+            >
+              <LogOut class="h-4 w-4" />
+            </button>
             <RouterLink
               v-if="user.matched"
               to="/home"

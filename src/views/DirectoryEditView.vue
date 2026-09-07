@@ -98,9 +98,7 @@ onMounted(loadDirectory);
   <section class="space-y-6">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <RouterLink to="/directory" class="inline-flex items-center gap-1 text-sm font-medium text-[#1a73e8]">
-          <ArrowLeft class="h-4 w-4" /> Back to directory
-        </RouterLink>
+        
         <h2 class="mt-3 text-2xl font-semibold tracking-tight">Edit household information</h2>
         <p class="mt-2 text-[#444746]">Update information for your household and everyone who lives there.</p>
       </div>

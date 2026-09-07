@@ -48,7 +48,6 @@ onMounted(async () => {
 <template>
   <section class="space-y-8 py-4 sm:py-8">
     <div>
-      <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Park Hill Neighborhood</p>
       <h2 class="mt-2 text-3xl font-semibold tracking-tight text-[#1f1f1f]">Welcome home</h2>
       <p class="mt-2 max-w-xl text-[#444746]">Find neighborhood information and keep your household details current.</p>
     </div>

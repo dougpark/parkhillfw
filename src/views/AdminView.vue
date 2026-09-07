@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { ClipboardList, FileText, FolderTree, Users } from 'lucide-vue-next';
+import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 
-const router = useRouter();
 const selectedFeature = ref('Access requests');
 
 const features = [
@@ -15,14 +14,6 @@ const features = [
 ];
 
 function selectFeature(label: string) {
-  if (label === 'Access requests') {
-    router.push('/admin/access-requests');
-    return;
-  }
-  if (label === 'Users') {
-    router.push('/admin/users');
-    return;
-  }
   selectedFeature.value = label;
 }
 </script>
@@ -53,7 +44,10 @@ function selectFeature(label: string) {
         </button>
       </nav>
 
-      <div class="p-6 sm:p-8">
+      <div v-if="selectedFeature === 'Access requests'" class="p-6 sm:p-8">
+        <AdminAccessRequestsView />
+      </div>
+      <div v-else class="p-6 sm:p-8">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h3 class="text-xl font-semibold">{{ selectedFeature }}</h3>

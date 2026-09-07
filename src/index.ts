@@ -135,6 +135,42 @@ app.get('/api/auth/me', requireAuth(), async (c) => {
     });
 });
 
+app.get('/api/account/login-emails', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { id: number };
+    const loginEmails = await db.select({ email: userLoginEmails.email })
+        .from(userLoginEmails).where(eq(userLoginEmails.userId, user.id)).all();
+    return c.json({ emails: loginEmails.map((item) => item.email) });
+});
+
+app.put('/api/account/login-emails', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { id: number; email: string };
+    const body = await c.req.json<{ emails?: string[] }>();
+    if (!Array.isArray(body.emails)) return c.json({ error: 'Invalid Login Email update.' }, 400);
+
+    const emails = [...new Set(body.emails.map(normalizeEmail).filter((email) => email && email.includes('@')))]
+        .filter((email) => email !== normalizeEmail(user.email));
+    for (const email of emails) {
+        const primaryOwner = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).get();
+        const alternateOwner = await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails)
+            .where(eq(userLoginEmails.email, email)).get();
+        if ((primaryOwner && primaryOwner.id !== user.id) || (alternateOwner && alternateOwner.userId !== user.id)) {
+            return c.json({ error: `Login Email ${email} is already assigned to another user.` }, 409);
+        }
+    }
+
+    const existing = await db.select().from(userLoginEmails).where(eq(userLoginEmails.userId, user.id)).all();
+    const keep = new Set(emails);
+    for (const item of existing) {
+        if (!keep.has(item.email)) await db.delete(userLoginEmails).where(eq(userLoginEmails.id, item.id));
+    }
+    for (const email of emails) {
+        await db.insert(userLoginEmails).values({ userId: user.id, email }).onConflictDoNothing();
+    }
+    return c.json({ emails });
+});
+
 app.post('/api/auth/logout', async (c) => {
     const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
     if (rawSession) {

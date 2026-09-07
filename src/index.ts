@@ -14,7 +14,7 @@ import {
     users,
 } from './db/schema';
 import { createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
-import { sendMagicLinkEmail } from './lib/email';
+import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
 import { getCookie, requireAdmin, requireAuth, requireDirectory } from './middleware/auth';
 
 type Bindings = {
@@ -301,6 +301,13 @@ app.get('/api/admin/access-requests', requireAuth(), requireAdmin(), async (c) =
     return c.json(await db.select().from(accessRequests).orderBy(accessRequests.createdAt).all());
 });
 
+app.get('/api/admin/access-requests/count', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const pending = await db.select({ id: accessRequests.id }).from(accessRequests)
+        .where(eq(accessRequests.status, 'pending')).all();
+    return c.json({ count: pending.length });
+});
+
 app.get('/api/admin/residents', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim().toLowerCase();
@@ -309,6 +316,30 @@ app.get('/api/admin/residents', requireAuth(), requireAdmin(), async (c) => {
         ? data.filter((resident) => `${resident.firstName} ${resident.lastName} ${resident.email ?? ''}`.toLowerCase().includes(q))
         : data;
     return c.json(filtered);
+});
+
+app.get('/api/admin/directory', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const q = c.req.query('q')?.trim();
+    const householdsQuery = q
+        ? db.select({ id: households.id, streetAddress: households.streetAddress })
+            .from(households)
+            .leftJoin(residents, eq(residents.householdId, households.id))
+            .where(or(
+                like(households.streetAddress, `%${q}%`),
+                like(residents.firstName, `%${q}%`),
+                like(residents.lastName, `%${q}%`),
+                like(residents.email, `%${q}%`),
+            )).all()
+        : db.select({ id: households.id, streetAddress: households.streetAddress }).from(households).all();
+    const matches = await householdsQuery;
+    const uniqueMatches = [...new Map(matches.map((item) => [item.id, item])).values()];
+    const results = await Promise.all(uniqueMatches.map(async (household) => ({
+        ...household,
+        residents: await db.select({ id: residents.id, firstName: residents.firstName, lastName: residents.lastName, email: residents.email })
+            .from(residents).where(eq(residents.householdId, household.id)).all(),
+    })));
+    return c.json(results);
 });
 
 app.get('/api/admin/users', requireAuth(), requireAdmin(), async (c) => {
@@ -370,8 +401,22 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
     const request = await db.select().from(accessRequests).where(eq(accessRequests.id, requestId)).get();
     if (!request) return c.json({ error: 'Access request not found.' }, 404);
 
+    const normalizedRequestEmail = normalizeEmail(request.email);
+    const targetResident = body.residentId
+        ? await db.select({ id: residents.id, householdId: residents.householdId }).from(residents).where(eq(residents.id, body.residentId)).get()
+        : null;
+    if (body.status === 'approved' && !targetResident) return c.json({ error: 'Selected directory resident was not found.' }, 400);
+
+    let outcomeToken: string | null = null;
     if (body.status === 'approved') {
-        await db.update(users).set({ residentId: body.residentId, linkStatus: 'admin_linked', updatedAt: new Date() }).where(eq(users.email, request.email));
+        const user = await db.select().from(users).where(eq(users.email, normalizedRequestEmail)).get();
+        if (!user) return c.json({ error: 'The requester account was not found.' }, 404);
+        const alternateOwner = await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails)
+            .where(eq(userLoginEmails.email, normalizedRequestEmail)).get();
+        if (alternateOwner && alternateOwner.userId !== user.id) return c.json({ error: 'This email is already assigned to another user.' }, 409);
+        await db.insert(userLoginEmails).values({ userId: user.id, email: normalizedRequestEmail }).onConflictDoNothing();
+        await db.update(users).set({ residentId: targetResident!.id, linkStatus: 'admin_linked', updatedAt: new Date() }).where(eq(users.id, user.id));
+        outcomeToken = await createMagicLinkToken(db, normalizedRequestEmail);
     }
     await db.update(accessRequests).set({
         status: body.status,
@@ -379,7 +424,14 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
         reviewedAt: new Date(),
         notes: body.notes ?? null,
     }).where(eq(accessRequests.id, requestId));
-    return c.json({ success: true });
+    try {
+        await sendAccessRequestOutcomeEmail(c.env.EMAIL, normalizedRequestEmail, body.status, outcomeToken, new URL(c.req.url).origin);
+    } catch (error) {
+        const emailError = error as { code?: string; message?: string };
+        console.error('Access request outcome email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });
+        return c.json({ success: true, emailSent: false, warning: 'The request was updated, but the outcome email could not be sent.' });
+    }
+    return c.json({ success: true, emailSent: true });
 });
 
 app.post('/api/households/:householdId/favorite', requireAuth(), requireDirectory(), async (c) => {

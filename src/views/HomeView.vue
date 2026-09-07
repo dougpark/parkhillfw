@@ -10,6 +10,7 @@ interface AuthUser {
 }
 
 const user = ref<AuthUser | null>(null);
+const pendingRequests = ref(0);
 
 const baseCards = [
   {
@@ -38,6 +39,13 @@ onMounted(async () => {
     if (response.ok) {
       const data = await response.json() as { user: AuthUser };
       user.value = data.user;
+      if (canAdmin(data.user)) {
+        const countResponse = await fetch('/api/admin/access-requests/count');
+        if (countResponse.ok) {
+          const countData = await countResponse.json() as { count: number };
+          pendingRequests.value = countData.count;
+        }
+      }
     }
   } catch {
     user.value = null;
@@ -63,7 +71,10 @@ onMounted(async () => {
             <ShieldCheck class="h-6 w-6" />
           </div>
           <div>
-            <h3 class="text-xl font-semibold text-[#1f1f1f]">Admin</h3>
+            <div class="flex items-center gap-2">
+              <h3 class="text-xl font-semibold text-[#1f1f1f]">Admin</h3>
+              <span v-if="pendingRequests" class="rounded-full bg-[#fff8e1] px-2 py-0.5 text-xs font-semibold text-[#8a6116]">{{ pendingRequests }} review{{ pendingRequests === 1 ? '' : 's' }}</span>
+            </div>
             <p class="mt-1 text-[#444746]">Manage neighborhood content and access</p>
           </div>
         </div>

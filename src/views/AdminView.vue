@@ -15,6 +15,10 @@ const features = [
 ];
 
 function selectFeature(label: string) {
+  if (label === 'Access requests') {
+    router.push('/admin/access-requests');
+    return;
+  }
   if (label === 'Users') {
     router.push('/admin/users');
     return;
@@ -31,7 +35,7 @@ function selectFeature(label: string) {
       <p class="mt-2 text-[#444746]">Choose an area to manage from the list.</p>
     </div>
 
-    <div class="grid min-h-[28rem] overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm md:grid-cols-[16rem_1fr]">
+    <div class="grid min-h-112 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm md:grid-cols-[16rem_1fr]">
       <nav class="border-b border-[#e1e3e1] bg-[#f0f4f9] p-3 md:border-b-0 md:border-r" aria-label="Admin features">
         <button
           v-for="feature in features"

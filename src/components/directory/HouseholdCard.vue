@@ -108,7 +108,8 @@ defineProps<{
             <span v-if="resident.isPrimaryContact" class="text-[#1a73e8]">· Primary</span>
           </p>
           <p class="text-[#444746]">{{ resident.email ?? 'N/A' }}</p>
-          <p class="text-[#444746]">{{ resident.phoneMobile ?? 'N/A' }}</p>
+          <p class="text-[#444746]">M: {{ resident.phoneMobile ?? 'N/A' }}</p>
+          <p class="text-[#444746]">H: {{ resident.phoneHome ?? 'N/A' }}</p>
           <p class="text-[#444746]">{{ resident.occupation ?? 'N/A' }}</p>
         </li>
       </ul>

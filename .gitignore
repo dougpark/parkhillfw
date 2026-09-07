@@ -1,6 +1,10 @@
 # Test Data
 directory-export.md
 directory-import.csv
+seed.sql
+# Ignore contents of data directory except .gitkeep
+data/*
+!data/.gitkeep
 
 # Dependencies
 node_modules/

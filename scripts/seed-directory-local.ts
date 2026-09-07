@@ -24,6 +24,13 @@ function cleanString(val: string | undefined): string | null {
 export async function seedDirectory(db: ReturnType<typeof drizzle>, csvFilePath: string) {
     const fileContent = readFileSync(csvFilePath, 'utf-8');
 
+    console.log('Clearing existing directory tables...');
+
+    // Wipe dependent tables first to prevent FK constraint violations
+    await db.delete(children);
+    await db.delete(residents);
+    await db.delete(households);
+
     const rawRecords: string[][] = parse(fileContent, {
         skip_empty_lines: true,
         relax_column_count: true,

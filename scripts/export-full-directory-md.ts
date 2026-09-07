@@ -79,7 +79,7 @@ async function main() {
         }
     }
 
-    const outputPath = './directory-export.md';
+    const outputPath = './data/directory-export.md';
     writeFileSync(outputPath, lines.join('\n'), 'utf-8');
     console.log(`Successfully exported directory to ${outputPath}`);
     process.exit(0);

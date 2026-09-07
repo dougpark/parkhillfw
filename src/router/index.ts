@@ -3,7 +3,13 @@ import { createRouter, createWebHistory } from 'vue-router';
 const router = createRouter({
     history: createWebHistory(),
     routes: [
-        { path: '/', redirect: '/login' },
+        { path: '/', redirect: '/home' },
+        {
+            path: '/home',
+            name: 'home',
+            meta: { requiresAuth: true },
+            component: () => import('../views/HomeView.vue'),
+        },
         {
             path: '/login',
             name: 'login',
@@ -46,7 +52,7 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
-    if (!to.meta.requiresAdmin && !to.meta.requiresDirectory && !to.meta.guestOnly) return true;
+    if (!to.meta.requiresAdmin && !to.meta.requiresDirectory && !to.meta.requiresAuth && !to.meta.guestOnly) return true;
 
     try {
         const response = await fetch('/api/auth/me');
@@ -56,6 +62,7 @@ router.beforeEach(async (to) => {
             return data.matched ? '/directory' : '/access-request';
         }
         if (!response.ok) return '/login';
+        if (to.meta.requiresAuth) return true;
         const data = await response.json() as {
             matched?: boolean;
             user?: {

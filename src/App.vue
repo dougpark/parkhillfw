@@ -40,7 +40,7 @@ watch(() => route.fullPath, loadAuthUser);
     <header class="sticky top-0 z-20 bg-white border-b border-[#e1e3e1]">
       <div class="max-w-5xl mx-auto flex items-center justify-between px-4 py-3 sm:px-8">
         <RouterLink
-          to="/directory"
+          to="/home"
           class="text-lg sm:text-xl font-semibold tracking-tight text-[#1a73e8]"
           aria-label="Go to directory"
         >
@@ -59,13 +59,21 @@ watch(() => route.fullPath, loadAuthUser);
               <Pencil class="h-4 w-4" />
             </RouterLink>
             <RouterLink
-              v-if="canAdmin(user)"
-              :to="isAdminView() ? '/directory' : '/admin'"
+              to="/home"
+              class="inline-flex items-center gap-1.5 rounded-full border border-[#1a73e8] px-3 py-1.5 text-sm font-medium text-[#1a73e8] transition-colors hover:bg-[#e8f0fe]"
+              aria-label="Home"
+              title="Home"
+            >
+              <Home class="h-4 w-4" />
+              <span>Home</span>
+            </RouterLink>
+            <RouterLink
+              v-if="canAdmin(user) && !isAdminView()"
+              to="/admin"
               class="inline-flex items-center gap-1.5 rounded-full bg-[#1a73e8] px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
               <ShieldCheck v-if="!isAdminView()" class="h-4 w-4" />
-              <Home v-else class="h-4 w-4" />
-              <span>{{ isAdminView() ? 'Home' : 'Admin' }}</span>
+              <span>Admin</span>
             </RouterLink>
           </template>
           <RouterLink

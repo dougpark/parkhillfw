@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import FilterChip from '@/components/ui/FilterChip.vue';
 import HouseholdCard from '@/components/directory/HouseholdCard.vue';
 
 interface Resident {
@@ -112,19 +113,10 @@ onMounted(loadDirectory);
         placeholder="Search residents, addresses, children..."
         @clear="clearCriteria"
       />
-      <div class="mt-3 flex flex-wrap gap-4 text-sm text-[#444746]">
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <input v-model="petSitting" type="checkbox" class="h-4 w-4 accent-[#1a73e8]" />
-          Pet Sitter
-        </label>
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <input v-model="babysitting" type="checkbox" class="h-4 w-4 accent-[#1a73e8]" />
-          Babysitter
-        </label>
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <input v-model="favoritesOnly" type="checkbox" class="h-4 w-4 accent-[#1a73e8]" />
-          Favorites
-        </label>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <FilterChip v-model="petSitting">Pet Sitter</FilterChip>
+        <FilterChip v-model="babysitting">Babysitter</FilterChip>
+        <FilterChip v-model="favoritesOnly">Favorites</FilterChip>
       </div>
     </div>
 

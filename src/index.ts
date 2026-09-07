@@ -255,6 +255,12 @@ app.put('/api/my-directory', requireAuth(), async (c) => {
     const householdId = linkedResident.householdId;
     const household = body.household;
     if (!household?.streetAddress?.trim()) return c.json({ error: 'Street address is required.' }, 400);
+    const currentHousehold = await db.select({ streetAddress: households.streetAddress })
+        .from(households).where(eq(households.id, householdId)).get();
+    if (!currentHousehold) return c.json({ error: 'Directory household not found.' }, 404);
+    if (household.streetAddress.trim() !== currentHousehold.streetAddress) {
+        return c.json({ error: 'Only an administrator can change the street address.' }, 403);
+    }
 
     const currentResidents = await db.select({ id: residents.id }).from(residents).where(eq(residents.householdId, householdId)).all();
     const residentIds = new Set(currentResidents.map((item) => item.id));
@@ -268,7 +274,7 @@ app.put('/api/my-directory', requireAuth(), async (c) => {
     if (submittedChildIds.some((id) => !childIds.has(id))) return c.json({ error: 'Invalid household child.' }, 400);
 
     await db.update(households).set({
-        streetAddress: household.streetAddress.trim(),
+        streetAddress: currentHousehold.streetAddress,
         yearMovedIn: household.yearMovedIn ?? null,
         parkHillMember: household.parkHillMember?.trim() || null,
         securityMember: Boolean(household.securityMember),

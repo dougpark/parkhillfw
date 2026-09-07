@@ -124,7 +124,8 @@ onMounted(loadDirectory);
       <section class="rounded-3xl border border-[#e1e3e1] bg-white p-5 shadow-sm sm:p-6">
         <h3 class="text-lg font-semibold">Household</h3>
         <div class="mt-5 grid gap-4 sm:grid-cols-2">
-          <label class="text-sm font-medium sm:col-span-2">Street address<input v-model="household.streetAddress" required :class="inputClass" /></label>
+          <label class="text-sm font-medium sm:col-span-2">Street address<input :value="household.streetAddress" readonly :class="`${inputClass} cursor-not-allowed bg-[#f0f4f9]`" /></label>
+          <p class="text-xs text-[#444746] sm:col-span-2">Address corrections must be made by an administrator.</p>
           <label class="text-sm font-medium">Year moved in<input v-model.number="household.yearMovedIn" type="number" min="1800" max="2200" :class="inputClass" /></label>
           <label class="text-sm font-medium">Park Hill membership<input v-model="household.parkHillMember" :class="inputClass" placeholder="e.g. PARK HILL REGULAR" /></label>
           <label class="flex items-center gap-3 text-sm font-medium sm:col-span-2"><input v-model="household.securityMember" type="checkbox" class="h-5 w-5 accent-[#1a73e8]" /> Security member</label>

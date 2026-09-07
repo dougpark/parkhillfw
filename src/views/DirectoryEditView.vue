@@ -37,6 +37,9 @@ interface Household {
 }
 
 const router = useRouter();
+const props = defineProps<{
+  adminHouseholdId?: number;
+}>();
 const household = ref<Household>({ streetAddress: '', yearMovedIn: null, parkHillMember: null, securityMember: false, pets: null, notes: null });
 const residents = ref<Resident[]>([]);
 const children = ref<Child[]>([]);
@@ -49,8 +52,11 @@ const inputClass = 'mt-1 w-full rounded-xl border border-[#e1e3e1] bg-white px-3
 
 async function loadDirectory() {
   try {
-    const response = await fetch('/api/my-directory');
-    const data = await response.json();
+    const endpoint = props.adminHouseholdId
+      ? `/api/admin/households/${props.adminHouseholdId}`
+      : '/api/my-directory';
+    const response = await fetch(endpoint);
+    const data = await response.json() as { error?: string; household: Household; residents: Resident[]; children: Child[] };
     if (!response.ok) throw new Error(data.error ?? 'Unable to load your directory information.');
     household.value = data.household;
     residents.value = data.residents;
@@ -67,12 +73,15 @@ async function saveDirectory() {
   saved.value = false;
   error.value = '';
   try {
-    const response = await fetch('/api/my-directory', {
+    const endpoint = props.adminHouseholdId
+      ? `/api/admin/households/${props.adminHouseholdId}`
+      : '/api/my-directory';
+    const response = await fetch(endpoint, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ household: household.value, residents: residents.value, children: children.value }),
     });
-    const data = await response.json();
+    const data = await response.json() as { error?: string };
     if (!response.ok) throw new Error(data.error ?? 'Unable to save your directory information.');
     saved.value = true;
     await loadDirectory();

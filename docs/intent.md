@@ -1,4 +1,6 @@
-Summary
+# intent.md
+
+## Summary
 - Mobile First with desktop support
 - Neighborhood directory and information site
 - manage directory
@@ -11,37 +13,39 @@ Summary
 - show menus
 - show info-messages
 
-Modes: User vs Admin
+## Modes: User vs Admin
 - for authorized editors and admins show Admin menu option in top right
 - admin page is two column with left column showing admin features they are authorized for
 - right column is details editor for the selected admin feature
 
-Users
+## Users
 - email magic links
 - long term 400 day browser token
 - send email through Amazon SES
 - flags - owner, admin, directory-editor, page-editor
 - homeowner match to their directory entry by email / default to same email, can override to a directory email on user table
 
-Email subsystem
+## Email subsystem
 - use Amazon SES
 - send magic link emails for login
 
-Directory
-- import from existing json files
+## Directory
+- import from existing json files - done
 - format for list
 - format for individual view
 - full text search
 
-Pages
+## Pages
 - markdown with attachments
 - full markdown editor page with preview overlay
 - full drag and drop images and attachments
 - full copy and paste images
 - page can be marked for showing on homepage
 - Public flag can show to non-authorized users
+- Draft Publish flag to hide unfinished pages, defaults to Draft
 
-Info-Messages
+
+## Info-Messages
 - short md  message to show at top in info box on homepage
 - flagged priority shows at top of all pages
 - start date 
@@ -50,30 +54,30 @@ Info-Messages
 - select image from drive
 - select from small icon pallet
 
-Homepage
+## Homepage
 - shows info messages
 - show security phone number
 - shows cards for highlighted pages
 - non-authorized users see only public flagged pages and menus
 
-Menus
+## Menus
 - Folders contain other folders and pages
 - pages show markdown previews
 - public flag can show to non-authorized users
 
-Documents
+## Documents
 - Drive type listing of all images and documents
 - copy md link so can paste into page editor
 - thumbnail previews
 
-Authorization Levels
+## Authorization Levels
 - Owner - site owner and can edit everything, multiple owners, can assign new owners
 - Admin - full site admin, can edit everything, can assign new admins
 - Page-Editor - can only edit all pages, info-messages and menus
 - Directory-Editor - can only edit all directory entries
 - User - no admin features only see the generated output
 
-Tech Stack
+## Tech Stack
 - Bun
 - Hono
 - Vue
@@ -82,10 +86,10 @@ Tech Stack
 - D1
 - R2
 - Amazon SES for magic link emails
-- markdown editor/ preview generator
+- markdown editor/ preview generator codemirror@6.0.2
 
 
-Explicit Data Schema & Relationships
+## Explicit Data Schema & Relationships
 •	User ‭$\leftrightarrow$‬ Directory Mapping:
 •	FK Link: users.resident_id (Nullable Foreign Key to residents.id ON DELETE SET NULL).
 •	Link Resolution: On login, if resident_id is null, attempt auto-linking where users.email === residents.email. Set link_status to 'auto_matched'.

@@ -16,11 +16,11 @@ export async function sendMagicLinkEmail(email: EmailBinding, toEmail: string, t
 
     await email.send({
         to: toEmail,
-        from: 'auth@parkhillfw.org',
+        from: '"Park Hill FW" <auth@parkhillfw.org>',
         subject: 'Your Park Hill Directory sign-in link',
         html,
         text,
-        replyTo: 'parkdn@gmail.com',
+        replyTo: '"Doug Park" <parkdn@gmail.com>',
     });
 }
 
@@ -43,10 +43,10 @@ export async function sendAccessRequestOutcomeEmail(
 
     await email.send({
         to: toEmail,
-        from: 'auth@parkhillfw.org',
+        from: '"Park Hill FW" <auth@parkhillfw.org>',
         subject,
         html,
         text,
-        replyTo: 'parkdn@gmail.com',
+        replyTo: '"Doug Park" <parkdn@gmail.com>',
     });
 }

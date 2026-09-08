@@ -48,6 +48,15 @@ function formatDate(value: string | null): string {
     return value ? new Date(value).toLocaleString() : '—';
 }
 
+function cleanSlug(): void {
+    const cleaned = slug.value
+        .toLowerCase()
+        .replace(/[^a-z0-9\s_-]+/g, '')
+        .replace(/[\s_]+/g, '-')
+        .replace(/-{2,}/g, '-');
+    if (cleaned !== slug.value) slug.value = cleaned;
+}
+
 function markDirty(): void {
     dirty.value = true;
     emit('dirty', true);
@@ -279,7 +288,7 @@ onBeforeUnmount(() => {
         placeholder="slug"
         spellcheck="false"
         class="w-40 rounded-xl border border-[#e1e3e1] bg-white px-3 py-1.5 font-mono text-xs outline-none transition-shadow focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20"
-        @input="markDirty"
+        @input="cleanSlug(); markDirty()"
       />
       <span class="hidden sm:inline" aria-hidden="true">·</span>
       <span class="hidden sm:inline">By {{ authorEmail ?? 'unknown' }}</span>
@@ -329,6 +338,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <p v-if="saveError" class="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert">
+      {{ saveError }}
+    </p>
+
     <EditorToolbar @command="onCommand" />
 
     <div class="relative min-h-[24rem] flex-1">
@@ -355,8 +368,6 @@ onBeforeUnmount(() => {
     </div>
 
     <AttachmentsPanel ref="attachmentsPanel" :page-id="pageId" @insert="insertAtCursor" />
-
-    <p v-if="saveError" class="text-sm text-red-600">{{ saveError }}</p>
   </div>
 </template>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { defineAsyncComponent, onMounted, ref } from 'vue';
-import { Pencil, Plus, Trash2 } from 'lucide-vue-next';
+import { Paperclip, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 
 // CodeMirror is heavy and only needed when an editor actually opens a page,
 // so load the editor (and its CodeMirror chunk) on demand.
@@ -14,6 +14,7 @@ interface PageRow {
     isDraft: boolean;
     updatedAt: string;
     authorEmail: string | null;
+    attachmentCount: number;
 }
 
 const pages = ref<PageRow[]>([]);
@@ -162,6 +163,21 @@ onMounted(load);
         >
           <Pencil class="h-4 w-4" />
         </button>
+        <span
+          v-if="page.attachmentCount > 0"
+          class="flex items-center gap-1 rounded-full bg-[#e8f0fe] px-2.5 py-1 text-xs font-medium text-[#0b57d0]"
+          :title="`${page.attachmentCount} attachment${page.attachmentCount === 1 ? '' : 's'} attached`"
+        >
+          <Paperclip class="h-3.5 w-3.5" />
+          {{ page.attachmentCount }}
+        </span>
+        <span
+          v-else
+          class="flex h-9 w-9 items-center justify-center text-[#c4c7c5]"
+          title="No attachments"
+        >
+          <Paperclip class="h-4 w-4" />
+        </span>
         <button
           type="button"
           title="Delete page"

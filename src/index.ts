@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, asc, desc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
 import {
     accessRequests,
     children,
@@ -794,7 +794,14 @@ app.get('/api/admin/pages', requireAuth(), requirePageEditor(), async (c) => {
         updatedAt: pages.updatedAt,
         authorEmail: users.email,
     }).from(pages).leftJoin(users, eq(users.id, pages.authorId)).orderBy(desc(pages.updatedAt)).all();
-    return c.json(rows);
+
+    const counts = await db.select({
+        pageId: documents.pageId,
+        count: sql<number>`count(*)`,
+    }).from(documents).groupBy(documents.pageId).all();
+    const countByPageId = new Map(counts.map((row) => [row.pageId, row.count]));
+
+    return c.json(rows.map((row) => ({ ...row, attachmentCount: countByPageId.get(row.id) ?? 0 })));
 });
 
 app.post('/api/admin/pages', requireAuth(), requirePageEditor(), async (c) => {

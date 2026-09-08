@@ -21,7 +21,7 @@ interface PageDetail {
 }
 
 const props = defineProps<{ pageId: number }>();
-const emit = defineEmits<{ done: [] }>();
+const emit = defineEmits<{ done: []; dirty: [value: boolean] }>();
 
 const loading = ref(true);
 const loadError = ref('');
@@ -29,6 +29,8 @@ const saveError = ref('');
 const saving = ref(false);
 const dirty = ref(false);
 const showPreview = ref(false);
+const lastSavedAt = ref<Date | null>(null);
+let autosaveTimer: ReturnType<typeof setInterval> | null = null;
 
 const title = ref('');
 const slug = ref('');
@@ -48,6 +50,7 @@ function formatDate(value: string | null): string {
 
 function markDirty(): void {
     dirty.value = true;
+    emit('dirty', true);
 }
 
 function onBeforeUnload(event: BeforeUnloadEvent): void {
@@ -108,18 +111,21 @@ function onCommand(name: MarkdownCommand): void {
     if (view) applyMarkdownCommand(view, name);
 }
 
-async function save(publish = false): Promise<void> {
+async function save(markAsDraft?: boolean): Promise<void> {
+    // Guard against overlapping saves (blur + interval could collide).
+    if (saving.value) return;
     saving.value = true;
     saveError.value = '';
-    const res = await fetch(`/api/admin/pages/${props.pageId}${publish ? '/publish' : ''}`, {
-        method: publish ? 'POST' : 'PUT',
+    const publishing = markAsDraft === false;
+    const res = await fetch(`/api/admin/pages/${props.pageId}${publishing ? '/publish' : ''}`, {
+        method: publishing ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             title: title.value.trim(),
             slug: slug.value.trim(),
             bodyMd: bodyMd.value,
             isPublic: isPublic.value,
-            ...(publish ? {} : { isDraft: isDraft.value }),
+            ...(publishing ? {} : { isDraft: markAsDraft === true ? true : isDraft.value }),
         }),
     });
     saving.value = false;
@@ -129,10 +135,39 @@ async function save(publish = false): Promise<void> {
         return;
     }
     const data = (await res.json()) as { page: PageDetail };
-    isDraft.value = data.page.isDraft;
+    // Only take isDraft from the server on an explicit publish/unpublish toggle.
+    // On quiet autosaves the local toggle state is authoritative — otherwise the
+    // Draft/Published pill would flash/reset on every background save.
+    if (markAsDraft !== undefined) isDraft.value = data.page.isDraft;
     isPublic.value = data.page.isPublic;
     updatedAt.value = data.page.updatedAt;
+    lastSavedAt.value = new Date();
     dirty.value = false;
+    emit('dirty', false);
+}
+
+// Quiet background save: preserves draft state, never touches CodeMirror, so
+// the cursor and panel don't move. Used by blur + interval autosave.
+function autosave(): void {
+    if (loading.value || loadError.value || !dirty.value) return;
+    void save();
+}
+
+// Toggle button behavior: publish a draft, or revert a published page to draft.
+function togglePublish(): void {
+    void save(isDraft.value ? false : true);
+}
+
+function startAutosave(): void {
+    if (autosaveTimer) return;
+    autosaveTimer = setInterval(autosave, 10_000);
+}
+
+function stopAutosave(): void {
+    if (autosaveTimer) {
+        clearInterval(autosaveTimer);
+        autosaveTimer = null;
+    }
 }
 
 function done(): void {
@@ -156,6 +191,7 @@ onMounted(async () => {
     updatedAt.value = data.page.updatedAt;
     authorEmail.value = data.page.authorEmail;
     loading.value = false;
+    emit('dirty', false);
     // The editor host only exists after the loading v-if flips, so wait a tick
     // before mounting CodeMirror into it.
     await nextTick();
@@ -177,14 +213,18 @@ onMounted(async () => {
                 EditorView.domEventHandlers({
                     paste: (event) => handlePaste(event),
                     drop: (event) => handleDrop(event),
+                    // Save when the editor loses focus — a natural pause point.
+                    blur: () => autosave(),
                 }),
             ],
         }),
     });
     window.addEventListener('beforeunload', onBeforeUnload);
+    startAutosave();
 });
 
 onBeforeUnmount(() => {
+    stopAutosave();
     window.removeEventListener('beforeunload', onBeforeUnload);
     view?.destroy();
     view = null;
@@ -206,11 +246,12 @@ onBeforeUnmount(() => {
       />
       <button
         type="button"
-        class="rounded-full bg-[#0b57d0] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        class="rounded-full px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        :class="isDraft ? 'bg-[#0b57d0]' : 'bg-[#444746]'"
         :disabled="saving"
-        @click="save(true)"
+        @click="togglePublish"
       >
-        Publish
+        {{ saving ? 'Saving…' : isDraft ? 'Publish' : 'Unpublish' }}
       </button>
     </div>
 
@@ -247,6 +288,9 @@ onBeforeUnmount(() => {
       </button>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
+        <span v-if="lastSavedAt && !dirty" class="text-xs text-[#444746]">
+          Saved {{ lastSavedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }}
+        </span>
         <button
           type="button"
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
@@ -264,13 +308,6 @@ onBeforeUnmount(() => {
           @click="save()"
         >
           {{ saving ? 'Saving…' : dirty ? 'Save ●' : 'Save' }}
-        </button>
-        <button
-          type="button"
-          class="rounded-full border border-[#e1e3e1] bg-white px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
-          @click="done"
-        >
-          Done
         </button>
       </div>
     </div>

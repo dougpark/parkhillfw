@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { defineAsyncComponent, onMounted, ref } from 'vue';
 import { Pencil, Plus, Trash2 } from 'lucide-vue-next';
-import AdminPageEditView from './AdminPageEditView.vue';
+
+// CodeMirror is heavy and only needed when an editor actually opens a page,
+// so load the editor (and its CodeMirror chunk) on demand.
+const AdminPageEditView = defineAsyncComponent(() => import('./AdminPageEditView.vue'));
 
 interface PageRow {
     id: number;
@@ -20,6 +23,21 @@ const mode = ref<'list' | 'edit'>('list');
 const editingPageId = ref<number | null>(null);
 const deleteTarget = ref<PageRow | null>(null);
 const deleting = ref(false);
+const editorDirty = ref(false);
+
+const emit = defineEmits<{ exit: [] }>();
+
+function goToAdminMenu(): void {
+    if (mode.value === 'edit' && editorDirty.value && !window.confirm('You have unsaved changes. Discard them?')) return;
+    if (mode.value === 'edit') {
+        mode.value = 'list';
+        editingPageId.value = null;
+        editorDirty.value = false;
+        void load();
+        return;
+    }
+    emit('exit');
+}
 
 function formatDate(value: string): string {
     return new Date(value).toLocaleString();
@@ -68,6 +86,7 @@ async function confirmDelete(): Promise<void> {
 function onEditorDone(): void {
     mode.value = 'list';
     editingPageId.value = null;
+    editorDirty.value = false;
     void load();
 }
 
@@ -75,7 +94,22 @@ onMounted(load);
 </script>
 
 <template>
-  <AdminPageEditView v-if="mode === 'edit' && editingPageId !== null" :page-id="editingPageId" @done="onEditorDone" />
+  <div>
+    <button
+      type="button"
+      class="mb-4 rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+      @click="goToAdminMenu"
+    >
+      ← {{ mode === 'edit' ? 'Pages List' : 'Admin menu' }}
+    </button>
+  </div>
+
+  <AdminPageEditView
+    v-if="mode === 'edit' && editingPageId !== null"
+    :page-id="editingPageId"
+    @done="onEditorDone"
+    @dirty="editorDirty = $event"
+  />
 
   <div v-else>
     <div class="flex flex-wrap items-center justify-between gap-3">

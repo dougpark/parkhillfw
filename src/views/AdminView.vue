@@ -35,14 +35,7 @@ function selectFeature(label: string) {
       v-if="selectedFeature === 'Pages'"
       class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8"
     >
-      <button
-        type="button"
-        class="mb-4 rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
-        @click="selectedFeature = 'Access requests'"
-      >
-        ← Admin menu
-      </button>
-      <AdminPagesView />
+      <AdminPagesView @exit="selectedFeature = 'Access requests'" />
     </div>
 
     <div v-else class="grid min-h-112 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm md:grid-cols-[16rem_1fr]">

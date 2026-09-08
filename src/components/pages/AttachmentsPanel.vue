@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Check, Copy, FileText, Trash2, Upload } from 'lucide-vue-next';
+import { Check, Copy, FileText, Images, Trash2, Upload, X } from 'lucide-vue-next';
 
 interface Attachment {
     id: number;
@@ -20,6 +20,9 @@ const error = ref('');
 const dragOver = ref(false);
 const copiedId = ref<number | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
+const showLibrary = ref(false);
+const libraryImages = ref<Attachment[]>([]);
+const libraryLoading = ref(false);
 
 function fileUrl(attachment: Attachment): string {
     return `/api/files/${attachment.r2Key}`;
@@ -85,6 +88,23 @@ function onFilePicked(event: Event): void {
     input.value = '';
 }
 
+async function openLibrary(): Promise<void> {
+    showLibrary.value = true;
+    libraryLoading.value = true;
+    const res = await fetch('/api/admin/attachments/images');
+    if (res.ok) {
+        // Exclude images already attached to this page.
+        const currentKeys = new Set(attachments.value.map((a) => a.r2Key));
+        libraryImages.value = ((await res.json()) as Attachment[]).filter((a) => !currentKeys.has(a.r2Key));
+    }
+    libraryLoading.value = false;
+}
+
+function pickLibraryImage(image: Attachment): void {
+    emit('insert', snippetFor(image));
+    showLibrary.value = false;
+}
+
 onMounted(load);
 defineExpose({ load });
 </script>
@@ -93,15 +113,25 @@ defineExpose({ load });
   <section class="rounded-xl border border-[#e1e3e1] bg-white p-4">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h4 class="text-sm font-semibold">Attachments</h4>
-      <button
-        type="button"
-        class="flex items-center gap-2 rounded-full bg-[#e8f0fe] px-4 py-2 text-sm font-medium text-[#0b57d0] transition-opacity hover:opacity-80"
-        :disabled="uploading"
-        @click="fileInput?.click()"
-      >
-        <Upload class="h-4 w-4" />
-        {{ uploading ? 'Uploading…' : 'Upload' }}
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="flex items-center gap-2 rounded-full border border-[#e1e3e1] bg-white px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+          @click="openLibrary"
+        >
+          <Images class="h-4 w-4" />
+          Browse images
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-2 rounded-full bg-[#e8f0fe] px-4 py-2 text-sm font-medium text-[#0b57d0] transition-opacity hover:opacity-80"
+          :disabled="uploading"
+          @click="fileInput?.click()"
+        >
+          <Upload class="h-4 w-4" />
+          {{ uploading ? 'Uploading…' : 'Upload' }}
+        </button>
+      </div>
       <input ref="fileInput" type="file" multiple class="hidden" @change="onFilePicked" />
     </div>
 
@@ -160,5 +190,38 @@ defineExpose({ load });
       </li>
     </ul>
     <p v-else class="mt-3 text-sm text-[#444746]">No attachments yet.</p>
+
+    <div v-if="showLibrary" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showLibrary = false">
+      <div class="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-3xl bg-white p-6 shadow-xl">
+        <div class="flex items-center justify-between">
+          <h4 class="text-lg font-semibold">Image library</h4>
+          <button
+            type="button"
+            title="Close"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+            @click="showLibrary = false"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        </div>
+        <p class="mt-1 text-sm text-[#444746]">Pick an image uploaded for any page to insert its link here.</p>
+
+        <p v-if="libraryLoading" class="py-8 text-center text-sm text-[#444746]">Loading images…</p>
+        <p v-else-if="!libraryImages.length" class="py-8 text-center text-sm text-[#444746]">No other images have been uploaded yet.</p>
+        <div v-else class="mt-4 grid flex-1 grid-cols-2 gap-3 overflow-auto sm:grid-cols-3 md:grid-cols-4">
+          <button
+            v-for="image in libraryImages"
+            :key="image.id"
+            type="button"
+            class="group overflow-hidden rounded-xl border border-[#e1e3e1] bg-white text-left transition-shadow hover:shadow-md"
+            :title="`Insert ${image.filename}`"
+            @click="pickLibraryImage(image)"
+          >
+            <img :src="fileUrl(image)" :alt="image.filename" class="h-24 w-full bg-[#f0f4f9] object-cover" loading="lazy" />
+            <span class="block truncate px-2 py-1.5 text-xs text-[#444746] group-hover:text-[#1a73e8]">{{ image.filename }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </section>
 </template>

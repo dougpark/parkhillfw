@@ -954,6 +954,13 @@ app.delete('/api/admin/attachments/:documentId', requireAuth(), requirePageEdito
     return c.json({ deleted: true });
 });
 
+// All uploaded images across pages — lets editors reuse an existing image.
+app.get('/api/admin/attachments/images', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const rows = await db.select().from(documents).where(like(documents.mimeType, 'image/%')).orderBy(desc(documents.createdAt)).all();
+    return c.json(rows);
+});
+
 // Public page view — editors may view drafts; public pages for any signed-in user;
 // non-public published pages require directory access.
 app.get('/api/pages/:slug', requireAuth(), async (c) => {

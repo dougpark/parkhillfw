@@ -232,22 +232,33 @@ export const pages = sqliteTable(
     ]
 );
 
-// Self-referencing Nested Menu Hierarchy
+// Self-referencing Nested Menu Hierarchy. A row is a navigation node; the same
+// page may be referenced by several rows so it can appear in multiple menus.
 export const menus = sqliteTable(
     'menus',
     {
         id: integer('id').primaryKey({ autoIncrement: true }),
         parentId: integer('parent_id').references((): any => menus.id, { onDelete: 'cascade' }),
 
+        kind: text('kind', { enum: ['menu', 'page', 'link'] }).notNull().default('menu'),
+        slug: text('slug'),
         title: text('title').notNull(),
+        description: text('description'),
+        iconName: text('icon_name'),
+
         pageId: integer('page_id').references(() => pages.id, { onDelete: 'set null' }),
         targetUrl: text('target_url'),
 
         displayOrder: integer('display_order').default(0),
         isPublic: integer('is_public', { mode: 'boolean' }).default(false),
+        isDraft: integer('is_draft', { mode: 'boolean' }).default(true),
+
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     },
     (table) => [
-        index('idx_menus_parent').on(table.parentId),
+        index('idx_menus_parent').on(table.parentId, table.displayOrder),
+        uniqueIndex('idx_menus_slug_unique').on(table.slug),
     ]
 );
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { BookOpen, Pencil, ShieldCheck } from 'lucide-vue-next';
+import NavCardGrid from '../components/menus/NavCardGrid.vue';
+import type { NavNode } from '../components/menus/menuTree';
 
 interface AuthUser {
   isOwner?: boolean;
@@ -11,6 +13,7 @@ interface AuthUser {
 
 const user = ref<AuthUser | null>(null);
 const pendingRequests = ref(0);
+const navItems = ref<NavNode[]>([]);
 
 const baseCards = [
   {
@@ -34,6 +37,13 @@ const canAdmin = (authUser: AuthUser) => Boolean(
 );
 
 onMounted(async () => {
+  try {
+    const navResponse = await fetch('/api/nav');
+    if (navResponse.ok) navItems.value = ((await navResponse.json()) as { items: NavNode[] }).items;
+  } catch {
+    navItems.value = [];
+  }
+
   try {
     const response = await fetch('/api/auth/me');
     if (response.ok) {
@@ -98,5 +108,7 @@ onMounted(async () => {
         <span class="mt-4 inline-block text-sm font-medium text-[#1a73e8] transition-transform group-hover:translate-x-1">Open <span aria-hidden="true">-&gt;</span></span>
       </RouterLink>
     </div>
+
+    <NavCardGrid v-if="navItems.length" :items="navItems" />
   </section>
 </template>

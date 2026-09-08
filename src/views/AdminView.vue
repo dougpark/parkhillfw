@@ -5,6 +5,8 @@ import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 
 import AdminDirectoryView from './AdminDirectoryView.vue';
 
+import AdminMenusView from './AdminMenusView.vue';
+
 import AdminPagesView from './AdminPagesView.vue';
 
 const selectedFeature = ref('Access requests');
@@ -36,6 +38,14 @@ function selectFeature(label: string) {
       class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8"
     >
       <AdminPagesView @exit="selectedFeature = 'Access requests'" />
+    </div>
+
+    <!-- Menus needs the full width for the hierarchy editor's indent guides -->
+    <div
+      v-else-if="selectedFeature === 'Menus'"
+      class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8"
+    >
+      <AdminMenusView @exit="selectedFeature = 'Access requests'" />
     </div>
 
     <div v-else class="grid min-h-112 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm md:grid-cols-[16rem_1fr]">

@@ -9,6 +9,7 @@ import {
     households,
     magicLinkRateLimits,
     magicTokens,
+    menus,
     pages,
     residents,
     sessions,
@@ -966,6 +967,426 @@ app.get('/api/admin/attachments/images', requireAuth(), requirePageEditor(), asy
     const db = drizzle(c.env.DB);
     const rows = await db.select().from(documents).where(like(documents.mimeType, 'image/%')).orderBy(desc(documents.createdAt)).all();
     return c.json(rows);
+});
+
+// ==========================================
+// Menus (navigation) — page editor role required to manage
+// ==========================================
+
+const MAX_MENU_DEPTH = 3;
+
+type MenuRow = typeof menus.$inferSelect;
+
+async function uniqueMenuSlug(db: PagesDb, title: string, excludeId?: number): Promise<string> {
+    const base = slugify(title);
+    let candidate = base;
+    for (let suffix = 2; ; suffix++) {
+        const existing = await db.select({ id: menus.id }).from(menus).where(eq(menus.slug, candidate)).get();
+        if (!existing || existing.id === excludeId) return candidate;
+        candidate = `${base}-${suffix}`;
+    }
+}
+
+function loadMenuRows(db: PagesDb) {
+    return db.select().from(menus).orderBy(asc(menus.displayOrder), asc(menus.id)).all();
+}
+
+// Depth of a node whose parent is parentId (root children are depth 1).
+function depthOfParent(parentById: Map<number, number | null>, parentId: number | null): number {
+    let depth = 1;
+    let cursor = parentId;
+    const seen = new Set<number>();
+    while (cursor !== null && cursor !== undefined) {
+        if (seen.has(cursor)) return Number.POSITIVE_INFINITY;
+        seen.add(cursor);
+        depth += 1;
+        cursor = parentById.get(cursor) ?? null;
+    }
+    return depth;
+}
+
+function subtreeHeight(childrenByParent: Map<number | null, number[]>, id: number): number {
+    const kids = childrenByParent.get(id) ?? [];
+    if (!kids.length) return 1;
+    return 1 + Math.max(...kids.map((kid) => subtreeHeight(childrenByParent, kid)));
+}
+
+function buildChildIndex(rows: Array<{ id: number; parentId: number | null }>): Map<number | null, number[]> {
+    const index = new Map<number | null, number[]>();
+    for (const row of rows) {
+        const bucket = index.get(row.parentId) ?? [];
+        bucket.push(row.id);
+        index.set(row.parentId, bucket);
+    }
+    return index;
+}
+
+function collectDescendantIds(childrenByParent: Map<number | null, number[]>, id: number): number[] {
+    const result: number[] = [];
+    const queue = [...(childrenByParent.get(id) ?? [])];
+    while (queue.length) {
+        const current = queue.shift()!;
+        result.push(current);
+        queue.push(...(childrenByParent.get(current) ?? []));
+    }
+    return result;
+}
+
+function normalizeMenuTarget(kind: string, pageId: unknown, targetUrl: unknown) {
+    if (kind === 'page') return { pageId: Number(pageId), targetUrl: null };
+    if (kind === 'link') return { pageId: null, targetUrl: String(targetUrl ?? '').trim() };
+    return { pageId: null, targetUrl: null };
+}
+
+app.get('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const rows = await db.select({
+        id: menus.id,
+        parentId: menus.parentId,
+        kind: menus.kind,
+        slug: menus.slug,
+        title: menus.title,
+        description: menus.description,
+        iconName: menus.iconName,
+        pageId: menus.pageId,
+        targetUrl: menus.targetUrl,
+        displayOrder: menus.displayOrder,
+        isPublic: menus.isPublic,
+        isDraft: menus.isDraft,
+        updatedAt: menus.updatedAt,
+        pageTitle: pages.title,
+        pageSlug: pages.slug,
+        pageIsDraft: pages.isDraft,
+        pageIsPublic: pages.isPublic,
+    }).from(menus).leftJoin(pages, eq(pages.id, menus.pageId))
+        .orderBy(asc(menus.displayOrder), asc(menus.id)).all();
+    return c.json(rows);
+});
+
+app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{
+        kind?: 'menu' | 'page' | 'link';
+        title?: string;
+        parentId?: number | null;
+        pageId?: number | null;
+        targetUrl?: string | null;
+        description?: string | null;
+        iconName?: string | null;
+    }>().catch(() => ({}));
+
+    const kind = body.kind ?? 'menu';
+    if (!['menu', 'page', 'link'].includes(kind)) return c.json({ error: 'Invalid menu kind.' }, 400);
+
+    const rows = await loadMenuRows(db);
+    const parentById = new Map<number, number | null>(rows.map((row) => [row.id, row.parentId]));
+
+    const parentId = body.parentId ?? null;
+    if (parentId !== null) {
+        const parent = rows.find((row) => row.id === parentId);
+        if (!parent) return c.json({ error: 'Parent menu not found.' }, 400);
+        if (parent.kind !== 'menu') return c.json({ error: 'Only folders can contain items.' }, 400);
+    }
+    if (depthOfParent(parentById, parentId) > MAX_MENU_DEPTH) {
+        return c.json({ error: `Menus can only be nested ${MAX_MENU_DEPTH} levels deep.` }, 400);
+    }
+
+    let title = body.title?.trim() ?? '';
+    const target = normalizeMenuTarget(kind, body.pageId, body.targetUrl);
+
+    if (kind === 'page') {
+        if (!Number.isInteger(target.pageId)) return c.json({ error: 'A page is required.' }, 400);
+        const page = await db.select({ id: pages.id, title: pages.title }).from(pages).where(eq(pages.id, target.pageId!)).get();
+        if (!page) return c.json({ error: 'Page not found.' }, 400);
+        if (!title) title = page.title;
+    }
+    if (kind === 'link' && !target.targetUrl) return c.json({ error: 'A link URL is required.' }, 400);
+    if (!title) title = kind === 'link' ? 'New link' : 'New menu';
+
+    const siblings = rows.filter((row) => row.parentId === parentId);
+    const displayOrder = siblings.length ? Math.max(...siblings.map((row) => row.displayOrder ?? 0)) + 1 : 0;
+
+    const created = await db.insert(menus).values({
+        parentId,
+        kind,
+        slug: kind === 'menu' ? await uniqueMenuSlug(db, title) : null,
+        title,
+        description: body.description?.trim() || null,
+        iconName: body.iconName?.trim() || null,
+        pageId: target.pageId,
+        targetUrl: target.targetUrl,
+        displayOrder,
+        isPublic: false,
+        isDraft: true,
+    }).returning().then((inserted) => inserted[0]);
+
+    return c.json({ menu: created }, 201);
+});
+
+// Batch reparent/reorder — the drag-and-drop save. Sends the whole tree so the
+// server can reject cycles and over-deep nesting before anything is written.
+// Registered before /:menuId so the literal path wins.
+app.put('/api/admin/menus/reorder', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ items?: Array<{ id?: number; parentId?: number | null; displayOrder?: number }> }>().catch(() => ({}));
+    const items = body.items ?? [];
+    if (!items.length) return c.json({ error: 'No items supplied.' }, 400);
+
+    const rows = await loadMenuRows(db);
+    const kindById = new Map(rows.map((row) => [row.id, row.kind]));
+    const seen = new Set<number>();
+    const nextParent = new Map<number, number | null>();
+
+    for (const item of items) {
+        const id = Number(item.id);
+        if (!Number.isInteger(id) || !kindById.has(id)) return c.json({ error: 'Unknown menu in payload.' }, 400);
+        if (seen.has(id)) return c.json({ error: 'Duplicate menu in payload.' }, 400);
+        seen.add(id);
+
+        const parentId = item.parentId ?? null;
+        if (parentId !== null) {
+            if (!kindById.has(parentId)) return c.json({ error: 'Unknown parent in payload.' }, 400);
+            if (kindById.get(parentId) !== 'menu') return c.json({ error: 'Only folders can contain items.' }, 400);
+        }
+        nextParent.set(id, parentId);
+    }
+    if (seen.size !== rows.length) return c.json({ error: 'Payload must contain every menu.' }, 400);
+
+    const nextRows = [...nextParent.entries()].map(([id, parentId]) => ({ id, parentId }));
+    const childIndex = buildChildIndex(nextRows);
+    for (const { id, parentId } of nextRows) {
+        const depth = depthOfParent(nextParent, parentId);
+        if (!Number.isFinite(depth)) return c.json({ error: 'Menus cannot contain themselves.' }, 400);
+        if (depth + subtreeHeight(childIndex, id) - 1 > MAX_MENU_DEPTH) {
+            return c.json({ error: `Menus can only be nested ${MAX_MENU_DEPTH} levels deep.` }, 400);
+        }
+    }
+
+    const now = new Date();
+    const statements = items.map((item, index) => db.update(menus).set({
+        parentId: item.parentId ?? null,
+        displayOrder: item.displayOrder ?? index,
+        updatedAt: now,
+    }).where(eq(menus.id, Number(item.id))));
+    await db.batch(statements as [typeof statements[number], ...typeof statements]);
+
+    return c.json({ saved: true, savedAt: now.toISOString() });
+});
+
+app.put('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const menuId = Number(c.req.param('menuId'));
+    if (!Number.isInteger(menuId)) return c.json({ error: 'Invalid menu ID.' }, 400);
+    const existing = await db.select().from(menus).where(eq(menus.id, menuId)).get();
+    if (!existing) return c.json({ error: 'Menu not found.' }, 404);
+
+    const body = await c.req.json<{
+        title?: string;
+        slug?: string | null;
+        description?: string | null;
+        iconName?: string | null;
+        pageId?: number | null;
+        targetUrl?: string | null;
+        isPublic?: boolean;
+        isDraft?: boolean;
+    }>();
+
+    const title = body.title?.trim() ?? '';
+    if (!title) return c.json({ error: 'Title is required.' }, 400);
+
+    let slug = existing.slug;
+    if (existing.kind === 'menu') {
+        const requested = body.slug?.trim() ?? '';
+        if (requested) {
+            if (!SLUG_PATTERN.test(requested)) return c.json({ error: 'Slug must be lowercase letters, numbers, and hyphens.' }, 400);
+            const conflict = await db.select({ id: menus.id }).from(menus).where(eq(menus.slug, requested)).get();
+            if (conflict && conflict.id !== menuId) return c.json({ error: 'Another menu already uses this slug.' }, 409);
+            slug = requested;
+        } else {
+            slug = await uniqueMenuSlug(db, title, menuId);
+        }
+    }
+
+    const target = normalizeMenuTarget(existing.kind, body.pageId ?? existing.pageId, body.targetUrl ?? existing.targetUrl);
+    if (existing.kind === 'page') {
+        if (!Number.isInteger(target.pageId)) return c.json({ error: 'A page is required.' }, 400);
+        const page = await db.select({ id: pages.id }).from(pages).where(eq(pages.id, target.pageId!)).get();
+        if (!page) return c.json({ error: 'Page not found.' }, 400);
+    }
+    if (existing.kind === 'link' && !target.targetUrl) return c.json({ error: 'A link URL is required.' }, 400);
+
+    const updated = await db.update(menus).set({
+        title,
+        slug,
+        description: body.description?.trim() || null,
+        iconName: body.iconName?.trim() || null,
+        pageId: target.pageId,
+        targetUrl: target.targetUrl,
+        isPublic: body.isPublic ?? Boolean(existing.isPublic),
+        isDraft: body.isDraft ?? Boolean(existing.isDraft),
+        updatedAt: new Date(),
+    }).where(eq(menus.id, menuId)).returning().then((rows) => rows[0]);
+
+    return c.json({ menu: updated });
+});
+
+app.post('/api/admin/menus/:menuId/publish', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const menuId = Number(c.req.param('menuId'));
+    if (!Number.isInteger(menuId)) return c.json({ error: 'Invalid menu ID.' }, 400);
+    const existing = await db.select({ id: menus.id }).from(menus).where(eq(menus.id, menuId)).get();
+    if (!existing) return c.json({ error: 'Menu not found.' }, 404);
+
+    const body = await c.req.json<{ isDraft?: boolean }>().catch(() => ({}));
+    const updated = await db.update(menus).set({
+        isDraft: body.isDraft ?? false,
+        updatedAt: new Date(),
+    }).where(eq(menus.id, menuId)).returning().then((rows) => rows[0]);
+    return c.json({ menu: updated });
+});
+
+app.delete('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const menuId = Number(c.req.param('menuId'));
+    if (!Number.isInteger(menuId)) return c.json({ error: 'Invalid menu ID.' }, 400);
+    const rows = await loadMenuRows(db);
+    if (!rows.some((row) => row.id === menuId)) return c.json({ error: 'Menu not found.' }, 404);
+
+    const descendants = collectDescendantIds(buildChildIndex(rows), menuId);
+    const ids = [menuId, ...descendants];
+    await db.delete(menus).where(inArray(menus.id, ids));
+    return c.json({ deleted: true, removedCount: ids.length });
+});
+
+// ==========================================
+// Navigation read model — shared by home cards and menu pages
+// ==========================================
+
+type Viewer = { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean } | null;
+
+async function resolveViewer(c: { env: Bindings; req: { raw: Request } }): Promise<Viewer> {
+    if (c.env.DEV_BYPASS_AUTH === 'true') return { residentId: 1, isAdmin: true };
+    const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
+    if (!rawSession) return null;
+    return (await findUserBySession(drizzle(c.env.DB), rawSession)) as Viewer;
+}
+
+type NavNode = {
+    id: number;
+    kind: string;
+    slug: string | null;
+    title: string;
+    description: string | null;
+    iconName: string | null;
+    pageSlug: string | null;
+    targetUrl: string | null;
+    isPublic: boolean;
+    isDraft: boolean;
+    children: NavNode[];
+};
+
+// Drops drafts and anything the viewer may not see, so private titles never
+// reach the wire. Editors see the tree as authored.
+function buildNavTree(
+    rows: Array<MenuRow & { pageSlug: string | null; pageIsDraft: boolean | null; pageIsPublic: boolean | null }>,
+    viewer: Viewer,
+): NavNode[] {
+    const isEditor = Boolean(viewer?.isPageEditor || viewer?.isAdmin || viewer?.isOwner);
+    const hasDirectory = Boolean(viewer?.residentId);
+
+    const canSee = (row: (typeof rows)[number]): boolean => {
+        if (isEditor) return true;
+        if (row.isDraft) return false;
+        if (!row.isPublic && !hasDirectory) return false;
+        if (row.kind === 'page') {
+            if (!row.pageSlug || row.pageIsDraft) return false;
+            if (!row.pageIsPublic && !hasDirectory) return false;
+        }
+        return true;
+    };
+
+    const byParent = new Map<number | null, typeof rows>();
+    for (const row of rows) {
+        const bucket = byParent.get(row.parentId) ?? [];
+        bucket.push(row);
+        byParent.set(row.parentId, bucket);
+    }
+
+    const build = (parentId: number | null): NavNode[] => (byParent.get(parentId) ?? [])
+        .filter(canSee)
+        .map((row) => ({
+            id: row.id,
+            kind: row.kind,
+            slug: row.slug,
+            title: row.title,
+            description: row.description,
+            iconName: row.iconName,
+            pageSlug: row.pageSlug,
+            targetUrl: row.targetUrl,
+            isPublic: Boolean(row.isPublic),
+            isDraft: Boolean(row.isDraft),
+            children: build(row.id),
+        }))
+        // A folder with nothing visible inside is a dead end for regular viewers.
+        .filter((node) => isEditor || node.kind !== 'menu' || node.children.length > 0);
+
+    return build(null);
+}
+
+function navRows(db: PagesDb) {
+    return db.select({
+        id: menus.id,
+        parentId: menus.parentId,
+        kind: menus.kind,
+        slug: menus.slug,
+        title: menus.title,
+        description: menus.description,
+        iconName: menus.iconName,
+        pageId: menus.pageId,
+        targetUrl: menus.targetUrl,
+        displayOrder: menus.displayOrder,
+        isPublic: menus.isPublic,
+        isDraft: menus.isDraft,
+        createdAt: menus.createdAt,
+        updatedAt: menus.updatedAt,
+        pageSlug: pages.slug,
+        pageIsDraft: pages.isDraft,
+        pageIsPublic: pages.isPublic,
+    }).from(menus).leftJoin(pages, eq(pages.id, menus.pageId))
+        .orderBy(asc(menus.displayOrder), asc(menus.id)).all();
+}
+
+app.get('/api/nav', async (c) => {
+    const db = drizzle(c.env.DB);
+    const viewer = await resolveViewer(c);
+    return c.json({ items: buildNavTree(await navRows(db), viewer) });
+});
+
+app.get('/api/nav/:slug', async (c) => {
+    const db = drizzle(c.env.DB);
+    const viewer = await resolveViewer(c);
+    const tree = buildNavTree(await navRows(db), viewer);
+    const slug = c.req.param('slug');
+
+    const trail: NavNode[] = [];
+    const find = (nodes: NavNode[]): NavNode | null => {
+        for (const node of nodes) {
+            trail.push(node);
+            if (node.slug === slug) return node;
+            const nested = find(node.children);
+            if (nested) return nested;
+            trail.pop();
+        }
+        return null;
+    };
+
+    const match = find(tree);
+    if (!match) return c.json({ error: 'Menu not found.' }, 404);
+    return c.json({
+        menu: { id: match.id, slug: match.slug, title: match.title, description: match.description, iconName: match.iconName },
+        breadcrumbs: trail.slice(0, -1).map((node) => ({ slug: node.slug, title: node.title })),
+        items: match.children,
+    });
 });
 
 // Public page view — editors may view drafts; public pages for any signed-in user;

@@ -93,6 +93,23 @@ function handlePaste(event: ClipboardEvent): boolean | void {
     }
     const text = event.clipboardData?.getData('text/plain') ?? '';
     const converted = toRelativeLinks(text);
+
+    // Bare URL pasted over a selection -> wrap the selection as the link text.
+    if (/^https?:\/\/\S+$/.test(converted) && view) {
+        event.preventDefault();
+        const { from, to } = view.state.selection.main;
+        const selected = view.state.doc.sliceString(from, to);
+        const insert = selected ? `[${selected}](${converted})` : `[link text](${converted})`;
+        view.dispatch({
+            changes: { from, to, insert },
+            selection: selected
+                ? { anchor: from + insert.length }
+                : { anchor: from + 1, head: from + 1 + 'link text'.length },
+        });
+        view.focus();
+        return;
+    }
+
     if (converted !== text && view) {
         event.preventDefault();
         insertAtCursor(converted);

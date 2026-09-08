@@ -763,6 +763,8 @@ const ATTACHMENT_MIME_TYPES = new Set([
     'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
     'application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/zip',
 ]);
+const ATTACHMENT_ALLOWED_DESCRIPTION = 'images (PNG, JPEG, GIF, WebP, SVG), PDF, plain text, Markdown, CSV, or ZIP';
+const ATTACHMENT_SIZE_DESCRIPTION = '10 MB';
 
 type PagesDb = ReturnType<typeof drizzle>;
 
@@ -916,8 +918,12 @@ app.post('/api/admin/pages/:pageId/attachments', requireAuth(), requirePageEdito
     const formData = await c.req.parseBody();
     const file = formData['file'];
     if (!(file instanceof File)) return c.json({ error: 'A file is required.' }, 400);
-    if (file.size > MAX_ATTACHMENT_BYTES) return c.json({ error: 'File exceeds the 10 MB limit.' }, 413);
-    if (!ATTACHMENT_MIME_TYPES.has(file.type)) return c.json({ error: `File type ${file.type || 'unknown'} is not allowed.` }, 415);
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+        return c.json({ error: `"${file.name}" is too large. Maximum size is ${ATTACHMENT_SIZE_DESCRIPTION}.` }, 413);
+    }
+    if (!ATTACHMENT_MIME_TYPES.has(file.type)) {
+        return c.json({ error: `"${file.name}" is not a supported file type. Allowed: ${ATTACHMENT_ALLOWED_DESCRIPTION}.` }, 415);
+    }
 
     const safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, '_') || 'file';
     const r2Key = `pages/${pageId}/${crypto.randomUUID()}-${safeName}`;

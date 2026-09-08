@@ -112,7 +112,10 @@ defineExpose({ load });
       @dragleave.prevent="dragOver = false"
       @drop.prevent="onDrop"
     >
-      Drag and drop files here, paste images into the editor, or use Upload.
+      <p>Drag and drop files here, paste images into the editor, or use Upload.</p>
+      <p class="mt-1 text-xs text-[#444746]/70">
+        Allowed: images (PNG, JPEG, GIF, WebP, SVG), PDF, text, Markdown, CSV, ZIP — up to 10 MB each.
+      </p>
     </div>
 
     <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>

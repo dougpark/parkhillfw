@@ -93,14 +93,15 @@ async function createAddress() {
     <section class="border-t border-[#c4c7c5] pt-8">
       <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Property records</p>
       <h3 class="mt-1 text-xl font-semibold">Address Management</h3>
-      <p class="mt-1 text-sm text-[#444746]">Create a new vacant property address for future household information.</p>
-      <p v-if="addressNotice" class="mt-4 rounded-xl bg-[#e6f4ea] p-3 text-sm text-[#137333]">{{ addressNotice }}</p>
+      <p class="mt-1 text-sm text-[#444746]">Create a new vacant property. Use this action when a portion of an existing residential property has been sold off to create a new addressable lot.</p>
       <form class="mt-4 flex flex-col gap-3 sm:flex-row" @submit.prevent="createAddress">
         <label class="flex-1 text-sm font-medium">New address
           <input v-model="address" required class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-3 py-2.5 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" placeholder="Enter a new street address" />
         </label>
         <button type="submit" :disabled="isCreatingAddress" class="rounded-full bg-[#1a73e8] px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">{{ isCreatingAddress ? 'Creating...' : 'Create vacant address' }}</button>
       </form>
+        <p v-if="addressNotice" class="mt-4 rounded-xl bg-[#e6f4ea] p-3 text-sm text-[#137333]">{{ addressNotice }}</p>
+    
     </section>
   </section>
 </template>

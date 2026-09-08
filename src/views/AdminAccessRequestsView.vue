@@ -8,6 +8,7 @@ interface AccessRequest {
   fullName: string;
   streetAddress: string;
   status: 'pending' | 'approved' | 'rejected';
+  reviewedAt: string | null;
   notes: string | null;
   createdAt: string;
 }
@@ -45,6 +46,13 @@ const sortedRequests = computed(() => [...requests.value].sort((left, right) => 
   return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
 }));
 const selectedRequest = computed(() => requests.value.find((request) => request.id === selectedId.value) ?? null);
+
+function formatDate(value: Date | string | null | undefined) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 async function loadRequests() {
   isLoading.value = true;
@@ -161,7 +169,9 @@ onMounted(loadRequests);
             <span class="h-2 w-2 shrink-0 rounded-full" :class="request.status === 'pending' ? 'bg-[#f4b400]' : request.status === 'approved' ? 'bg-[#34a853]' : 'bg-[#b3261e]'" />
           </span>
           <span class="mt-1 block truncate text-xs text-[#444746]">{{ request.streetAddress }}</span>
-          <span class="mt-1 block text-[11px] uppercase tracking-wide text-[#444746]">{{ request.status }}</span>
+          <span class="mt-1 block text-[11px] uppercase tracking-wide text-[#444746]">
+            {{ request.status }}<template v-if="request.status !== 'pending' && request.reviewedAt"> · {{ formatDate(request.reviewedAt) }}</template>
+          </span>
         </button>
       </aside>
 
@@ -172,7 +182,9 @@ onMounted(loadRequests);
             <p class="mt-1 text-sm text-[#444746]">{{ selectedRequest.email }}</p>
             <p class="text-sm text-[#444746]">Submitted address: {{ selectedRequest.streetAddress }}</p>
           </div>
-          <span class="rounded-full px-3 py-1 text-xs font-medium" :class="selectedRequest.status === 'pending' ? 'bg-[#fff8e1] text-[#8a6116]' : selectedRequest.status === 'approved' ? 'bg-[#e6f4ea] text-[#137333]' : 'bg-red-50 text-[#b3261e]'">{{ selectedRequest.status }}</span>
+          <span class="rounded-full px-3 py-1 text-xs font-medium" :class="selectedRequest.status === 'pending' ? 'bg-[#fff8e1] text-[#8a6116]' : selectedRequest.status === 'approved' ? 'bg-[#e6f4ea] text-[#137333]' : 'bg-red-50 text-[#b3261e]'">
+            {{ selectedRequest.status }}<template v-if="selectedRequest.status !== 'pending' && selectedRequest.reviewedAt"> · {{ formatDate(selectedRequest.reviewedAt) }}</template>
+          </span>
         </div>
 
         <div class="mt-8 border-t border-[#e1e3e1] pt-6">

@@ -42,8 +42,7 @@
 - full copy and paste images
 - page can be marked for showing on homepage
 - Public flag can show to non-authorized users
-- Draft Publish flag to hide unfinished pages, defaults to Draft
-
+- Draft Publish flag to hide unfinished pages, defaults
 
 ## Info-Messages
 - short md  message to show at top in info box on homepage

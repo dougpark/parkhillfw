@@ -57,6 +57,12 @@ const router = createRouter({
             meta: { requiresDirectory: true },
             component: () => import('../views/DirectoryEditView.vue'),
         },
+        {
+            path: '/pages/:slug',
+            name: 'page',
+            meta: { requiresAuth: true },
+            component: () => import('../views/PageView.vue'),
+        },
     ],
 });
 

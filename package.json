@@ -7,6 +7,7 @@
     "@cloudflare/workers-types": "^5.20260906.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "latest",
+    "@types/markdown-it": "^14.2.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4.3.3",
@@ -17,10 +18,15 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.2",
+    "codemirror": "^6.0.2",
     "csv-parse": "^7.0.2",
     "drizzle-orm": "^0.45.2",
+    "github-markdown-css": "^5.9.0",
     "hono": "^4.13.7",
     "lucide-vue-next": "^1.0.0",
+    "markdown-it": "^15.0.1",
+    "markdown-it-task-lists": "^2.1.1",
     "vue": "^3.5.42",
     "vue-router": "^5.3.1"
   },

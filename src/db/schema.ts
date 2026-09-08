@@ -219,7 +219,10 @@ export const pages = sqliteTable(
         bodyMd: text('body_md').notNull(),
 
         isPublic: integer('is_public', { mode: 'boolean' }).default(false),
+        isDraft: integer('is_draft', { mode: 'boolean' }).default(true),
         isHomepageCard: integer('is_homepage_card', { mode: 'boolean' }).default(false),
+
+        authorId: integer('author_id').references(() => users.id, { onDelete: 'set null' }),
 
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
         updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -271,6 +274,7 @@ export const documents = sqliteTable(
     'documents',
     {
         id: integer('id').primaryKey({ autoIncrement: true }),
+        pageId: integer('page_id').references(() => pages.id, { onDelete: 'cascade' }),
         r2Key: text('r2_key').notNull(),
         filename: text('filename').notNull(),
         mimeType: text('mime_type').notNull(),
@@ -281,5 +285,6 @@ export const documents = sqliteTable(
     },
     (table) => [
         uniqueIndex('idx_documents_r2_key_unique').on(table.r2Key),
+        index('idx_documents_page').on(table.pageId),
     ]
 );

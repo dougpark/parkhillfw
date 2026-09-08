@@ -1,13 +1,15 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, asc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, like, or, type SQL } from 'drizzle-orm';
 import {
     accessRequests,
     children,
+    documents,
     householdFavorites,
     households,
     magicLinkRateLimits,
     magicTokens,
+    pages,
     residents,
     sessions,
     userLoginEmails,
@@ -15,7 +17,7 @@ import {
 } from './db/schema';
 import { approvalLinkLifetimeMinutes, createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
-import { getCookie, requireAdmin, requireAuth, requireDirectory } from './middleware/auth';
+import { getCookie, requireAdmin, requireAuth, requireDirectory, requirePageEditor } from './middleware/auth';
 
 type Bindings = {
     DB: D1Database;
@@ -749,6 +751,229 @@ app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
     }));
 
     return c.json(data);
+});
+
+// ==========================================
+// Pages (CMS) — page editor role required
+// ==========================================
+
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_MIME_TYPES = new Set([
+    'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml',
+    'application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'application/zip',
+]);
+
+type PagesDb = ReturnType<typeof drizzle>;
+
+function slugify(value: string): string {
+    return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'page';
+}
+
+async function uniquePageSlug(db: PagesDb, title: string, excludeId?: number): Promise<string> {
+    const base = slugify(title);
+    let candidate = base;
+    for (let suffix = 2; ; suffix++) {
+        const existing = await db.select({ id: pages.id }).from(pages).where(eq(pages.slug, candidate)).get();
+        if (!existing || existing.id === excludeId) return candidate;
+        candidate = `${base}-${suffix}`;
+    }
+}
+
+app.get('/api/admin/pages', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const rows = await db.select({
+        id: pages.id,
+        slug: pages.slug,
+        title: pages.title,
+        isPublic: pages.isPublic,
+        isDraft: pages.isDraft,
+        isHomepageCard: pages.isHomepageCard,
+        updatedAt: pages.updatedAt,
+        authorEmail: users.email,
+    }).from(pages).leftJoin(users, eq(users.id, pages.authorId)).orderBy(desc(pages.updatedAt)).all();
+    return c.json(rows);
+});
+
+app.post('/api/admin/pages', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { id: number };
+    const body = await c.req.json<{ title?: string }>().catch(() => ({ title: undefined }));
+    const title = body.title?.trim() || 'Untitled page';
+    const slug = await uniquePageSlug(db, title);
+    const created = await db.insert(pages).values({
+        slug,
+        title,
+        bodyMd: '',
+        isDraft: true,
+        authorId: user.id,
+    }).returning().then((rows) => rows[0]);
+    return c.json({ page: created }, 201);
+});
+
+app.get('/api/admin/pages/:pageId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const pageId = Number(c.req.param('pageId'));
+    if (!Number.isInteger(pageId)) return c.json({ error: 'Invalid page ID.' }, 400);
+    const page = await db.select({
+        id: pages.id,
+        slug: pages.slug,
+        title: pages.title,
+        bodyMd: pages.bodyMd,
+        isPublic: pages.isPublic,
+        isDraft: pages.isDraft,
+        isHomepageCard: pages.isHomepageCard,
+        authorId: pages.authorId,
+        createdAt: pages.createdAt,
+        updatedAt: pages.updatedAt,
+        authorEmail: users.email,
+    }).from(pages).leftJoin(users, eq(users.id, pages.authorId)).where(eq(pages.id, pageId)).get();
+    if (!page) return c.json({ error: 'Page not found.' }, 404);
+    return c.json({ page });
+});
+
+app.put('/api/admin/pages/:pageId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const pageId = Number(c.req.param('pageId'));
+    if (!Number.isInteger(pageId)) return c.json({ error: 'Invalid page ID.' }, 400);
+    const existing = await db.select({ id: pages.id }).from(pages).where(eq(pages.id, pageId)).get();
+    if (!existing) return c.json({ error: 'Page not found.' }, 404);
+
+    const body = await c.req.json<{ title?: string; slug?: string; bodyMd?: string; isPublic?: boolean; isDraft?: boolean }>();
+    const title = body.title?.trim() ?? '';
+    if (!title) return c.json({ error: 'Title is required.' }, 400);
+    const slug = body.slug?.trim() ?? '';
+    if (!SLUG_PATTERN.test(slug)) return c.json({ error: 'Slug must be lowercase letters, numbers, and hyphens.' }, 400);
+    const slugConflict = await db.select({ id: pages.id }).from(pages).where(eq(pages.slug, slug)).get();
+    if (slugConflict && slugConflict.id !== pageId) return c.json({ error: 'Another page already uses this slug.' }, 409);
+
+    const updated = await db.update(pages).set({
+        title,
+        slug,
+        bodyMd: body.bodyMd ?? '',
+        isPublic: Boolean(body.isPublic),
+        isDraft: Boolean(body.isDraft),
+        updatedAt: new Date(),
+    }).where(eq(pages.id, pageId)).returning().then((rows) => rows[0]);
+    return c.json({ page: updated });
+});
+
+app.post('/api/admin/pages/:pageId/publish', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const pageId = Number(c.req.param('pageId'));
+    if (!Number.isInteger(pageId)) return c.json({ error: 'Invalid page ID.' }, 400);
+    const existing = await db.select({ id: pages.id }).from(pages).where(eq(pages.id, pageId)).get();
+    if (!existing) return c.json({ error: 'Page not found.' }, 404);
+
+    const body = await c.req.json<{ title?: string; slug?: string; bodyMd?: string; isPublic?: boolean }>();
+    const title = body.title?.trim() ?? '';
+    if (!title) return c.json({ error: 'Title is required.' }, 400);
+    const slug = body.slug?.trim() ?? '';
+    if (!SLUG_PATTERN.test(slug)) return c.json({ error: 'Slug must be lowercase letters, numbers, and hyphens.' }, 400);
+    const slugConflict = await db.select({ id: pages.id }).from(pages).where(eq(pages.slug, slug)).get();
+    if (slugConflict && slugConflict.id !== pageId) return c.json({ error: 'Another page already uses this slug.' }, 409);
+
+    const updated = await db.update(pages).set({
+        title,
+        slug,
+        bodyMd: body.bodyMd ?? '',
+        isPublic: Boolean(body.isPublic),
+        isDraft: false,
+        updatedAt: new Date(),
+    }).where(eq(pages.id, pageId)).returning().then((rows) => rows[0]);
+    return c.json({ page: updated });
+});
+
+app.delete('/api/admin/pages/:pageId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const pageId = Number(c.req.param('pageId'));
+    if (!Number.isInteger(pageId)) return c.json({ error: 'Invalid page ID.' }, 400);
+    const existing = await db.select({ id: pages.id }).from(pages).where(eq(pages.id, pageId)).get();
+    if (!existing) return c.json({ error: 'Page not found.' }, 404);
+
+    const pageDocuments = await db.select({ r2Key: documents.r2Key }).from(documents).where(eq(documents.pageId, pageId)).all();
+    await Promise.all(pageDocuments.map((document) => c.env.BUCKET.delete(document.r2Key)));
+    await db.delete(documents).where(eq(documents.pageId, pageId));
+    await db.delete(pages).where(eq(pages.id, pageId));
+    return c.json({ deleted: true });
+});
+
+app.get('/api/admin/pages/:pageId/attachments', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const pageId = Number(c.req.param('pageId'));
+    if (!Number.isInteger(pageId)) return c.json({ error: 'Invalid page ID.' }, 400);
+    return c.json(await db.select().from(documents).where(eq(documents.pageId, pageId)).orderBy(desc(documents.createdAt)).all());
+});
+
+app.post('/api/admin/pages/:pageId/attachments', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { id: number };
+    const pageId = Number(c.req.param('pageId'));
+    if (!Number.isInteger(pageId)) return c.json({ error: 'Invalid page ID.' }, 400);
+    const existing = await db.select({ id: pages.id }).from(pages).where(eq(pages.id, pageId)).get();
+    if (!existing) return c.json({ error: 'Page not found.' }, 404);
+
+    const formData = await c.req.parseBody();
+    const file = formData['file'];
+    if (!(file instanceof File)) return c.json({ error: 'A file is required.' }, 400);
+    if (file.size > MAX_ATTACHMENT_BYTES) return c.json({ error: 'File exceeds the 10 MB limit.' }, 413);
+    if (!ATTACHMENT_MIME_TYPES.has(file.type)) return c.json({ error: `File type ${file.type || 'unknown'} is not allowed.` }, 415);
+
+    const safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, '_') || 'file';
+    const r2Key = `pages/${pageId}/${crypto.randomUUID()}-${safeName}`;
+    await c.env.BUCKET.put(r2Key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } });
+
+    const created = await db.insert(documents).values({
+        pageId,
+        r2Key,
+        filename: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        uploadedByUserId: user.id,
+    }).returning().then((rows) => rows[0]);
+
+    const url = `/api/files/${r2Key}`;
+    const snippet = file.type.startsWith('image/') ? `![${file.name}](${url})` : `[${file.name}](${url})`;
+    return c.json({ document: created, url, snippet }, 201);
+});
+
+app.delete('/api/admin/attachments/:documentId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const documentId = Number(c.req.param('documentId'));
+    if (!Number.isInteger(documentId)) return c.json({ error: 'Invalid attachment ID.' }, 400);
+    const document = await db.select().from(documents).where(eq(documents.id, documentId)).get();
+    if (!document) return c.json({ error: 'Attachment not found.' }, 404);
+    await c.env.BUCKET.delete(document.r2Key);
+    await db.delete(documents).where(eq(documents.id, documentId));
+    return c.json({ deleted: true });
+});
+
+// Public page view — editors may view drafts; public pages for any signed-in user;
+// non-public published pages require directory access.
+app.get('/api/pages/:slug', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const page = await db.select().from(pages).where(eq(pages.slug, c.req.param('slug'))).get();
+    if (!page) return c.json({ error: 'Page not found.' }, 404);
+    const user = c.get('user') as { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const isEditor = Boolean(user.isPageEditor || user.isAdmin || user.isOwner);
+    if (page.isDraft && !isEditor) return c.json({ error: 'Page not found.' }, 404);
+    if (!page.isDraft && !page.isPublic && !user.residentId && !isEditor) {
+        return c.json({ error: 'Directory access is required to view this page.' }, 403);
+    }
+    return c.json(page);
+});
+
+// Authenticated file proxy for R2 attachments — no public bucket access.
+app.get('/api/files/*', requireAuth(), async (c) => {
+    const key = decodeURIComponent(c.req.path.slice('/api/files/'.length));
+    if (!key) return c.json({ error: 'File not found.' }, 404);
+    const object = await c.env.BUCKET.get(key);
+    if (!object) return c.json({ error: 'File not found.' }, 404);
+    const headers = new Headers();
+    headers.set('Content-Type', object.httpMetadata?.contentType ?? 'application/octet-stream');
+    headers.set('Cache-Control', 'private, max-age=3600');
+    headers.set('ETag', object.httpEtag);
+    return new Response(object.body, { headers });
 });
 
 app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw));

@@ -5,6 +5,8 @@ import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 
 import AdminDirectoryView from './AdminDirectoryView.vue';
 
+import AdminPagesView from './AdminPagesView.vue';
+
 const selectedFeature = ref('Access requests');
 
 const features = [
@@ -28,7 +30,22 @@ function selectFeature(label: string) {
       <p class="mt-2 text-[#444746]">Choose an area to manage from the list.</p>
     </div>
 
-    <div class="grid min-h-112 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm md:grid-cols-[16rem_1fr]">
+    <!-- Pages renders full-width so the markdown editor is not squeezed by the sidebar -->
+    <div
+      v-if="selectedFeature === 'Pages'"
+      class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8"
+    >
+      <button
+        type="button"
+        class="mb-4 rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+        @click="selectedFeature = 'Access requests'"
+      >
+        ← Admin menu
+      </button>
+      <AdminPagesView />
+    </div>
+
+    <div v-else class="grid min-h-112 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm md:grid-cols-[16rem_1fr]">
       <nav class="border-b border-[#e1e3e1] bg-[#f0f4f9] p-3 md:border-b-0 md:border-r" aria-label="Admin features">
         <button
           v-for="feature in features"

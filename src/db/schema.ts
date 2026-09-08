@@ -10,6 +10,7 @@ export const households = sqliteTable(
     {
         id: integer('id').primaryKey({ autoIncrement: true }),
         streetAddress: text('street_address').notNull(),
+        status: text('status', { enum: ['active', 'vacant', 'archived'] }).notNull().default('active'),
         yearMovedIn: integer('year_moved_in'),
 
         // Membership Flags

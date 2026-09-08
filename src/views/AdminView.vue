@@ -4,6 +4,7 @@ import { ClipboardList, FileText, FolderTree, Users } from 'lucide-vue-next';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 import AdminHouseholdResetView from './AdminHouseholdResetView.vue';
 import AdminDirectoryView from './AdminDirectoryView.vue';
+import AdminArchiveAddressView from './AdminArchiveAddressView.vue';
 
 const selectedFeature = ref('Access requests');
 
@@ -53,6 +54,9 @@ function selectFeature(label: string) {
         <AdminDirectoryView />
         <div class="mt-10 border-t border-[#e1e3e1] pt-10">
           <AdminHouseholdResetView />
+        </div>
+        <div class="mt-10 border-t border-[#e1e3e1] pt-10">
+          <AdminArchiveAddressView />
         </div>
       </div>
       <div v-else class="p-6 sm:p-8">

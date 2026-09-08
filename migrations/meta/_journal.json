@@ -43,6 +43,13 @@
       "when": 1788817592635,
       "tag": "0005_lyrical_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788823337455,
+      "tag": "0006_noisy_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

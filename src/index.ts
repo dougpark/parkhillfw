@@ -372,7 +372,7 @@ app.get('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim();
     const householdRows = q
-        ? await db.select({ id: households.id, streetAddress: households.streetAddress })
+        ? await db.select({ id: households.id, streetAddress: households.streetAddress, status: households.status })
             .from(households)
             .leftJoin(residents, eq(residents.householdId, households.id))
             .where(or(
@@ -381,7 +381,7 @@ app.get('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
                 like(residents.lastName, `%${q}%`),
                 like(residents.email, `%${q}%`),
             )).all()
-        : await db.select({ id: households.id, streetAddress: households.streetAddress }).from(households).all();
+        : await db.select({ id: households.id, streetAddress: households.streetAddress, status: households.status }).from(households).all();
     const uniqueHouseholds = [...new Map(householdRows.map((item) => [item.id, item])).values()];
     return c.json(await Promise.all(uniqueHouseholds.map(async (household) => ({
         ...household,
@@ -390,6 +390,18 @@ app.get('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
         children: await db.select({ id: children.id, name: children.name }).from(children)
             .where(eq(children.householdId, household.id)).all(),
     }))));
+});
+
+app.post('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ streetAddress?: string }>();
+    const streetAddress = body.streetAddress?.trim() ?? '';
+    if (!streetAddress) return c.json({ error: 'Street address is required.' }, 400);
+    const existing = await db.select({ id: households.id }).from(households)
+        .where(eq(households.streetAddress, streetAddress)).get();
+    if (existing) return c.json({ error: 'A household already exists at this address.' }, 409);
+    const created = await db.insert(households).values({ streetAddress, status: 'vacant' }).returning({ id: households.id, streetAddress: households.streetAddress });
+    return c.json({ household: created[0] }, 201);
 });
 
 app.get('/api/admin/households/:householdId', requireAuth(), requireAdmin(), async (c) => {
@@ -510,6 +522,7 @@ app.post('/api/admin/households/:householdId/vacate', requireAuth(), requireAdmi
     await db.delete(children).where(eq(children.householdId, householdId));
     await db.delete(residents).where(eq(residents.householdId, householdId));
     await db.update(households).set({
+        status: 'vacant',
         yearMovedIn: null,
         parkHillMember: null,
         securityMember: false,
@@ -520,6 +533,21 @@ app.post('/api/admin/households/:householdId/vacate', requireAuth(), requireAdmi
     }).where(eq(households.id, householdId));
 
     return c.json({ cleared: true, streetAddress: household.streetAddress, residentsRemoved: residentIds.length, usersReset: userIds.length });
+});
+
+app.post('/api/admin/households/:householdId/archive', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const householdId = Number(c.req.param('householdId'));
+    const body = await c.req.json<{ confirmation?: string; reason?: string }>();
+    if (!Number.isInteger(householdId)) return c.json({ error: 'Invalid household ID.' }, 400);
+    const household = await db.select({ id: households.id, streetAddress: households.streetAddress, status: households.status })
+        .from(households).where(eq(households.id, householdId)).get();
+    if (!household) return c.json({ error: 'Household not found.' }, 404);
+    if (household.status !== 'vacant') return c.json({ error: 'Household must be vacant before it can be archived.' }, 409);
+    if (body.confirmation?.trim() !== household.streetAddress) return c.json({ error: 'Type the exact street address to confirm archiving.' }, 400);
+    await db.update(households).set({ status: 'archived', updatedAt: new Date(), notes: body.reason?.trim() || 'Archived address' })
+        .where(eq(households.id, householdId));
+    return c.json({ archived: true, streetAddress: household.streetAddress });
 });
 
 app.get('/api/admin/users', requireAuth(), requireAdmin(), async (c) => {
@@ -698,7 +726,7 @@ app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
             .all()).map((row) => row.householdId)
     );
 
-    const householdRows = (await db.select().from(households).all()).sort((left, right) =>
+    const householdRows = (await db.select().from(households).where(or(eq(households.status, 'active'), eq(households.status, 'vacant'))).all()).sort((left, right) =>
         compareStreetAddresses(left.streetAddress, right.streetAddress)
     );
     const filteredHouseholds = matchedHouseholdIds

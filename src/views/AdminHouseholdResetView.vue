@@ -69,7 +69,7 @@ async function markVacant() {
     <div>
       <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Directory maintenance</p>
       <h2 class="mt-1 text-2xl font-semibold tracking-tight">Mark household vacant</h2>
-      <p class="mt-2 text-[#444746]">Find a household by resident name or address, then clear its occupants while preserving the property address. Ex. Residents moved out. Get ready for new occupants.</p>
+      <p class="mt-2 text-[#444746]">Search for a property to archive departing residents, clear active contacts, and mark the household as vacant for future occupants.</p>
     </div>
 
     <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="searchHouseholds">

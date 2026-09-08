@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Search } from 'lucide-vue-next';
+import { ChevronDown, Search } from 'lucide-vue-next';
 import DirectoryEditView from './DirectoryEditView.vue';
+import AdminArchiveAddressView from './AdminArchiveAddressView.vue';
+import AdminHouseholdResetView from './AdminHouseholdResetView.vue';
 
 interface HouseholdResult {
   id: number;
@@ -18,6 +20,7 @@ const error = ref('');
 const address = ref('');
 const addressNotice = ref('');
 const isCreatingAddress = ref(false);
+const showAdvanced = ref(false);
 
 async function searchHouseholds() {
   isSearching.value = true;
@@ -63,6 +66,8 @@ async function createAddress() {
 
 <template>
   <section class="space-y-6">
+
+    <!-- Directory Editing -->
     <div>
       <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Directory editing</p>
       <h2 class="mt-1 text-2xl font-semibold tracking-tight">Edit household directory entry</h2>
@@ -78,6 +83,8 @@ async function createAddress() {
     </form>
 
     <p v-if="error" class="rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
+
+
     <div v-if="results.length" class="space-y-2">
       <button v-for="household in results" :key="household.id" type="button" class="w-full rounded-2xl border p-4 text-left transition-colors" :class="selectedId === household.id ? 'border-[#1a73e8] bg-[#e8f0fe]' : 'border-[#e1e3e1] bg-white hover:border-[#1a73e8]'" @click="selectedId = household.id">
         <span class="flex items-center justify-between gap-3">
@@ -88,20 +95,41 @@ async function createAddress() {
       </button>
     </div>
 
-    <DirectoryEditView v-if="selectedId" :key="selectedId" :admin-household-id="selectedId" />
 
-    <section class="border-t border-[#c4c7c5] pt-8">
-      <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Property records</p>
-      <h3 class="mt-1 text-xl font-semibold">Address Management</h3>
-      <p class="mt-1 text-sm text-[#444746]">Create a new vacant property. Use this action when a portion of an existing residential property has been sold off to create a new addressable lot.</p>
-      <form class="mt-4 flex flex-col gap-3 sm:flex-row" @submit.prevent="createAddress">
-        <label class="flex-1 text-sm font-medium">New address
-          <input v-model="address" required class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-3 py-2.5 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" placeholder="Enter a new street address" />
-        </label>
-        <button type="submit" :disabled="isCreatingAddress" class="rounded-full bg-[#1a73e8] px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">{{ isCreatingAddress ? 'Creating...' : 'Create vacant address' }}</button>
-      </form>
-        <p v-if="addressNotice" class="mt-4 rounded-xl bg-[#e6f4ea] p-3 text-sm text-[#137333]">{{ addressNotice }}</p>
-    
+    <DirectoryEditView v-if="selectedId" :key="selectedId" :admin-household-id="selectedId" />
+<div class="mt-10 border-t border-[#e1e3e1] pt-10">
+          <AdminHouseholdResetView />
+        </div>
     </section>
-  </section>
+
+    <!-- Hidden Show Advanced Section -->
+    <section class="border-t border-[#c4c7c5] pt-8">
+      <button type="button" class="inline-flex items-center gap-2 text-sm font-medium text-[#1a73e8] transition hover:text-[#0b57d0]" @click="showAdvanced = !showAdvanced">
+        <span>{{ showAdvanced ? 'Hide advanced' : 'Show advanced' }}</span>
+        <ChevronDown class="h-4 w-4 transition-transform" :class="showAdvanced ? 'rotate-180' : ''" />
+      </button>
+
+      <div v-if="showAdvanced" class="mt-6 space-y-8">
+
+        <!-- Create new vacant property -->
+        <section>
+          <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Property records</p>
+          <h3 class="mt-1 text-xl font-semibold">Address Management</h3>
+          <p class="mt-1 text-sm text-[#444746]">Create a new vacant property. Use this action when a portion of an existing residential property has been sold off to create a new addressable lot.</p>
+          <form class="mt-4 flex flex-col gap-3 sm:flex-row" @submit.prevent="createAddress">
+            <label class="flex-1 text-sm font-medium">New address
+              <input v-model="address" required class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-3 py-2.5 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" placeholder="Enter a new street address" />
+            </label>
+            <button type="submit" :disabled="isCreatingAddress" class="rounded-full bg-[#1a73e8] px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">{{ isCreatingAddress ? 'Creating...' : 'Create vacant address' }}</button>
+          </form>
+          <p v-if="addressNotice" class="mt-4 rounded-xl bg-[#e6f4ea] p-3 text-sm text-[#137333]">{{ addressNotice }}</p>
+        </section>
+
+        <!-- Archive Address -->
+        <div class="border-t border-[#e1e3e1] pt-8">
+          <AdminArchiveAddressView />
+        </div>
+      </div>
+    </section>
+  
 </template>

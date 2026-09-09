@@ -106,13 +106,13 @@ onMounted(loadDirectory);
 
 <template>
   <section class="space-y-6">
-    <BreadcrumbNav current="Edit My Household" />
+    <BreadcrumbNav v-if="!adminHouseholdId" current="Edit My Household" />
 
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         
-        <h2 class="mt-3 text-2xl font-semibold tracking-tight">Edit My Household</h2>
-        <p class="mt-2 text-[#444746]">Update information for your household and everyone who lives there.</p>
+        <h2 class="mt-3 text-2xl font-semibold tracking-tight">{{ adminHouseholdId ? 'Edit Household' : 'Edit My Household' }}</h2>
+        <p v-if="!adminHouseholdId" class="mt-2 text-[#444746]">Update information for your household and everyone who lives there.</p>
       </div>
       <button type="button" :disabled="isSaving || isLoading" class="inline-flex items-center gap-2 rounded-full bg-[#1a73e8] px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60" @click="saveDirectory">
         <Save class="h-4 w-4" /> {{ isSaving ? 'Saving...' : 'Save changes' }}

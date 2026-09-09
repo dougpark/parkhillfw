@@ -85,7 +85,7 @@ async function createAddress() {
     <p v-if="error" class="rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
 
 
-    <div v-if="results.length" class="space-y-2">
+    <div v-if="results.length && !selectedId" class="space-y-2">
       <button v-for="household in results" :key="household.id" type="button" class="w-full rounded-2xl border p-4 text-left transition-colors" :class="selectedId === household.id ? 'border-[#1a73e8] bg-[#e8f0fe]' : 'border-[#e1e3e1] bg-white hover:border-[#1a73e8]'" @click="selectedId = household.id">
         <span class="flex items-center justify-between gap-3">
           <span class="font-medium">{{ household.streetAddress }}</span>

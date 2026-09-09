@@ -1362,6 +1362,22 @@ app.get('/api/nav', async (c) => {
     return c.json({ items: buildNavTree(await navRows(db), viewer) });
 });
 
+// Ancestor menu titles for a page, so a page can show its way back home.
+function navTrailToPage(tree: NavNode[], pageSlug: string): Array<{ slug: string | null; title: string }> {
+    const trail: NavNode[] = [];
+    const walk = (nodes: NavNode[]): boolean => {
+        for (const node of nodes) {
+            trail.push(node);
+            if (node.kind === 'page' && node.pageSlug === pageSlug) return true;
+            if (walk(node.children)) return true;
+            trail.pop();
+        }
+        return false;
+    };
+    if (!walk(tree)) return [];
+    return trail.slice(0, -1).map((node) => ({ slug: node.slug, title: node.title }));
+}
+
 app.get('/api/nav/:slug', async (c) => {
     const db = drizzle(c.env.DB);
     const viewer = await resolveViewer(c);
@@ -1401,7 +1417,8 @@ app.get('/api/pages/:slug', requireAuth(), async (c) => {
     if (!page.isDraft && !page.isPublic && !user.residentId && !isEditor) {
         return c.json({ error: 'Directory access is required to view this page.' }, 403);
     }
-    return c.json(page);
+    const breadcrumbs = navTrailToPage(buildNavTree(await navRows(db), user as Viewer), page.slug);
+    return c.json({ ...page, breadcrumbs });
 });
 
 // Authenticated file proxy for R2 attachments — no public bucket access.

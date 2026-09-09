@@ -21,10 +21,13 @@ const projection = ref<{ depth: number; parentId: number | null; siblingIndex: n
 const rowHandled = ref(false);
 const listEl = ref<HTMLElement | null>(null);
 
-const hiddenIds = computed(() => (dragId.value === null ? [] : [dragId.value, ...descendantIds(props.rows, dragId.value)]));
+const draggedIds = computed(() => (dragId.value === null ? [] : [dragId.value, ...descendantIds(props.rows, dragId.value)]));
 
-const allNodes = computed(() => flattenMenus(props.rows, collapsed.value));
-const visible = computed<FlatNode[]>(() => allNodes.value.filter((node) => !hiddenIds.value.includes(node.row.id)));
+// Every node stays rendered while dragging — removing the drag source from the
+// DOM cancels the native drag — so the dragged subtree is only dimmed, and the
+// drop projection runs against the list with that subtree excluded.
+const nodes = computed(() => flattenMenus(props.rows, collapsed.value));
+const projectable = computed<FlatNode[]>(() => nodes.value.filter((node) => !draggedIds.value.includes(node.row.id)));
 
 function hasChildren(id: number): boolean {
   return props.rows.some((row) => row.parentId === id);
@@ -48,7 +51,7 @@ function siblingIndexOf(row: MenuRow): number {
 }
 
 function depthOf(row: MenuRow): number {
-  return allNodes.value.find((node) => node.row.id === row.id)?.depth ?? 1;
+  return nodes.value.find((node) => node.row.id === row.id)?.depth ?? 1;
 }
 
 function canMoveUp(row: MenuRow): boolean {
@@ -112,13 +115,22 @@ function onDragStart(event: DragEvent, row: MenuRow): void {
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
 }
 
+// Rendered slots include the dragged subtree; the projection list does not.
+function toProjectableIndex(renderedIndex: number): number {
+  let count = 0;
+  for (let index = 0; index < renderedIndex; index += 1) {
+    if (!draggedIds.value.includes(nodes.value[index]!.row.id)) count += 1;
+  }
+  return count;
+}
+
 function updateProjection(event: DragEvent, insertIndex: number): void {
   if (dragId.value === null || !listEl.value) return;
   const left = listEl.value.getBoundingClientRect().left;
   const requestedDepth = Math.round((event.clientX - left - 12) / INDENT_PX) + 1;
   const height = subtreeHeight(props.rows, dragId.value);
   dropIndex.value = insertIndex;
-  projection.value = projectDrop(visible.value, insertIndex, requestedDepth, height);
+  projection.value = projectDrop(projectable.value, toProjectableIndex(insertIndex), requestedDepth, height);
 }
 
 function onRowDragOver(event: DragEvent, index: number): void {
@@ -138,7 +150,7 @@ function onListDragOver(event: DragEvent): void {
     rowHandled.value = false;
     return;
   }
-  updateProjection(event, visible.value.length);
+  updateProjection(event, nodes.value.length);
 }
 
 function onDrop(event: DragEvent): void {
@@ -180,11 +192,11 @@ function isBroken(row: MenuRow): boolean {
     @drop="onDrop"
     @dragend="resetDrag"
   >
-    <p v-if="!visible.length && dragId === null" class="px-3 py-6 text-center text-sm text-[#444746]">
+    <p v-if="!nodes.length" class="px-3 py-6 text-center text-sm text-[#444746]">
       No menus yet. Add a folder to start building navigation.
     </p>
 
-    <template v-for="(node, index) in visible" :key="node.row.id">
+    <template v-for="(node, index) in nodes" :key="node.row.id">
       <div
         v-if="dropIndex === index && projection"
         class="h-0.5 rounded-full bg-[#1a73e8]"
@@ -194,6 +206,7 @@ function isBroken(row: MenuRow): boolean {
       <div
         :draggable="armedId === node.row.id"
         class="group flex items-center gap-2 rounded-xl px-2 py-2 transition-colors hover:bg-[#f0f4f9]"
+        :class="draggedIds.includes(node.row.id) ? 'opacity-40' : ''"
         :style="{ marginLeft: `${(node.depth - 1) * INDENT_PX}px` }"
         @dragstart="onDragStart($event, node.row)"
         @dragover="onRowDragOver($event, index)"
@@ -256,7 +269,7 @@ function isBroken(row: MenuRow): boolean {
     </template>
 
     <div
-      v-if="dropIndex === visible.length && projection"
+      v-if="dropIndex === nodes.length && projection"
       class="h-0.5 rounded-full bg-[#1a73e8]"
       :style="{ marginLeft: `${(projection.depth - 1) * INDENT_PX + 12}px` }"
       aria-hidden="true"

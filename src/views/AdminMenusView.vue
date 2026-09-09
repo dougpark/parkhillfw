@@ -143,8 +143,8 @@ onMounted(load);
 
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
-      <h3 class="text-xl font-semibold">Menus</h3>
-      <p class="mt-1 text-sm text-[#444746]">Organize how members navigate pages. Drafts stay hidden until published.</p>
+      <h3 class="text-xl font-semibold">Navigation</h3>
+      <p class="mt-1 text-sm text-[#444746]">Organize how pages are navigated. Drafts stay hidden until published.</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <button

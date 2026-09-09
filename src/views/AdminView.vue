@@ -16,7 +16,7 @@ const features = [
   { label: 'Access requests', description: 'Review unmatched resident requests.', icon: ClipboardList },
   { label: 'Directory', description: 'Edit households and residents.', icon: Users },
   { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText },
-  { label: 'Menus', description: 'Organize navigation and folders.', icon: FolderTree },
+  { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree },
   { label: 'Users', description: 'Manage users and Login Emails.', icon: Users },
 ];
 
@@ -48,7 +48,7 @@ function selectFeature(label: string) {
 
     <!-- Menus needs the full width for the hierarchy editor's indent guides -->
     <div
-      v-else-if="selectedFeature === 'Menus'"
+      v-else-if="selectedFeature === 'Navigation'"
       class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8"
     >
       <AdminMenusView @exit="selectedFeature = 'Access requests'" />

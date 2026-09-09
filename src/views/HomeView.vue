@@ -74,7 +74,7 @@ onMounted(async () => {
       <RouterLink
         v-if="user && canAdmin(user)"
         to="/admin"
-        class="group rounded-3xl border border-[#e1e3e1] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40"
+        class="group rounded-3xl border border-[#e1e3e1] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#f7faff] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40"
       >
         <div class="flex items-center gap-4">
           <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f3e8fd] text-[#7c4dff]">
@@ -82,30 +82,28 @@ onMounted(async () => {
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h3 class="text-xl font-semibold text-[#1f1f1f]">Admin</h3>
+              <h3 class="text-xl font-semibold text-[#1f1f1f] transition-colors group-hover:text-[#1a73e8]">Admin</h3>
               <span v-if="pendingRequests" class="rounded-full bg-[#fff8e1] px-2 py-0.5 text-xs font-semibold text-[#8a6116]">{{ pendingRequests }} review{{ pendingRequests === 1 ? '' : 's' }}</span>
             </div>
             <p class="mt-1 text-[#444746]">Manage neighborhood content and access</p>
           </div>
         </div>
-        <span class="mt-4 inline-block text-sm font-medium text-[#1a73e8] transition-transform group-hover:translate-x-1">Open <span aria-hidden="true">-&gt;</span></span>
       </RouterLink>
       <RouterLink
         v-for="card in baseCards"
         :key="card.title"
         :to="card.to"
-        class="group rounded-3xl border border-[#e1e3e1] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40"
+        class="group rounded-3xl border border-[#e1e3e1] bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#f7faff] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40"
       >
         <div class="flex items-center gap-4">
           <div :class="['flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl', card.color]">
             <component :is="card.icon" class="h-6 w-6" />
           </div>
           <div>
-            <h3 class="text-xl font-semibold text-[#1f1f1f]">{{ card.title }}</h3>
+            <h3 class="text-xl font-semibold text-[#1f1f1f] transition-colors group-hover:text-[#1a73e8]">{{ card.title }}</h3>
             <p class="mt-1 text-[#444746]">{{ card.description }}</p>
           </div>
         </div>
-        <span class="mt-4 inline-block text-sm font-medium text-[#1a73e8] transition-transform group-hover:translate-x-1">Open <span aria-hidden="true">-&gt;</span></span>
       </RouterLink>
     </div>
 

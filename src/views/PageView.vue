@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronRight, Home } from 'lucide-vue-next';
+import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import MarkdownPreview from '../components/common/MarkdownPreview.vue';
 
 interface PublicPage {
@@ -37,18 +37,7 @@ watch(() => route.params.slug, (slug) => {
       {{ error }}
     </p>
     <template v-else-if="page">
-      <nav class="flex flex-wrap items-center gap-1 text-sm text-[#444746]" aria-label="Breadcrumb">
-        <RouterLink to="/home" class="flex items-center gap-1 rounded-full px-2 py-1 hover:bg-[#f0f4f9]">
-          <Home class="h-4 w-4" />
-          Home
-        </RouterLink>
-        <template v-for="crumb in page.breadcrumbs" :key="crumb.slug ?? crumb.title">
-          <ChevronRight class="h-4 w-4" aria-hidden="true" />
-          <RouterLink :to="`/menu/${crumb.slug}`" class="rounded-full px-2 py-1 hover:bg-[#f0f4f9]">{{ crumb.title }}</RouterLink>
-        </template>
-        <ChevronRight class="h-4 w-4" aria-hidden="true" />
-        <span class="px-2 py-1 font-medium text-[#1f1f1f]">{{ page.title }}</span>
-      </nav>
+      <BreadcrumbNav :trail="page.breadcrumbs.map((crumb) => ({ to: `/menu/${crumb.slug}`, title: crumb.title }))" :current="page.title" />
 
       <h2 class="mt-4 text-2xl font-semibold tracking-tight">{{ page.title }}</h2>
       <MarkdownPreview class="mt-6" :source="page.bodyMd" />

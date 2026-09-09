@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import BreadcrumbNav from '@/components/common/BreadcrumbNav.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FilterChip from '@/components/ui/FilterChip.vue';
 import HouseholdCard from '@/components/directory/HouseholdCard.vue';
@@ -106,6 +107,9 @@ onMounted(loadDirectory);
 
 <template>
   <div class="space-y-6">
+    <BreadcrumbNav current="Directory" />
+     <h2 class="mt-1 text-2xl font-semibold tracking-tight">Directory</h2>
+   
     <div class="sticky top-14 z-10 -mx-4 bg-[#f0f4f9] px-4 py-3 sm:mx-0 sm:px-0">
       <BaseInput
         v-model="query"

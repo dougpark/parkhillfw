@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { ClipboardList, FileText, FolderTree, Users } from 'lucide-vue-next';
+import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 
 import AdminDirectoryView from './AdminDirectoryView.vue';
@@ -26,9 +27,14 @@ function selectFeature(label: string) {
 
 <template>
   <section class="space-y-6">
+    <BreadcrumbNav
+      :trail="[{ title: 'Admin' }]"
+      :current="selectedFeature"
+      @crumb-click="selectedFeature = 'Access requests'"
+    />
+
     <div>
-      <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Administration</p>
-      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Manage Park Hill</h2>
+      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Administration</h2>
       <p class="mt-2 text-[#444746]">Choose an area to manage from the list.</p>
     </div>
 

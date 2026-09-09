@@ -636,9 +636,9 @@ app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
         isPageEditor: users.isPageEditor,
         isDirectoryEditor: users.isDirectoryEditor,
     };
-    // Two passes cover both directions of the resident<->user link: residents who have
-    // never logged in (no users row yet) and user accounts not linked to a resident.
-    const [residentRows, userRows] = await Promise.all([
+    // Three passes cover every place an account can be found: residents who have never
+    // logged in (no users row yet), the account's primary login email, and its aliases.
+    const [residentRows, userRows, aliasRows] = await Promise.all([
         db.select(columns).from(residents)
             .leftJoin(users, eq(users.residentId, residents.id))
             .where(or(like(residents.firstName, term), like(residents.lastName, term), like(residents.email, term)))
@@ -647,10 +647,15 @@ app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
             .leftJoin(residents, eq(residents.id, users.residentId))
             .where(like(users.email, term))
             .limit(20).all(),
+        db.select(columns).from(userLoginEmails)
+            .innerJoin(users, eq(users.id, userLoginEmails.userId))
+            .leftJoin(residents, eq(residents.id, users.residentId))
+            .where(like(userLoginEmails.email, term))
+            .limit(20).all(),
     ]);
 
     const merged = new Map<string, (typeof residentRows)[number]>();
-    for (const row of [...residentRows, ...userRows]) {
+    for (const row of [...residentRows, ...userRows, ...aliasRows]) {
         const key = row.userId ? `u${row.userId}` : `r${row.residentId}`;
         if (!merged.has(key)) merged.set(key, row);
     }
@@ -682,6 +687,20 @@ app.post('/api/admin/access-control/users', requireAuth(), requireAdmin(), async
     if (!email || !email.includes('@')) return c.json({ error: 'A valid email is required to add this user.' }, 400);
 
     let user = await db.select().from(users).where(eq(users.email, email)).get();
+    if (!user) {
+        // The email may be an alias in userLoginEmails rather than a users.email row.
+        const alias = await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails).where(eq(userLoginEmails.email, email)).get();
+        if (alias) user = await db.select().from(users).where(eq(users.id, alias.userId)).get();
+    }
+    if (!user && resident) {
+        // Mirror the canonical-account rule from /api/auth/verify: a resident can only have
+        // one users row, so reuse the existing one and file this email as an alias.
+        const canonicalUser = await db.select().from(users).where(eq(users.residentId, resident.id)).orderBy(asc(users.id)).get();
+        if (canonicalUser) {
+            await db.insert(userLoginEmails).values({ userId: canonicalUser.id, email }).onConflictDoNothing();
+            user = canonicalUser;
+        }
+    }
     if (!user) {
         user = await db.insert(users).values({
             email,

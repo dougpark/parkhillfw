@@ -91,7 +91,7 @@ watch(() => route.fullPath, loadAuthUser);
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#f0f4f9] text-[#1f1f1f] font-sans">
+  <div class="min-h-screen bg-[#f0f4f9] text-[#1f1f1f] font-sans" @click="isAccountMenuOpen = false">
     <header class="sticky top-0 z-20 bg-white border-b border-[#e1e3e1]">
       <div class="max-w-5xl mx-auto flex items-center justify-between px-4 py-3 sm:px-8">
         <RouterLink
@@ -102,7 +102,7 @@ watch(() => route.fullPath, loadAuthUser);
           <img src="/ph-logo.jpeg" alt="" class="h-10 w-8 shrink-0 object-contain" />
           <span class="truncate">Park Hill Neighborhood</span>
         </RouterLink>
-        <div class="relative flex items-center gap-2">
+        <div class="relative flex items-center gap-2" @click.stop>
           <template v-if="user">
             <button
               type="button"

@@ -67,7 +67,7 @@ async function archiveSelected() {
   <section class="space-y-6">
     <div>
       <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Property records</p>
-      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Archive an address</h2>
+      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Archive an Address</h2>
       <p class="mt-2 text-[#444746]">Search for an address to confirm the household is vacant, then archive the entry to preserve historical records. Use this option when a residential structure has been removed or consolidated into an adjacent property.</p>
     </div>
 

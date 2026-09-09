@@ -142,7 +142,7 @@ onMounted(loadRequests);
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Admin review</p>
-        <h2 class="mt-1 text-2xl font-semibold tracking-tight">Access requests</h2>
+        <h2 class="mt-1 text-2xl font-semibold tracking-tight">Access Requests</h2>
         <p class="mt-2 text-[#444746]">Verify the request against the directory before connecting an account.</p>
       </div>
       <span class="rounded-full bg-[#fff8e1] px-3 py-1.5 text-sm font-medium text-[#8a6116]">{{ pendingRequests.length }} pending</span>

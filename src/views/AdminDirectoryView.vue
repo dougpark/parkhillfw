@@ -70,7 +70,7 @@ async function createAddress() {
     <!-- Directory Editing -->
     <div>
       <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Directory editing</p>
-      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Edit household directory entry</h2>
+      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Edit Household Directory</h2>
       <p class="mt-2 text-[#444746]">Search by resident name or address, then edit the household, residents, and children.</p>
     </div>
 

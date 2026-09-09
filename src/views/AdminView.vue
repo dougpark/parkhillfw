@@ -10,10 +10,10 @@ import AdminMenusView from './AdminMenusView.vue';
 
 import AdminPagesView from './AdminPagesView.vue';
 
-const selectedFeature = ref('Access requests');
+const selectedFeature = ref('Access Requests');
 
 const features = [
-  { label: 'Access requests', description: 'Review unmatched resident requests.', icon: ClipboardList },
+  { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList },
   { label: 'Directory', description: 'Edit households and residents.', icon: Users },
   { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText },
   { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree },
@@ -30,7 +30,7 @@ function selectFeature(label: string) {
     <BreadcrumbNav
       :trail="[{ title: 'Admin' }]"
       :current="selectedFeature"
-      @crumb-click="selectedFeature = 'Access requests'"
+      @crumb-click="selectedFeature = 'Access Requests'"
     />
 
     <div>
@@ -43,7 +43,7 @@ function selectFeature(label: string) {
       v-if="selectedFeature === 'Pages'"
       class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8"
     >
-      <AdminPagesView @exit="selectedFeature = 'Access requests'" />
+      <AdminPagesView @exit="selectedFeature = 'Access Requests'" />
     </div>
 
     <!-- Menus needs the full width for the hierarchy editor's indent guides -->
@@ -51,7 +51,7 @@ function selectFeature(label: string) {
       v-else-if="selectedFeature === 'Navigation'"
       class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8"
     >
-      <AdminMenusView @exit="selectedFeature = 'Access requests'" />
+      <AdminMenusView @exit="selectedFeature = 'Access Requests'" />
     </div>
 
     <div v-else class="grid min-h-112 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm md:grid-cols-[16rem_1fr]">
@@ -72,7 +72,7 @@ function selectFeature(label: string) {
         </button>
       </nav>
 
-      <div v-if="selectedFeature === 'Access requests'" class="p-6 sm:p-8">
+      <div v-if="selectedFeature === 'Access Requests'" class="p-6 sm:p-8">
         <AdminAccessRequestsView />
       </div>
       <div v-else-if="selectedFeature === 'Directory'" class="p-6 sm:p-8">

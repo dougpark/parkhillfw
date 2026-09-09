@@ -68,7 +68,7 @@ async function markVacant() {
   <section class="space-y-6">
     <div>
       <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Directory maintenance</p>
-      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Mark household vacant</h2>
+      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Mark Household Vacant</h2>
       <p class="mt-2 text-[#444746]">Search for a property to archive departing residents, clear active contacts, and mark the household as vacant for future occupants.</p>
     </div>
 

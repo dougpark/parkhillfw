@@ -106,7 +106,7 @@ onMounted(load);
       class="mb-4 rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
       @click="goToAdminMenu"
     >
-      ← {{ mode === 'edit' ? 'Pages List' : 'Admin menu' }}
+      ← {{ mode === 'edit' ? 'Page List' : 'Admin menu' }}
     </button>
   </div>
 

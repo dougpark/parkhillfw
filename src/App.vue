@@ -11,6 +11,7 @@ interface AuthUser {
 const user = ref<AuthUser | null>(null);
 const route = useRoute();
 const router = useRouter();
+const isAccountMenuOpen = ref(false);
 const isAccountPanelOpen = ref(false);
 const loginEmails = ref<string[]>([]);
 const isLoadingEmails = ref(false);
@@ -19,6 +20,7 @@ const emailPanelError = ref('');
 const emailPanelSaved = ref(false);
 
 async function openAccountPanel() {
+  isAccountMenuOpen.value = false;
   isAccountPanelOpen.value = true;
   isLoadingEmails.value = true;
   emailPanelError.value = '';
@@ -33,6 +35,10 @@ async function openAccountPanel() {
   } finally {
     isLoadingEmails.value = false;
   }
+}
+
+function toggleAccountMenu() {
+  isAccountMenuOpen.value = !isAccountMenuOpen.value;
 }
 
 function addLoginEmail() {
@@ -61,6 +67,7 @@ async function saveLoginEmails() {
 }
 
 async function switchAccount() {
+  isAccountMenuOpen.value = false;
   await fetch('/api/auth/logout', { method: 'POST' });
   user.value = null;
   await router.push({ path: '/login', query: { switch: '1' } });
@@ -94,22 +101,38 @@ watch(() => route.fullPath, loadAuthUser);
         >
           Park Hill Neighborhood
         </RouterLink>
-        <div class="flex items-center gap-2">
+        <div class="relative flex items-center gap-2">
           <template v-if="user">
             <button
               type="button"
               class="max-w-32 truncate text-xs font-medium text-[#444746] underline decoration-[#c4c7c5] underline-offset-4 hover:text-[#1a73e8] sm:max-w-none sm:text-sm"
-              @click="openAccountPanel"
+              :aria-expanded="isAccountMenuOpen"
+              aria-haspopup="menu"
+              @click="toggleAccountMenu"
             >{{ user.displayName }}</button>
-            <button
-              type="button"
-              class="rounded-full p-2 text-[#444746] transition-colors hover:bg-[#f0f4f9]"
-              aria-label="Switch account"
-              title="Switch account"
-              @click="switchAccount"
+            <div
+              v-if="isAccountMenuOpen"
+              class="absolute right-0 top-full z-30 mt-2 w-44 rounded-xl border border-[#e1e3e1] bg-white p-1.5 shadow-lg"
+              role="menu"
             >
-              <LogOut class="h-4 w-4" />
-            </button>
+              <button
+                type="button"
+                class="block w-full rounded-lg px-3 py-2 text-left text-sm text-[#1f1f1f] hover:bg-[#f0f4f9]"
+                role="menuitem"
+                @click="openAccountPanel"
+              >
+                Edit Emails
+              </button>
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-[#1f1f1f] hover:bg-[#f0f4f9]"
+                role="menuitem"
+                @click="switchAccount"
+              >
+                <LogOut class="h-4 w-4" />
+                Logout
+              </button>
+            </div>
           </template>
           <RouterLink
             v-else

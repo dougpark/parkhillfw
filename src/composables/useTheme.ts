@@ -18,7 +18,7 @@ const THEME_COLORS: Record<ThemeName, string> = {
 export const themeOptions: ThemeOption[] = [
     { name: 'original', label: 'Original', colors: ['#f0f4f9', '#1a73e8', '#7c4dff'] },
     { name: 'modern-lite', label: 'Modern Lite', colors: ['#faf9f6', '#e07a5f', '#81b29a'] },
-    { name: 'modern-dark', label: 'Modern Dark', colors: ['#2b2d42', '#ef233c', '#8d99ae'] },
+    { name: 'modern-dark', label: 'Modern Dark', colors: ['#2b2d42', '#ab5b49', '#8d99ae'] },
 ];
 
 function isThemeName(value: string | undefined): value is ThemeName {
@@ -26,9 +26,9 @@ function isThemeName(value: string | undefined): value is ThemeName {
 }
 
 function readInitialTheme(): ThemeName {
-    if (typeof document === 'undefined') return 'original';
+    if (typeof document === 'undefined') return 'modern-lite';
     const currentTheme = document.documentElement.dataset.theme;
-    return isThemeName(currentTheme) ? currentTheme : 'original';
+    return isThemeName(currentTheme) ? currentTheme : 'modern-lite';
 }
 
 const theme = ref<ThemeName>(readInitialTheme());

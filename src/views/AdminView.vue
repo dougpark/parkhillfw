@@ -35,8 +35,7 @@ function selectFeature(label: string) {
 
     <div>
       <h2 class="mt-1 text-2xl font-semibold tracking-tight">Administration</h2>
-      <p class="mt-2 text-[#444746]">Choose an area to manage from the list.</p>
-    </div>
+      </div>
 
     <!-- Pages renders full-width so the markdown editor is not squeezed by the sidebar -->
     <div

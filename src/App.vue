@@ -96,10 +96,11 @@ watch(() => route.fullPath, loadAuthUser);
       <div class="max-w-5xl mx-auto flex items-center justify-between px-4 py-3 sm:px-8">
         <RouterLink
           to="/home"
-          class="text-lg sm:text-xl font-semibold tracking-tight text-[#1a73e8]"
+          class="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight text-[#1a73e8] sm:text-xl"
           aria-label="Go to directory"
         >
-          Park Hill Neighborhood
+          <img src="/ph-logo.jpeg" alt="" class="h-10 w-8 shrink-0 object-contain" />
+          <span class="truncate">Park Hill Neighborhood</span>
         </RouterLink>
         <div class="relative flex items-center gap-2">
           <template v-if="user">

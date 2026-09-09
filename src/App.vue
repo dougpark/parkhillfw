@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue';
 import { Check, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
+import modernLogo from '/modern-ph-logo.svg?raw';
 
 interface AuthUser {
   displayName: string;
@@ -12,6 +13,7 @@ interface AuthUser {
 const user = ref<AuthUser | null>(null);
 const route = useRoute();
 const router = useRouter();
+const navbarLogo = modernLogo.replace('viewBox="0 0 512.000000 512.000000"', 'viewBox="145 45 220 300"');
 const { theme, themeOptions, applyTheme } = useTheme();
 const isAccountMenuOpen = ref(false);
 const isAccountPanelOpen = ref(false);
@@ -101,7 +103,7 @@ watch(() => route.fullPath, loadAuthUser);
           class="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight text-accent sm:text-xl"
           aria-label="Go to directory"
         >
-          <img src="/ph-logo.jpeg" alt="" class="h-10 w-8 shrink-0 object-contain" />
+          <span class="themed-logo h-10 w-10 shrink-0" aria-hidden="true" v-html="navbarLogo" />
           <span class="truncate">Park Hill Neighborhood</span>
         </RouterLink>
         <div class="relative flex items-center gap-2" @click.stop>
@@ -202,3 +204,11 @@ watch(() => route.fullPath, loadAuthUser);
     </main>
   </div>
 </template>
+
+<style scoped>
+.themed-logo :deep(svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+</style>

@@ -30,14 +30,14 @@ const buttons: Array<{ name: MarkdownCommand; label: string; icon: unknown }> = 
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-1 rounded-xl border border-[#e1e3e1] bg-[#f0f4f9] p-2" role="toolbar" aria-label="Markdown formatting">
+  <div class="flex flex-wrap items-center gap-1 rounded-xl border border-theme-border bg-app-bg p-2" role="toolbar" aria-label="Markdown formatting">
     <button
       v-for="button in buttons"
       :key="button.name"
       type="button"
       :title="button.label"
       :aria-label="button.label"
-      class="flex h-9 w-9 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-white hover:text-[#1a73e8]"
+      class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-surface hover:text-accent"
       @click="emit('command', button.name)"
     >
       <component :is="button.icon" class="h-4 w-4" />

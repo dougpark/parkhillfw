@@ -67,41 +67,41 @@ async function markVacant() {
 <template>
   <section class="space-y-6">
     <div>
-      <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Directory maintenance</p>
+      <p class="text-sm font-medium uppercase tracking-wide text-accent">Directory maintenance</p>
       <h2 class="mt-1 text-2xl font-semibold tracking-tight">Mark Household Vacant</h2>
-      <p class="mt-2 text-[#444746]">Search for a property to archive departing residents, clear active contacts, and mark the household as vacant for future occupants.</p>
+      <p class="mt-2 text-content-muted">Search for a property to archive departing residents, clear active contacts, and mark the household as vacant for future occupants.</p>
     </div>
 
     <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="searchHouseholds">
       <div class="relative flex-1">
-        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#444746]" />
-        <input v-model="query" required class="w-full rounded-xl border border-[#e1e3e1] bg-white py-3 pl-10 pr-3 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" placeholder="Search resident name or street address" />
+        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+        <input v-model="query" required class="w-full rounded-xl border border-theme-border bg-surface py-3 pl-10 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30" placeholder="Search resident name or street address" />
       </div>
-      <button type="submit" :disabled="isSearching" class="rounded-full bg-[#1a73e8] px-5 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">{{ isSearching ? 'Searching...' : 'Search' }}</button>
+      <button type="submit" :disabled="isSearching" class="rounded-full bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60">{{ isSearching ? 'Searching...' : 'Search' }}</button>
     </form>
 
-    <p v-if="error" class="rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
-    <p v-if="notice" class="rounded-xl bg-[#e6f4ea] p-3 text-sm text-[#137333]">{{ notice }}</p>
+    <p v-if="error" class="rounded-xl bg-danger-subtle p-3 text-sm text-danger">{{ error }}</p>
+    <p v-if="notice" class="rounded-xl bg-success-subtle p-3 text-sm text-success">{{ notice }}</p>
 
     <div v-if="results.length" class="space-y-2">
-      <button v-for="household in results" :key="household.id" type="button" class="w-full rounded-2xl border p-4 text-left transition-colors" :class="selected?.id === household.id ? 'border-[#1a73e8] bg-[#e8f0fe]' : 'border-[#e1e3e1] bg-white hover:border-[#1a73e8]'" @click="selectHousehold(household)">
+      <button v-for="household in results" :key="household.id" type="button" class="w-full rounded-2xl border p-4 text-left transition-colors" :class="selected?.id === household.id ? 'border-accent bg-accent/10' : 'border-theme-border bg-surface hover:border-accent'" @click="selectHousehold(household)">
         <span class="block font-medium">{{ household.streetAddress }}</span>
-        <span class="mt-1 block text-sm text-[#444746]">{{ household.residents.map((resident) => `${resident.firstName} ${resident.lastName}`).join(', ') || 'No residents' }} · {{ household.children.length }} children</span>
+        <span class="mt-1 block text-sm text-content-muted">{{ household.residents.map((resident) => `${resident.firstName} ${resident.lastName}`).join(', ') || 'No residents' }} · {{ household.children.length }} children</span>
       </button>
     </div>
 
-    <div v-if="selected" class="rounded-3xl border border-[#f1b3b0] bg-[#fff8f7] p-5 sm:p-6">
+    <div v-if="selected" class="rounded-3xl border border-danger-border bg-danger-subtle p-5 sm:p-6">
       <div class="flex items-start gap-3">
-        <ShieldAlert class="mt-0.5 h-5 w-5 shrink-0 text-[#b3261e]" />
+        <ShieldAlert class="mt-0.5 h-5 w-5 shrink-0 text-danger" />
         <div>
-          <h3 class="font-semibold text-[#7f1d1d]">Clear {{ selected.streetAddress }}?</h3>
-          <p class="mt-2 text-sm text-[#7f1d1d]">This will remove {{ selected.residents.length }} resident record(s), {{ selected.children.length }} child record(s), private Login Emails, active sessions, outstanding login links, favorites, pets, notes, and membership details. The household address will remain.</p>
+          <h3 class="font-semibold text-danger">Clear {{ selected.streetAddress }}?</h3>
+          <p class="mt-2 text-sm text-danger">This will remove {{ selected.residents.length }} resident record(s), {{ selected.children.length }} child record(s), private Login Emails, active sessions, outstanding login links, favorites, pets, notes, and membership details. The household address will remain.</p>
         </div>
       </div>
-      <label class="mt-5 block text-sm font-medium text-[#1f1f1f]">Type the address to confirm
-        <input v-model="confirmation" class="mt-2 w-full rounded-xl border border-[#e1e3e1] bg-white px-3 py-2.5 text-sm focus:border-[#b3261e] focus:outline-none focus:ring-2 focus:ring-[#b3261e]/30" :placeholder="selected.streetAddress" />
+      <label class="mt-5 block text-sm font-medium text-content">Type the address to confirm
+        <input v-model="confirmation" class="mt-2 w-full rounded-xl border border-theme-border bg-surface px-3 py-2.5 text-sm focus:border-danger focus:outline-none focus:ring-2 focus:ring-danger/30" :placeholder="selected.streetAddress" />
       </label>
-      <button type="button" :disabled="isClearing || confirmation.trim() !== selected.streetAddress" class="mt-4 inline-flex items-center gap-2 rounded-full bg-[#b3261e] px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" @click="markVacant"><Trash2 class="h-4 w-4" />{{ isClearing ? 'Clearing...' : 'Mark household vacant' }}</button>
+      <button type="button" :disabled="isClearing || confirmation.trim() !== selected.streetAddress" class="mt-4 inline-flex items-center gap-2 rounded-full bg-danger px-5 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" @click="markVacant"><Trash2 class="h-4 w-4" />{{ isClearing ? 'Clearing...' : 'Mark household vacant' }}</button>
     </div>
   </section>
 </template>

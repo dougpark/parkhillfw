@@ -50,52 +50,52 @@ function submit(): void {
 
 <template>
   <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center" @click.self="emit('close')">
-    <form class="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white shadow-xl" @submit.prevent="submit">
-      <div class="flex items-center justify-between gap-4 border-b border-[#e1e3e1] p-6">
+    <form class="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-surface shadow-xl" @submit.prevent="submit">
+      <div class="flex items-center justify-between gap-4 border-b border-theme-border p-6">
         <div class="flex items-center gap-3">
-          <component :is="menuIcon(iconName, props.row.kind)" class="h-5 w-5 text-[#1a73e8]" />
-          <h3 class="text-xl font-semibold text-[#1f1f1f]">Edit {{ props.row.kind === 'menu' ? 'menu' : props.row.kind }}</h3>
+          <component :is="menuIcon(iconName, props.row.kind)" class="h-5 w-5 text-accent" />
+          <h3 class="text-xl font-semibold text-content">Edit {{ props.row.kind === 'menu' ? 'menu' : props.row.kind }}</h3>
         </div>
-        <button type="button" class="rounded-full p-2 text-[#444746] hover:bg-[#f0f4f9]" aria-label="Close" @click="emit('close')">
+        <button type="button" class="rounded-full p-2 text-content-muted hover:bg-app-bg" aria-label="Close" @click="emit('close')">
           <X class="h-5 w-5" />
         </button>
       </div>
 
       <div class="space-y-5 p-6">
         <label class="block">
-          <span class="text-sm font-medium text-[#1f1f1f]">Title</span>
-          <input v-model="title" type="text" class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-4 py-3 focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40" />
+          <span class="text-sm font-medium text-content">Title</span>
+          <input v-model="title" type="text" class="mt-1 w-full rounded-xl border border-theme-border px-4 py-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40" />
         </label>
 
         <label v-if="props.row.kind === 'menu'" class="block">
-          <span class="text-sm font-medium text-[#1f1f1f]">Slug</span>
-          <input v-model="slug" type="text" placeholder="auto-generated from the title" class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-4 py-3 focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40" />
-          <span class="mt-1 block text-xs text-[#444746]">Used for the menu address: /menu/{{ slug || 'your-slug' }}</span>
+          <span class="text-sm font-medium text-content">Slug</span>
+          <input v-model="slug" type="text" placeholder="auto-generated from the title" class="mt-1 w-full rounded-xl border border-theme-border px-4 py-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40" />
+          <span class="mt-1 block text-xs text-content-muted">Used for the menu address: /menu/{{ slug || 'your-slug' }}</span>
         </label>
 
         <label v-if="props.row.kind === 'link'" class="block">
-          <span class="text-sm font-medium text-[#1f1f1f]">Link URL</span>
-          <input v-model="targetUrl" type="text" placeholder="https://example.com" class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-4 py-3 focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40" />
+          <span class="text-sm font-medium text-content">Link URL</span>
+          <input v-model="targetUrl" type="text" placeholder="https://example.com" class="mt-1 w-full rounded-xl border border-theme-border px-4 py-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40" />
         </label>
 
-        <p v-if="props.row.kind === 'page'" class="rounded-xl bg-[#f0f4f9] px-4 py-3 text-sm text-[#444746]">
-          Links to page <span class="font-medium text-[#1f1f1f]">{{ props.row.pageTitle ?? 'missing page' }}</span>
+        <p v-if="props.row.kind === 'page'" class="rounded-xl bg-app-bg px-4 py-3 text-sm text-content-muted">
+          Links to page <span class="font-medium text-content">{{ props.row.pageTitle ?? 'missing page' }}</span>
         </p>
 
         <label class="block">
-          <span class="text-sm font-medium text-[#1f1f1f]">Description</span>
-          <textarea v-model="description" rows="2" class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-4 py-3 focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/40" />
+          <span class="text-sm font-medium text-content">Description</span>
+          <textarea v-model="description" rows="2" class="mt-1 w-full rounded-xl border border-theme-border px-4 py-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40" />
         </label>
 
         <div>
-          <span class="text-sm font-medium text-[#1f1f1f]">Icon</span>
+          <span class="text-sm font-medium text-content">Icon</span>
           <div class="mt-2 flex flex-wrap gap-2">
             <button
               v-for="name in MENU_ICON_NAMES"
               :key="name"
               type="button"
               class="rounded-xl border p-2.5 transition-colors"
-              :class="iconName === name ? 'border-[#1a73e8] bg-[#e8f0fe] text-[#1a73e8]' : 'border-[#e1e3e1] text-[#444746] hover:bg-[#f0f4f9]'"
+              :class="iconName === name ? 'border-accent bg-accent/10 text-accent' : 'border-theme-border text-content-muted hover:bg-app-bg'"
               :aria-label="name"
               :aria-pressed="iconName === name"
               @click="iconName = iconName === name ? '' : name"
@@ -105,23 +105,23 @@ function submit(): void {
           </div>
         </div>
 
-        <div class="space-y-3 rounded-2xl bg-[#f0f4f9] p-4">
-          <label class="flex items-center gap-3 text-sm text-[#1f1f1f]">
+        <div class="space-y-3 rounded-2xl bg-app-bg p-4">
+          <label class="flex items-center gap-3 text-sm text-content">
             <input v-model="isDraft" type="checkbox" class="h-4 w-4 rounded" />
             Draft — hidden from everyone except editors
           </label>
-          <label class="flex items-center gap-3 text-sm text-[#1f1f1f]">
+          <label class="flex items-center gap-3 text-sm text-content">
             <input v-model="isPublic" type="checkbox" class="h-4 w-4 rounded" />
             Public — visible to visitors without directory access
           </label>
         </div>
 
-        <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
+        <p v-if="error" class="text-sm text-danger">{{ error }}</p>
       </div>
 
-      <div class="flex justify-end gap-3 border-t border-[#e1e3e1] p-6">
-        <button type="button" class="rounded-full border border-[#e1e3e1] px-5 py-2.5 text-sm font-medium text-[#444746] hover:bg-[#f0f4f9]" @click="emit('close')">Cancel</button>
-        <button type="submit" class="rounded-full bg-[#1a73e8] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">Save</button>
+      <div class="flex justify-end gap-3 border-t border-theme-border p-6">
+        <button type="button" class="rounded-full border border-theme-border px-5 py-2.5 text-sm font-medium text-content-muted hover:bg-app-bg" @click="emit('close')">Cancel</button>
+        <button type="submit" class="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-on-accent transition-opacity hover:opacity-90">Save</button>
       </div>
     </form>
   </div>

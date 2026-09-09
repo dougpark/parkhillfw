@@ -103,7 +103,7 @@ onMounted(load);
   <div>
     <button
       type="button"
-      class="mb-4 rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+      class="mb-4 rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-app-bg"
       @click="goToAdminMenu"
     >
       ← {{ mode === 'edit' ? 'Page List' : 'Admin menu' }}
@@ -121,11 +121,11 @@ onMounted(load);
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h3 class="text-xl font-semibold">Pages</h3>
-        <p class="mt-1 text-sm text-[#444746]">Create and edit neighborhood pages. Drafts are hidden from members.</p>
+        <p class="mt-1 text-sm text-content-muted">Create and edit neighborhood pages. Drafts are hidden from members.</p>
       </div>
       <button
         type="button"
-        class="flex items-center gap-2 rounded-full bg-[#1a73e8] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        class="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
         @click="createPage"
       >
         <Plus class="h-4 w-4" />
@@ -133,18 +133,18 @@ onMounted(load);
       </button>
     </div>
 
-    <p v-if="error" class="mt-4 text-sm text-red-600">{{ error }}</p>
-    <p v-if="loading" class="mt-6 text-sm text-[#444746]">Loading pages…</p>
+    <p v-if="error" class="mt-4 text-sm text-danger">{{ error }}</p>
+    <p v-if="loading" class="mt-6 text-sm text-content-muted">Loading pages…</p>
 
-    <div v-else-if="pages.length" class="mt-6 overflow-hidden rounded-2xl border border-[#e1e3e1] bg-white">
+    <div v-else-if="pages.length" class="mt-6 overflow-hidden rounded-2xl border border-theme-border bg-surface">
       <div
         v-for="page in pages"
         :key="page.id"
-        class="flex flex-wrap items-center gap-3 border-b border-[#e1e3e1] px-4 py-3 last:border-b-0 sm:px-5"
+        class="flex flex-wrap items-center gap-3 border-b border-theme-border px-4 py-3 last:border-b-0 sm:px-5"
       >
         <div class="min-w-0 flex-1">
           <p class="truncate font-medium">{{ page.title }}</p>
-          <p class="mt-0.5 truncate text-xs text-[#444746]">
+          <p class="mt-0.5 truncate text-xs text-content-muted">
             /pages/{{ page.slug }} · by {{ page.authorEmail ?? 'unknown' }} · edited {{ formatDate(page.updatedAt) }}
           </p>
         </div>
@@ -156,21 +156,21 @@ onMounted(load);
         </span>
         <span
           class="rounded-full px-2.5 py-1 text-xs font-medium"
-          :class="page.isPublic ? 'bg-[#e8f0fe] text-[#0b57d0]' : 'bg-[#f0f4f9] text-[#444746]'"
+          :class="page.isPublic ? 'bg-accent/10 text-accent' : 'bg-app-bg text-content-muted'"
         >
           {{ page.isPublic ? 'Public' : 'Members only' }}
         </span>
         <button
           type="button"
           title="Edit page"
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-[#e8f0fe] hover:text-[#1a73e8]"
+          class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-accent/10 hover:text-accent"
           @click="editPage(page)"
         >
           <Pencil class="h-4 w-4" />
         </button>
         <span
           v-if="page.attachmentCount > 0"
-          class="flex items-center gap-1 rounded-full bg-[#e8f0fe] px-2.5 py-1 text-xs font-medium text-[#0b57d0]"
+          class="flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent"
           :title="`${page.attachmentCount} attachment${page.attachmentCount === 1 ? '' : 's'} attached`"
         >
           <Paperclip class="h-3.5 w-3.5" />
@@ -178,7 +178,7 @@ onMounted(load);
         </span>
         <span
           v-else
-          class="flex h-9 w-9 items-center justify-center text-[#c4c7c5]"
+          class="flex h-9 w-9 items-center justify-center text-content-muted/50"
           title="No attachments"
         >
           <Paperclip class="h-4 w-4" />
@@ -186,34 +186,34 @@ onMounted(load);
         <button
           type="button"
           title="Delete page"
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-red-50 hover:text-red-600"
+          class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-danger-subtle hover:text-danger"
           @click="deleteTarget = page"
         >
           <Trash2 class="h-4 w-4" />
         </button>
       </div>
     </div>
-    <p v-else class="mt-6 rounded-2xl border border-dashed border-[#c4c7c5] bg-[#f8fafd] p-6 text-center text-sm text-[#444746]">
+    <p v-else class="mt-6 rounded-2xl border border-dashed border-theme-border bg-surface-subtle p-6 text-center text-sm text-content-muted">
       No pages yet. Create the first one.
     </p>
 
     <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div class="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
+      <div class="w-full max-w-sm rounded-3xl bg-surface p-6 shadow-xl">
         <h4 class="text-lg font-semibold">Delete page?</h4>
-        <p class="mt-2 text-sm text-[#444746]">
+        <p class="mt-2 text-sm text-content-muted">
           “{{ deleteTarget.title }}” and its attachments will be permanently deleted.
         </p>
         <div class="mt-6 flex justify-end gap-2">
           <button
             type="button"
-            class="rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+            class="rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-app-bg"
             @click="deleteTarget = null"
           >
             Cancel
           </button>
           <button
             type="button"
-            class="rounded-full bg-red-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            class="rounded-full bg-danger px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
             :disabled="deleting"
             @click="confirmDelete"
           >

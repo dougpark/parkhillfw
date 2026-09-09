@@ -33,7 +33,7 @@ watch(() => route.params.slug, (slug) => {
 
 <template>
   <section class="mx-auto max-w-3xl">
-    <p v-if="error" class="rounded-2xl border border-dashed border-[#c4c7c5] bg-[#f8fafd] p-6 text-center text-sm text-[#444746]">
+    <p v-if="error" class="rounded-2xl border border-dashed border-theme-border bg-surface-subtle p-6 text-center text-sm text-content-muted">
       {{ error }}
     </p>
     <template v-else-if="page">
@@ -43,11 +43,11 @@ watch(() => route.params.slug, (slug) => {
       <MarkdownPreview class="mt-6" :source="page.bodyMd" />
 
       <div class="mt-8">
-        <button type="button" class="rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] hover:bg-[#f0f4f9]" @click="$router.back()">
+        <button type="button" class="rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted hover:bg-app-bg" @click="$router.back()">
           ← Back
         </button>
       </div>
     </template>
-    <p v-else class="text-sm text-[#444746]">Loading…</p>
+    <p v-else class="text-sm text-content-muted">Loading…</p>
   </section>
 </template>

@@ -30,36 +30,36 @@ async function requestLink() {
 
 <template>
   <section class="mx-auto max-w-md py-10 sm:py-16">
-    <div class="rounded-3xl border border-[#e1e3e1] bg-white p-6 shadow-sm sm:p-8">
+    <div class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm sm:p-8">
       <div class="mb-8">
-        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1a73e8]/10 text-[#1a73e8]">
+        <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
           <Mail class="h-5 w-5" />
         </div>
         <h2 class="text-2xl font-semibold tracking-tight">Sign in to Park Hill</h2>
-        <p class="mt-2 text-[#444746]">Enter your email and we’ll send you a secure sign-in link.</p>
+        <p class="mt-2 text-content-muted">Enter your email and we’ll send you a secure sign-in link.</p>
       </div>
       <form class="space-y-4" @submit.prevent="requestLink">
-        <label class="block text-sm font-medium text-[#1f1f1f]">
+        <label class="block text-sm font-medium text-content">
           Email address
           <input
             v-model="email"
             type="email"
             required
             autocomplete="email"
-            class="mt-2 w-full rounded-xl border border-[#e1e3e1] px-4 py-3 focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30"
+            class="mt-2 w-full rounded-xl border border-theme-border px-4 py-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
             placeholder="you@example.com"
           />
         </label>
         <button
           type="submit"
           :disabled="isSending"
-          class="w-full rounded-full bg-[#1a73e8] px-6 py-3 font-medium text-white transition-all hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+          class="w-full rounded-full bg-accent px-6 py-3 font-medium text-on-accent transition-all hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
         >
           {{ isSending ? 'Sending...' : 'Send sign-in link' }}
         </button>
       </form>
-      <p v-if="message" class="mt-5 rounded-xl bg-[#e8f0fe] p-3 text-sm text-[#0b57d0]">{{ message }}</p>
-      <p v-if="error" class="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
+      <p v-if="message" class="mt-5 rounded-xl bg-accent/10 p-3 text-sm text-accent">{{ message }}</p>
+      <p v-if="error" class="mt-5 rounded-xl bg-danger-subtle p-3 text-sm text-danger">{{ error }}</p>
     </div>
   </section>
 </template>

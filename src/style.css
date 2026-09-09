@@ -1,1 +1,90 @@
 @import "tailwindcss";
+
+:root,
+:root[data-theme="original"] {
+	color-scheme: light;
+	--theme-app-bg: #f0f4f9;
+	--theme-surface: #ffffff;
+	--theme-surface-subtle: #f8fafd;
+	--theme-surface-hover: #f7faff;
+	--theme-text: #1f1f1f;
+	--theme-text-muted: #444746;
+	--theme-accent: #1a73e8;
+	--theme-accent-secondary: #7c4dff;
+	--theme-border: #e1e3e1;
+	--theme-on-accent: #ffffff;
+	--theme-success: #137333;
+	--theme-success-subtle: #e6f4ea;
+	--theme-warning: #8a6116;
+	--theme-warning-subtle: #fff8e1;
+	--theme-danger: #b3261e;
+	--theme-danger-subtle: #fff8f7;
+	--theme-danger-border: #f1b3b0;
+}
+
+:root[data-theme="modern-lite"] {
+	color-scheme: light;
+	--theme-app-bg: #faf9f6;
+	--theme-surface: #ffffff;
+	--theme-surface-subtle: #f1f4ef;
+	--theme-surface-hover: #f3ede8;
+	--theme-text: #1e2f23;
+	--theme-text-muted: #52685a;
+	--theme-accent: #e07a5f;
+	--theme-accent-secondary: #81b29a;
+	--theme-border: #d7ded8;
+	--theme-on-accent: #ffffff;
+	--theme-success: #356b4d;
+	--theme-success-subtle: #e7f2eb;
+	--theme-warning: #805b18;
+	--theme-warning-subtle: #fff4d6;
+	--theme-danger: #a63832;
+	--theme-danger-subtle: #fff0ed;
+	--theme-danger-border: #e5aaa2;
+}
+
+:root[data-theme="modern-dark"] {
+	color-scheme: dark;
+	--theme-app-bg: #2b2d42;
+	--theme-surface: #35384f;
+	--theme-surface-subtle: #303247;
+	--theme-surface-hover: #40445d;
+	--theme-text: #edf2f4;
+	--theme-text-muted: #8d99ae;
+	--theme-accent: #ef233c;
+	--theme-accent-secondary: #81b29a;
+	--theme-border: #4b5068;
+	--theme-on-accent: #ffffff;
+	--theme-success: #9ad7b0;
+	--theme-success-subtle: #234638;
+	--theme-warning: #f4d06f;
+	--theme-warning-subtle: #4a4025;
+	--theme-danger: #ff9b9b;
+	--theme-danger-subtle: #532d39;
+	--theme-danger-border: #874657;
+}
+
+@theme inline {
+	--color-app-bg: var(--theme-app-bg);
+	--color-surface: var(--theme-surface);
+	--color-surface-subtle: var(--theme-surface-subtle);
+	--color-surface-hover: var(--theme-surface-hover);
+	--color-content: var(--theme-text);
+	--color-content-muted: var(--theme-text-muted);
+	--color-accent: var(--theme-accent);
+	--color-accent-secondary: var(--theme-accent-secondary);
+	--color-theme-border: var(--theme-border);
+	--color-on-accent: var(--theme-on-accent);
+	--color-success: var(--theme-success);
+	--color-success-subtle: var(--theme-success-subtle);
+	--color-warning: var(--theme-warning);
+	--color-warning-subtle: var(--theme-warning-subtle);
+	--color-danger: var(--theme-danger);
+	--color-danger-subtle: var(--theme-danger-subtle);
+	--color-danger-border: var(--theme-danger-border);
+}
+
+html,
+body {
+	background: var(--theme-app-bg);
+}

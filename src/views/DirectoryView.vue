@@ -110,7 +110,7 @@ onMounted(loadDirectory);
     <BreadcrumbNav current="Directory" />
      <h2 class="mt-1 text-2xl font-semibold tracking-tight">Directory</h2>
    
-    <div class="sticky top-14 z-10 -mx-4 bg-[#f0f4f9] px-4 py-3 sm:mx-0 sm:px-0">
+    <div class="sticky top-14 z-10 -mx-4 bg-app-bg px-4 py-3 sm:mx-0 sm:px-0">
       <BaseInput
         v-model="query"
         :show-clear="Boolean(query || petSitting || babysitting || favoritesOnly)"
@@ -124,9 +124,9 @@ onMounted(loadDirectory);
       </div>
     </div>
 
-    <p v-if="isLoading" class="text-center text-[#444746] py-10">Loading directory...</p>
-    <p v-else-if="error" class="text-center text-red-600 py-10">{{ error }}</p>
-    <p v-else-if="!households.length" class="text-center text-[#444746] py-10">No households found.</p>
+    <p v-if="isLoading" class="text-center text-content-muted py-10">Loading directory...</p>
+    <p v-else-if="error" class="text-center text-danger py-10">{{ error }}</p>
+    <p v-else-if="!households.length" class="text-center text-content-muted py-10">No households found.</p>
 
     <div v-else class="space-y-6">
       <HouseholdCard

@@ -141,35 +141,35 @@ onMounted(loadRequests);
   <section class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Admin review</p>
+        <p class="text-sm font-medium uppercase tracking-wide text-accent">Admin review</p>
         <h2 class="mt-1 text-2xl font-semibold tracking-tight">Access Requests</h2>
-        <p class="mt-2 text-[#444746]">Verify the request against the directory before connecting an account.</p>
+        <p class="mt-2 text-content-muted">Verify the request against the directory before connecting an account.</p>
       </div>
-      <span class="rounded-full bg-[#fff8e1] px-3 py-1.5 text-sm font-medium text-[#8a6116]">{{ pendingRequests.length }} pending</span>
+      <span class="rounded-full bg-warning-subtle px-3 py-1.5 text-sm font-medium text-warning">{{ pendingRequests.length }} pending</span>
     </div>
 
-    <p v-if="error" class="rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
-    <p v-if="notice" class="rounded-xl bg-[#e6f4ea] p-3 text-sm text-[#137333]">{{ notice }}</p>
-    <p v-if="isLoading" class="py-10 text-center text-[#444746]">Loading requests...</p>
-    <p v-else-if="!requests.length" class="rounded-3xl border border-[#e1e3e1] bg-white p-6 text-[#444746]">No access requests.</p>
+    <p v-if="error" class="rounded-xl bg-danger-subtle p-3 text-sm text-danger">{{ error }}</p>
+    <p v-if="notice" class="rounded-xl bg-success-subtle p-3 text-sm text-success">{{ notice }}</p>
+    <p v-if="isLoading" class="py-10 text-center text-content-muted">Loading requests...</p>
+    <p v-else-if="!requests.length" class="rounded-3xl border border-theme-border bg-surface p-6 text-content-muted">No access requests.</p>
 
-    <div v-else class="grid min-h-136 overflow-hidden rounded-3xl border border-[#e1e3e1] bg-white shadow-sm lg:grid-cols-[18rem_1fr]">
-      <aside class="border-b border-[#e1e3e1] bg-[#f0f4f9] p-3 lg:border-b-0 lg:border-r">
-        <h3 class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[#444746]">Requests</h3>
+    <div v-else class="grid min-h-136 overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm lg:grid-cols-[18rem_1fr]">
+      <aside class="border-b border-theme-border bg-app-bg p-3 lg:border-b-0 lg:border-r">
+        <h3 class="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-content-muted">Requests</h3>
         <button
           v-for="request in sortedRequests"
           :key="request.id"
           type="button"
           class="mb-1 w-full rounded-2xl p-3 text-left transition-colors"
-          :class="selectedId === request.id ? 'bg-white shadow-sm' : 'hover:bg-white/70'"
+          :class="selectedId === request.id ? 'bg-surface shadow-sm' : 'hover:bg-surface/70'"
           @click="selectRequest(request)"
         >
           <span class="flex items-center justify-between gap-2">
             <strong class="truncate text-sm">{{ request.fullName }}</strong>
-            <span class="h-2 w-2 shrink-0 rounded-full" :class="request.status === 'pending' ? 'bg-[#f4b400]' : request.status === 'approved' ? 'bg-[#34a853]' : 'bg-[#b3261e]'" />
+            <span class="h-2 w-2 shrink-0 rounded-full" :class="request.status === 'pending' ? 'bg-[#f4b400]' : request.status === 'approved' ? 'bg-[#34a853]' : 'bg-danger'" />
           </span>
-          <span class="mt-1 block truncate text-xs text-[#444746]">{{ request.streetAddress }}</span>
-          <span class="mt-1 block text-[11px] uppercase tracking-wide text-[#444746]">
+          <span class="mt-1 block truncate text-xs text-content-muted">{{ request.streetAddress }}</span>
+          <span class="mt-1 block text-[11px] uppercase tracking-wide text-content-muted">
             {{ request.status }}<template v-if="request.status !== 'pending' && request.reviewedAt"> · {{ formatDate(request.reviewedAt) }}</template>
           </span>
         </button>
@@ -179,42 +179,42 @@ onMounted(loadRequests);
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h3 class="text-xl font-semibold">{{ selectedRequest.fullName }}</h3>
-            <p class="mt-1 text-sm text-[#444746]">{{ selectedRequest.email }}</p>
-            <p class="text-sm text-[#444746]">Submitted address: {{ selectedRequest.streetAddress }}</p>
+            <p class="mt-1 text-sm text-content-muted">{{ selectedRequest.email }}</p>
+            <p class="text-sm text-content-muted">Submitted address: {{ selectedRequest.streetAddress }}</p>
           </div>
-          <span class="rounded-full px-3 py-1 text-xs font-medium" :class="selectedRequest.status === 'pending' ? 'bg-[#fff8e1] text-[#8a6116]' : selectedRequest.status === 'approved' ? 'bg-[#e6f4ea] text-[#137333]' : 'bg-red-50 text-[#b3261e]'">
+          <span class="rounded-full px-3 py-1 text-xs font-medium" :class="selectedRequest.status === 'pending' ? 'bg-warning-subtle text-warning' : selectedRequest.status === 'approved' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'">
             {{ selectedRequest.status }}<template v-if="selectedRequest.status !== 'pending' && selectedRequest.reviewedAt"> · {{ formatDate(selectedRequest.reviewedAt) }}</template>
           </span>
         </div>
 
-        <div class="mt-8 border-t border-[#e1e3e1] pt-6">
+        <div class="mt-8 border-t border-theme-border pt-6">
           <h4 class="font-semibold">Verify directory match</h4>
-          <p class="mt-1 text-sm text-[#444746]">Search by name or address, then select the resident this Login Email belongs to.</p>
+          <p class="mt-1 text-sm text-content-muted">Search by name or address, then select the resident this Login Email belongs to.</p>
           <div class="relative mt-4">
-            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#444746]" />
-            <input v-model="directoryQuery" class="w-full rounded-xl border border-[#e1e3e1] py-3 pl-10 pr-3 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" placeholder="Search directory by name or street address" />
+            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+            <input v-model="directoryQuery" class="w-full rounded-xl border border-theme-border py-3 pl-10 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30" placeholder="Search directory by name or street address" />
           </div>
-          <p v-if="isSearching" class="mt-4 text-sm text-[#444746]">Searching...</p>
+          <p v-if="isSearching" class="mt-4 text-sm text-content-muted">Searching...</p>
           <div v-else class="mt-4 space-y-3">
-            <div v-for="match in directoryMatches" :key="match.id" class="rounded-2xl border border-[#e1e3e1] p-4">
+            <div v-for="match in directoryMatches" :key="match.id" class="rounded-2xl border border-theme-border p-4">
               <p class="font-medium">{{ match.streetAddress }}</p>
               <div class="mt-2 flex flex-wrap gap-2">
-                <button v-for="resident in match.residents" :key="resident.id" type="button" class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm" :class="selectedResidentId === resident.id ? 'border-[#1a73e8] bg-[#e8f0fe] text-[#0b57d0]' : 'border-[#e1e3e1] hover:border-[#1a73e8]'" @click="chooseResident(resident.id)">
+                <button v-for="resident in match.residents" :key="resident.id" type="button" class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm" :class="selectedResidentId === resident.id ? 'border-accent bg-accent/10 text-accent' : 'border-theme-border hover:border-accent'" @click="chooseResident(resident.id)">
                   <Check v-if="selectedResidentId === resident.id" class="h-4 w-4" />
-                  {{ resident.firstName }} {{ resident.lastName }}<span v-if="resident.email" class="text-xs text-[#444746]">· {{ resident.email }}</span>
+                  {{ resident.firstName }} {{ resident.lastName }}<span v-if="resident.email" class="text-xs text-content-muted">· {{ resident.email }}</span>
                 </button>
               </div>
             </div>
-            <p v-if="directoryQuery && !directoryMatches.length && !isSearching" class="text-sm text-[#444746]">No matching directory entries.</p>
+            <p v-if="directoryQuery && !directoryMatches.length && !isSearching" class="text-sm text-content-muted">No matching directory entries.</p>
           </div>
         </div>
 
-        <div v-if="selectedRequest.status === 'pending'" class="mt-8 flex flex-wrap gap-3 border-t border-[#e1e3e1] pt-6">
-          <button type="button" :disabled="isReviewing" class="inline-flex items-center gap-2 rounded-full bg-[#1a73e8] px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60" @click="review('approved')">Approve and send login link</button>
-          <button type="button" :disabled="isReviewing" class="inline-flex items-center gap-2 rounded-full border border-[#b3261e] px-5 py-2.5 text-sm font-medium text-[#b3261e] hover:bg-red-50 disabled:opacity-60" @click="review('rejected')"><X class="h-4 w-4" /> Reject request</button>
+        <div v-if="selectedRequest.status === 'pending'" class="mt-8 flex flex-wrap gap-3 border-t border-theme-border pt-6">
+          <button type="button" :disabled="isReviewing" class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60" @click="review('approved')">Approve and send login link</button>
+          <button type="button" :disabled="isReviewing" class="inline-flex items-center gap-2 rounded-full border border-danger px-5 py-2.5 text-sm font-medium text-danger hover:bg-danger-subtle disabled:opacity-60" @click="review('rejected')"><X class="h-4 w-4" /> Reject request</button>
         </div>
       </article>
-      <div v-else class="flex items-center justify-center p-8 text-center text-[#444746]">Select a request to review.</div>
+      <div v-else class="flex items-center justify-center p-8 text-center text-content-muted">Select a request to review.</div>
     </div>
   </section>
 </template>

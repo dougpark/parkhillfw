@@ -15,8 +15,8 @@ defineEmits<{
     :class="[
       'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium cursor-pointer transition-all select-none',
       modelValue
-        ? 'border-[#1a73e8] bg-[#1a73e8] text-white shadow-sm'
-        : 'border-[#e1e3e1] bg-white text-[#444746] hover:bg-[#f0f4f9]'
+        ? 'border-accent bg-accent text-on-accent shadow-sm'
+        : 'border-theme-border bg-surface text-content-muted hover:bg-app-bg'
     ]"
   >
     <input

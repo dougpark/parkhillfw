@@ -45,19 +45,19 @@ watch(() => route.params.slug, (slug) => {
     <BreadcrumbNav :trail="breadcrumbs.map((crumb) => ({ to: `/menu/${crumb.slug}`, title: crumb.title }))" :current="title" />
 
     <div>
-      <h2 class="text-3xl font-semibold tracking-tight text-[#1f1f1f]">{{ title }}</h2>
-      <p v-if="description" class="mt-2 max-w-xl text-[#444746]">{{ description }}</p>
+      <h2 class="text-3xl font-semibold tracking-tight text-content">{{ title }}</h2>
+      <p v-if="description" class="mt-2 max-w-xl text-content-muted">{{ description }}</p>
     </div>
 
-    <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
-    <p v-else-if="loading" class="text-sm text-[#444746]">Loading…</p>
+    <p v-if="error" class="text-sm text-danger">{{ error }}</p>
+    <p v-else-if="loading" class="text-sm text-content-muted">Loading…</p>
     <NavCardGrid v-else-if="items.length" :items="items" />
-    <p v-else class="rounded-2xl border border-dashed border-[#c4c7c5] bg-[#f8fafd] p-8 text-center text-sm text-[#444746]">
+    <p v-else class="rounded-2xl border border-dashed border-theme-border bg-surface-subtle p-8 text-center text-sm text-content-muted">
       Nothing here yet.
     </p>
 
     <div>
-      <button type="button" class="rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] hover:bg-[#f0f4f9]" @click="$router.back()">
+      <button type="button" class="rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted hover:bg-app-bg" @click="$router.back()">
         ← Back
       </button>
     </div>

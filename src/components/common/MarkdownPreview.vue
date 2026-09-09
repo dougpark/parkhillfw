@@ -22,7 +22,12 @@ const rendered = computed(() => md.render(props.source ?? ''));
 <style scoped>
 .markdown-body {
     background: transparent;
-    color: #1f1f1f;
+    color: var(--theme-text);
+    --fgColor-default: var(--theme-text);
+    --fgColor-muted: var(--theme-text-muted);
+    --fgColor-accent: var(--theme-accent);
+    --bgColor-default: transparent;
+    --borderColor-default: var(--theme-border);
     font-family: inherit;
     font-size: 1rem;
     box-sizing: border-box;

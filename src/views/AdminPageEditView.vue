@@ -258,8 +258,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="loading" class="p-6 text-sm text-[#444746]">Loading page…</div>
-  <div v-else-if="loadError" class="p-6 text-sm text-red-600">{{ loadError }}</div>
+  <div v-if="loading" class="p-6 text-sm text-content-muted">Loading page…</div>
+  <div v-else-if="loadError" class="p-6 text-sm text-danger">{{ loadError }}</div>
 
   <div v-else class="flex min-h-[32rem] flex-col space-y-4">
     <div class="flex flex-wrap items-center gap-3">
@@ -267,13 +267,13 @@ onBeforeUnmount(() => {
         v-model="title"
         type="text"
         placeholder="Page title"
-        class="min-w-0 flex-1 rounded-xl border border-[#e1e3e1] bg-white px-4 py-2.5 text-lg font-semibold outline-none transition-shadow focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20"
+        class="min-w-0 flex-1 rounded-xl border border-theme-border bg-surface px-4 py-2.5 text-lg font-semibold outline-none transition-shadow focus:border-accent focus:ring-2 focus:ring-accent/20"
         @input="markDirty"
       />
       <button
         type="button"
-        class="rounded-full px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-        :class="isDraft ? 'bg-[#0b57d0]' : 'bg-[#444746]'"
+        class="rounded-full px-5 py-2.5 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+        :class="isDraft ? 'bg-accent' : 'bg-content-muted'"
         :disabled="saving"
         @click="togglePublish"
       >
@@ -281,13 +281,13 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 text-sm text-[#444746]">
+    <div class="flex flex-wrap items-center gap-2 text-sm text-content-muted">
       <input
         v-model="slug"
         type="text"
         placeholder="slug"
         spellcheck="false"
-        class="w-40 rounded-xl border border-[#e1e3e1] bg-white px-3 py-1.5 font-mono text-xs outline-none transition-shadow focus:border-[#1a73e8] focus:ring-2 focus:ring-[#1a73e8]/20"
+        class="w-40 rounded-xl border border-theme-border bg-surface px-3 py-1.5 font-mono text-xs outline-none transition-shadow focus:border-accent focus:ring-2 focus:ring-accent/20"
         @input="cleanSlug(); markDirty()"
       />
       <span class="hidden sm:inline" aria-hidden="true">·</span>
@@ -306,7 +306,7 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="rounded-full px-3 py-1 text-xs font-medium transition-colors"
-        :class="isPublic ? 'bg-[#e8f0fe] text-[#0b57d0]' : 'bg-[#f0f4f9] text-[#444746]'"
+        :class="isPublic ? 'bg-accent/10 text-accent' : 'bg-app-bg text-content-muted'"
         title="Toggle public visibility"
         @click="isPublic = !isPublic; markDirty()"
       >
@@ -314,13 +314,13 @@ onBeforeUnmount(() => {
       </button>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <span v-if="lastSavedAt && !dirty" class="text-xs text-[#444746]">
+        <span v-if="lastSavedAt && !dirty" class="text-xs text-content-muted">
           Saved {{ lastSavedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }}
         </span>
         <button
           type="button"
           class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-          :class="showPreview ? 'bg-[#1a73e8] text-white shadow' : 'border border-[#e1e3e1] bg-white text-[#444746] hover:bg-[#f0f4f9]'"
+          :class="showPreview ? 'bg-accent text-on-accent shadow' : 'border border-theme-border bg-surface text-content-muted hover:bg-app-bg'"
           :aria-pressed="showPreview"
           @click="showPreview = !showPreview"
         >
@@ -329,7 +329,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="rounded-full px-4 py-2 text-sm font-medium transition-all"
-          :class="dirty ? 'bg-[#1a73e8] text-white shadow hover:opacity-90' : 'bg-[#e8f0fe] text-[#0b57d0]'"
+          :class="dirty ? 'bg-accent text-on-accent shadow hover:opacity-90' : 'bg-accent/10 text-accent'"
           :disabled="saving"
           @click="save()"
         >
@@ -338,24 +338,24 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <p v-if="saveError" class="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert">
+    <p v-if="saveError" class="rounded-xl border border-danger-border bg-danger-subtle px-4 py-2.5 text-sm text-danger" role="alert">
       {{ saveError }}
     </p>
 
     <EditorToolbar @command="onCommand" />
 
     <div class="relative min-h-[24rem] flex-1">
-      <div ref="editorHost" class="h-full overflow-hidden rounded-xl border border-[#e1e3e1] bg-white" />
+      <div ref="editorHost" class="h-full overflow-hidden rounded-xl border border-theme-border bg-surface" />
       <div
         v-if="showPreview"
-        class="absolute inset-0 z-10 flex flex-col overflow-hidden rounded-xl border border-[#c4c7c5] bg-white shadow-lg"
+        class="absolute inset-0 z-10 flex flex-col overflow-hidden rounded-xl border border-theme-border bg-surface shadow-lg"
       >
-        <div class="flex items-center justify-between border-b border-[#e1e3e1] bg-[#f0f4f9] px-4 py-2">
-          <p class="text-sm font-medium text-[#444746]">Preview — unsaved changes shown as-is</p>
+        <div class="flex items-center justify-between border-b border-theme-border bg-app-bg px-4 py-2">
+          <p class="text-sm font-medium text-content-muted">Preview — unsaved changes shown as-is</p>
           <button
             type="button"
             title="Close preview"
-            class="flex h-8 w-8 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-white"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-surface"
             @click="showPreview = false"
           >
             <X class="h-4 w-4" />

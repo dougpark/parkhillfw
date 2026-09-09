@@ -110,13 +110,13 @@ defineExpose({ load });
 </script>
 
 <template>
-  <section class="rounded-xl border border-[#e1e3e1] bg-white p-4">
+  <section class="rounded-xl border border-theme-border bg-surface p-4">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h4 class="text-sm font-semibold">Attachments</h4>
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="flex items-center gap-2 rounded-full border border-[#e1e3e1] bg-white px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+          class="flex items-center gap-2 rounded-full border border-theme-border bg-surface px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-app-bg"
           @click="openLibrary"
         >
           <Images class="h-4 w-4" />
@@ -124,7 +124,7 @@ defineExpose({ load });
         </button>
         <button
           type="button"
-          class="flex items-center gap-2 rounded-full bg-[#e8f0fe] px-4 py-2 text-sm font-medium text-[#0b57d0] transition-opacity hover:opacity-80"
+          class="flex items-center gap-2 rounded-full bg-accent/10 px-4 py-2 text-sm font-medium text-accent transition-opacity hover:opacity-80"
           :disabled="uploading"
           @click="fileInput?.click()"
         >
@@ -136,36 +136,36 @@ defineExpose({ load });
     </div>
 
     <div
-      class="mt-3 rounded-xl border border-dashed p-4 text-center text-sm text-[#444746] transition-colors"
-      :class="dragOver ? 'border-[#1a73e8] bg-[#e8f0fe]' : 'border-[#c4c7c5] bg-[#f8fafd]'"
+      class="mt-3 rounded-xl border border-dashed p-4 text-center text-sm text-content-muted transition-colors"
+      :class="dragOver ? 'border-accent bg-accent/10' : 'border-theme-border bg-surface-subtle'"
       @dragover.prevent="dragOver = true"
       @dragleave.prevent="dragOver = false"
       @drop.prevent="onDrop"
     >
       <p>Drag and drop files here, paste images into the editor, or use Upload.</p>
-      <p class="mt-1 text-xs text-[#444746]/70">
+      <p class="mt-1 text-xs text-content-muted/70">
         Allowed: images (PNG, JPEG, GIF, WebP, SVG), PDF, text, Markdown, CSV, ZIP — up to 10 MB each.
       </p>
     </div>
 
-    <p v-if="error" class="mt-2 text-sm text-red-600">{{ error }}</p>
+    <p v-if="error" class="mt-2 text-sm text-danger">{{ error }}</p>
 
-    <ul v-if="attachments.length" class="mt-3 divide-y divide-[#e1e3e1]">
+    <ul v-if="attachments.length" class="mt-3 divide-y divide-theme-border">
       <li v-for="attachment in attachments" :key="attachment.id" class="flex items-center gap-3 py-2">
         <img
           v-if="attachment.mimeType.startsWith('image/')"
           :src="fileUrl(attachment)"
           :alt="attachment.filename"
-          class="h-10 w-10 shrink-0 rounded-lg border border-[#e1e3e1] object-cover"
+          class="h-10 w-10 shrink-0 rounded-lg border border-theme-border object-cover"
         />
-        <FileText v-else class="h-6 w-6 shrink-0 text-[#444746]" />
+        <FileText v-else class="h-6 w-6 shrink-0 text-content-muted" />
         <div class="min-w-0 flex-1">
           <p class="truncate text-sm font-medium">{{ attachment.filename }}</p>
-          <p class="text-xs text-[#444746]">{{ attachment.mimeType }} · {{ formatSize(attachment.sizeBytes) }}</p>
+          <p class="text-xs text-content-muted">{{ attachment.mimeType }} · {{ formatSize(attachment.sizeBytes) }}</p>
         </div>
         <button
           type="button"
-          class="rounded-full px-3 py-1.5 text-xs font-medium text-[#0b57d0] transition-colors hover:bg-[#e8f0fe]"
+          class="rounded-full px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
           @click="emit('insert', snippetFor(attachment))"
         >
           Insert
@@ -173,7 +173,7 @@ defineExpose({ load });
         <button
           type="button"
           :title="copiedId === attachment.id ? 'Copied!' : 'Copy markdown link'"
-          class="flex h-8 w-8 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-[#f0f4f9] hover:text-[#1a73e8]"
+          class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-app-bg hover:text-accent"
           @click="copySnippet(attachment)"
         >
           <Check v-if="copiedId === attachment.id" class="h-4 w-4 text-green-600" />
@@ -182,43 +182,43 @@ defineExpose({ load });
         <button
           type="button"
           title="Delete attachment"
-          class="flex h-8 w-8 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-red-50 hover:text-red-600"
+          class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-danger-subtle hover:text-danger"
           @click="remove(attachment)"
         >
           <Trash2 class="h-4 w-4" />
         </button>
       </li>
     </ul>
-    <p v-else class="mt-3 text-sm text-[#444746]">No attachments yet.</p>
+    <p v-else class="mt-3 text-sm text-content-muted">No attachments yet.</p>
 
     <div v-if="showLibrary" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showLibrary = false">
-      <div class="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-3xl bg-white p-6 shadow-xl">
+      <div class="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-3xl bg-surface p-6 shadow-xl">
         <div class="flex items-center justify-between">
           <h4 class="text-lg font-semibold">Image library</h4>
           <button
             type="button"
             title="Close"
-            class="flex h-8 w-8 items-center justify-center rounded-lg text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-app-bg"
             @click="showLibrary = false"
           >
             <X class="h-4 w-4" />
           </button>
         </div>
-        <p class="mt-1 text-sm text-[#444746]">Pick an image uploaded for any page to insert its link here.</p>
+        <p class="mt-1 text-sm text-content-muted">Pick an image uploaded for any page to insert its link here.</p>
 
-        <p v-if="libraryLoading" class="py-8 text-center text-sm text-[#444746]">Loading images…</p>
-        <p v-else-if="!libraryImages.length" class="py-8 text-center text-sm text-[#444746]">No other images have been uploaded yet.</p>
+        <p v-if="libraryLoading" class="py-8 text-center text-sm text-content-muted">Loading images…</p>
+        <p v-else-if="!libraryImages.length" class="py-8 text-center text-sm text-content-muted">No other images have been uploaded yet.</p>
         <div v-else class="mt-4 grid flex-1 grid-cols-2 gap-3 overflow-auto sm:grid-cols-3 md:grid-cols-4">
           <button
             v-for="image in libraryImages"
             :key="image.id"
             type="button"
-            class="group overflow-hidden rounded-xl border border-[#e1e3e1] bg-white text-left transition-shadow hover:shadow-md"
+            class="group overflow-hidden rounded-xl border border-theme-border bg-surface text-left transition-shadow hover:shadow-md"
             :title="`Insert ${image.filename}`"
             @click="pickLibraryImage(image)"
           >
-            <img :src="fileUrl(image)" :alt="image.filename" class="h-24 w-full bg-[#f0f4f9] object-cover" loading="lazy" />
-            <span class="block truncate px-2 py-1.5 text-xs text-[#444746] group-hover:text-[#1a73e8]">{{ image.filename }}</span>
+            <img :src="fileUrl(image)" :alt="image.filename" class="h-24 w-full bg-app-bg object-cover" loading="lazy" />
+            <span class="block truncate px-2 py-1.5 text-xs text-content-muted group-hover:text-accent">{{ image.filename }}</span>
           </button>
         </div>
       </div>

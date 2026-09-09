@@ -69,42 +69,42 @@ async function createAddress() {
 
     <!-- Directory Editing -->
     <div>
-      <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Directory editing</p>
+      <p class="text-sm font-medium uppercase tracking-wide text-accent">Directory editing</p>
       <h2 class="mt-1 text-2xl font-semibold tracking-tight">Edit Household Directory</h2>
-      <p class="mt-2 text-[#444746]">Search by resident name or address, then edit the household, residents, and children.</p>
+      <p class="mt-2 text-content-muted">Search by resident name or address, then edit the household, residents, and children.</p>
     </div>
 
     <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="searchHouseholds">
       <div class="relative flex-1">
-        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#444746]" />
-        <input v-model="query" required class="w-full rounded-xl border border-[#e1e3e1] bg-white py-3 pl-10 pr-3 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" placeholder="Search resident name or street address" />
+        <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-content-muted" />
+        <input v-model="query" required class="w-full rounded-xl border border-theme-border bg-surface py-3 pl-10 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30" placeholder="Search resident name or street address" />
       </div>
-      <button type="submit" :disabled="isSearching" class="rounded-full bg-[#1a73e8] px-5 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">{{ isSearching ? 'Searching...' : 'Search' }}</button>
+      <button type="submit" :disabled="isSearching" class="rounded-full bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60">{{ isSearching ? 'Searching...' : 'Search' }}</button>
     </form>
 
-    <p v-if="error" class="rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
+    <p v-if="error" class="rounded-xl bg-danger-subtle p-3 text-sm text-danger">{{ error }}</p>
 
 
     <div v-if="results.length && !selectedId" class="space-y-2">
-      <button v-for="household in results" :key="household.id" type="button" class="w-full rounded-2xl border p-4 text-left transition-colors" :class="selectedId === household.id ? 'border-[#1a73e8] bg-[#e8f0fe]' : 'border-[#e1e3e1] bg-white hover:border-[#1a73e8]'" @click="selectedId = household.id">
+      <button v-for="household in results" :key="household.id" type="button" class="w-full rounded-2xl border p-4 text-left transition-colors" :class="selectedId === household.id ? 'border-accent bg-accent/10' : 'border-theme-border bg-surface hover:border-accent'" @click="selectedId = household.id">
         <span class="flex items-center justify-between gap-3">
           <span class="font-medium">{{ household.streetAddress }}</span>
-          <span class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide" :class="household.status === 'active' ? 'bg-[#e6f4ea] text-[#137333]' : household.status === 'vacant' ? 'bg-[#fff8e1] text-[#8a6116]' : 'bg-[#f0f4f9] text-[#444746]'">{{ household.status }}</span>
+          <span class="rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide" :class="household.status === 'active' ? 'bg-success-subtle text-success' : household.status === 'vacant' ? 'bg-warning-subtle text-warning' : 'bg-app-bg text-content-muted'">{{ household.status }}</span>
         </span>
-        <span class="mt-1 block text-sm text-[#444746]">{{ household.residents.map((resident) => `${resident.firstName} ${resident.lastName}`).join(', ') || 'No residents' }}</span>
+        <span class="mt-1 block text-sm text-content-muted">{{ household.residents.map((resident) => `${resident.firstName} ${resident.lastName}`).join(', ') || 'No residents' }}</span>
       </button>
     </div>
 
 
     <DirectoryEditView v-if="selectedId" :key="selectedId" :admin-household-id="selectedId" />
-<div class="mt-10 border-t border-[#e1e3e1] pt-10">
+<div class="mt-10 border-t border-theme-border pt-10">
           <AdminHouseholdResetView />
         </div>
     </section>
 
     <!-- Hidden Show Advanced Section -->
-    <section class="border-t border-[#c4c7c5] pt-8">
-      <button type="button" class="inline-flex items-center gap-2 text-sm font-medium text-[#1a73e8] transition hover:text-[#0b57d0]" @click="showAdvanced = !showAdvanced">
+    <section class="border-t border-theme-border pt-8">
+      <button type="button" class="inline-flex items-center gap-2 text-sm font-medium text-accent transition hover:text-accent" @click="showAdvanced = !showAdvanced">
         <span>{{ showAdvanced ? 'Hide advanced' : 'Show advanced' }}</span>
         <ChevronDown class="h-4 w-4 transition-transform" :class="showAdvanced ? 'rotate-180' : ''" />
       </button>
@@ -113,20 +113,20 @@ async function createAddress() {
 
         <!-- Create new vacant property -->
         <section>
-          <p class="text-sm font-medium uppercase tracking-wide text-[#1a73e8]">Property records</p>
+          <p class="text-sm font-medium uppercase tracking-wide text-accent">Property records</p>
           <h3 class="mt-1 text-xl font-semibold">Address Management</h3>
-          <p class="mt-1 text-sm text-[#444746]">Create a new vacant property. Use this action when a portion of an existing residential property has been sold off to create a new addressable lot.</p>
+          <p class="mt-1 text-sm text-content-muted">Create a new vacant property. Use this action when a portion of an existing residential property has been sold off to create a new addressable lot.</p>
           <form class="mt-4 flex flex-col gap-3 sm:flex-row" @submit.prevent="createAddress">
             <label class="flex-1 text-sm font-medium">New address
-              <input v-model="address" required class="mt-1 w-full rounded-xl border border-[#e1e3e1] px-3 py-2.5 text-sm focus:border-[#1a73e8] focus:outline-none focus:ring-2 focus:ring-[#1a73e8]/30" placeholder="Enter a new street address" />
+              <input v-model="address" required class="mt-1 w-full rounded-xl border border-theme-border px-3 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30" placeholder="Enter a new street address" />
             </label>
-            <button type="submit" :disabled="isCreatingAddress" class="rounded-full bg-[#1a73e8] px-5 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60">{{ isCreatingAddress ? 'Creating...' : 'Create vacant address' }}</button>
+            <button type="submit" :disabled="isCreatingAddress" class="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60">{{ isCreatingAddress ? 'Creating...' : 'Create vacant address' }}</button>
           </form>
-          <p v-if="addressNotice" class="mt-4 rounded-xl bg-[#e6f4ea] p-3 text-sm text-[#137333]">{{ addressNotice }}</p>
+          <p v-if="addressNotice" class="mt-4 rounded-xl bg-success-subtle p-3 text-sm text-success">{{ addressNotice }}</p>
         </section>
 
         <!-- Archive Address -->
-        <div class="border-t border-[#e1e3e1] pt-8">
+        <div class="border-t border-theme-border pt-8">
           <AdminArchiveAddressView />
         </div>
       </div>

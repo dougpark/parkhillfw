@@ -16,7 +16,7 @@ export async function sendMagicLinkEmail(email: EmailBinding, toEmail: string, t
 
     await email.send({
         to: toEmail,
-        from: '"Park Hill FW" <auth@parkhillfw.org>',
+        from: '"Park Hill Directorty" <auth@parkhillfw.org>',
         subject: 'Your Park Hill Directory sign-in link',
         html,
         text,
@@ -43,7 +43,7 @@ export async function sendAccessRequestOutcomeEmail(
 
     await email.send({
         to: toEmail,
-        from: '"Park Hill FW" <auth@parkhillfw.org>',
+        from: '"Park Hill Directory" <auth@parkhillfw.org>',
         subject,
         html,
         text,

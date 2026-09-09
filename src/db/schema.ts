@@ -206,6 +206,24 @@ export const magicLinkRateLimits = sqliteTable(
     }
 );
 
+// Reusable audit trail for access control, access requests, page/directory edits, etc.
+export const activityLogs = sqliteTable(
+    'activity_logs',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        actorUserId: integer('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+        targetUserId: integer('target_user_id').references(() => users.id, { onDelete: 'set null' }),
+        category: text('category', { enum: ['access_control', 'access_request', 'page', 'directory'] }).notNull(),
+        action: text('action').notNull(),
+        details: text('details'),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        index('idx_activity_logs_category').on(table.category, table.createdAt),
+        index('idx_activity_logs_target').on(table.targetUserId),
+    ]
+);
+
 // ==========================================
 // 3. CONTENT & NAVIGATION (Pages, Menus, Messages)
 // ==========================================

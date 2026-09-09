@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import {
     accessRequests,
+    activityLogs,
     children,
     documents,
     householdFavorites,
@@ -595,6 +597,215 @@ app.put('/api/admin/users/:userId/login-emails', requireAuth(), requireAdmin(), 
         await db.insert(userLoginEmails).values({ userId, email }).onConflictDoNothing();
     }
     return c.json({ alternateEmails: emails });
+});
+
+const PERMISSION_FIELDS = ['isOwner', 'isAdmin', 'isPageEditor', 'isDirectoryEditor'] as const;
+type PermissionField = (typeof PERMISSION_FIELDS)[number];
+
+async function logAccessControlChange(
+    db: ReturnType<typeof drizzle>,
+    actorUserId: number,
+    targetUserId: number,
+    action: string,
+    details: Record<string, unknown>,
+) {
+    await db.insert(activityLogs).values({
+        actorUserId,
+        targetUserId,
+        category: 'access_control',
+        action,
+        details: JSON.stringify(details),
+    });
+}
+
+app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const query = (c.req.query('q') ?? '').trim();
+    if (!query) return c.json([]);
+
+    const term = `%${query}%`;
+    const columns = {
+        residentId: residents.id,
+        firstName: residents.firstName,
+        lastName: residents.lastName,
+        residentEmail: residents.email,
+        userId: users.id,
+        userEmail: users.email,
+        isOwner: users.isOwner,
+        isAdmin: users.isAdmin,
+        isPageEditor: users.isPageEditor,
+        isDirectoryEditor: users.isDirectoryEditor,
+    };
+    // Two passes cover both directions of the resident<->user link: residents who have
+    // never logged in (no users row yet) and user accounts not linked to a resident.
+    const [residentRows, userRows] = await Promise.all([
+        db.select(columns).from(residents)
+            .leftJoin(users, eq(users.residentId, residents.id))
+            .where(or(like(residents.firstName, term), like(residents.lastName, term), like(residents.email, term)))
+            .limit(20).all(),
+        db.select(columns).from(users)
+            .leftJoin(residents, eq(residents.id, users.residentId))
+            .where(like(users.email, term))
+            .limit(20).all(),
+    ]);
+
+    const merged = new Map<string, (typeof residentRows)[number]>();
+    for (const row of [...residentRows, ...userRows]) {
+        const key = row.userId ? `u${row.userId}` : `r${row.residentId}`;
+        if (!merged.has(key)) merged.set(key, row);
+    }
+
+    return c.json([...merged.values()].slice(0, 20).map((row) => ({
+        userId: row.userId,
+        residentId: row.residentId,
+        email: row.userEmail ?? row.residentEmail ?? '',
+        displayName: row.firstName ? `${row.firstName} ${row.lastName}` : (row.userEmail ?? row.residentEmail ?? 'Unknown'),
+        isOwner: row.isOwner,
+        isAdmin: row.isAdmin,
+        isPageEditor: row.isPageEditor,
+        isDirectoryEditor: row.isDirectoryEditor,
+    })));
+});
+
+// Materializes a users row for a resident who has never logged in, so an admin can grant
+// access before the resident's first sign-in.
+app.post('/api/admin/access-control/users', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ residentId?: number; email?: string }>().catch(() => ({}));
+
+    let resident = null;
+    if (Number.isInteger(body.residentId)) {
+        resident = await db.select().from(residents).where(eq(residents.id, body.residentId!)).get();
+        if (!resident) return c.json({ error: 'Resident not found.' }, 404);
+    }
+    const email = normalizeEmail(body.email ?? resident?.email ?? '');
+    if (!email || !email.includes('@')) return c.json({ error: 'A valid email is required to add this user.' }, 400);
+
+    let user = await db.select().from(users).where(eq(users.email, email)).get();
+    if (!user) {
+        user = await db.insert(users).values({
+            email,
+            residentId: resident?.id ?? null,
+            linkStatus: resident ? 'admin_linked' : 'unlinked',
+        }).returning().then((rows) => rows[0]);
+    } else if (resident && !user.residentId) {
+        user = await db.update(users).set({ residentId: resident.id, linkStatus: 'admin_linked', updatedAt: new Date() })
+            .where(eq(users.id, user.id)).returning().then((rows) => rows[0]);
+    }
+    return c.json({ user });
+});
+
+app.get('/api/admin/users/with-access', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const rows = await db.select({
+        id: users.id,
+        email: users.email,
+        isOwner: users.isOwner,
+        isAdmin: users.isAdmin,
+        isPageEditor: users.isPageEditor,
+        isDirectoryEditor: users.isDirectoryEditor,
+        firstName: residents.firstName,
+        lastName: residents.lastName,
+    }).from(users)
+        .leftJoin(residents, eq(residents.id, users.residentId))
+        .where(or(eq(users.isOwner, true), eq(users.isAdmin, true), eq(users.isPageEditor, true), eq(users.isDirectoryEditor, true)))
+        .orderBy(asc(users.email)).all();
+
+    return c.json(rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        displayName: row.firstName ? `${row.firstName} ${row.lastName}` : row.email,
+        isOwner: row.isOwner,
+        isAdmin: row.isAdmin,
+        isPageEditor: row.isPageEditor,
+        isDirectoryEditor: row.isDirectoryEditor,
+    })));
+});
+
+app.put('/api/admin/users/:userId/permissions', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
+    const userId = Number(c.req.param('userId'));
+    const body = await c.req.json<{ field?: PermissionField; value?: boolean }>().catch(() => ({}));
+    if (!Number.isInteger(userId) || !body.field || !PERMISSION_FIELDS.includes(body.field) || typeof body.value !== 'boolean') {
+        return c.json({ error: 'Invalid permission update.' }, 400);
+    }
+    if (body.field === 'isOwner' && !actor.isOwner) return c.json({ error: 'Only an Owner can change the Owner permission.' }, 403);
+
+    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    if (!target) return c.json({ error: 'User not found.' }, 404);
+
+    if (body.field === 'isOwner' && !body.value) {
+        const ownerCount = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.isOwner, true)).get();
+        if (target.isOwner && (ownerCount?.count ?? 0) <= 1) {
+            return c.json({ error: 'At least one Owner is required.' }, 409);
+        }
+    }
+
+    const nextValues: Partial<Record<PermissionField, boolean>> = { [body.field]: body.value };
+    if (body.field === 'isOwner' && body.value) nextValues.isAdmin = true; // Owner always implies Admin
+
+    await db.update(users).set(nextValues).where(eq(users.id, userId));
+    await logAccessControlChange(db, actor.id, userId, 'set_permission', { field: body.field, from: target[body.field], to: body.value });
+
+    const updated = await db.select().from(users).where(eq(users.id, userId)).get();
+    return c.json({ user: updated });
+});
+
+app.post('/api/admin/users/:userId/permissions/clear', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
+    const userId = Number(c.req.param('userId'));
+    if (!Number.isInteger(userId)) return c.json({ error: 'Invalid user ID.' }, 400);
+
+    const target = await db.select().from(users).where(eq(users.id, userId)).get();
+    if (!target) return c.json({ error: 'User not found.' }, 404);
+    if (target.isOwner && !actor.isOwner) return c.json({ error: 'Only an Owner can remove Owner access.' }, 403);
+
+    if (target.isOwner) {
+        const ownerCount = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.isOwner, true)).get();
+        if ((ownerCount?.count ?? 0) <= 1) return c.json({ error: 'At least one Owner is required.' }, 409);
+    }
+
+    const before = {
+        isOwner: target.isOwner,
+        isAdmin: target.isAdmin,
+        isPageEditor: target.isPageEditor,
+        isDirectoryEditor: target.isDirectoryEditor,
+    };
+    await db.update(users).set({ isOwner: false, isAdmin: false, isPageEditor: false, isDirectoryEditor: false }).where(eq(users.id, userId));
+    await logAccessControlChange(db, actor.id, userId, 'clear_permissions', { before });
+
+    return c.json({ cleared: true });
+});
+
+app.get('/api/admin/activity-logs', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const category = c.req.query('category');
+    const query = (c.req.query('q') ?? '').trim();
+    const limit = Math.min(Number(c.req.query('limit')) || 50, 200);
+
+    const targetUsers = alias(users, 'target_users');
+    const conditions: SQL[] = [];
+    if (category) conditions.push(eq(activityLogs.category, category as typeof activityLogs.$inferSelect.category));
+    if (query) conditions.push(or(like(users.email, `%${query}%`), like(targetUsers.email, `%${query}%`), like(activityLogs.action, `%${query}%`))!);
+
+    const rows = await db.select({
+        id: activityLogs.id,
+        category: activityLogs.category,
+        action: activityLogs.action,
+        details: activityLogs.details,
+        createdAt: activityLogs.createdAt,
+        actorEmail: users.email,
+        targetEmail: targetUsers.email,
+    }).from(activityLogs)
+        .leftJoin(users, eq(users.id, activityLogs.actorUserId))
+        .leftJoin(targetUsers, eq(targetUsers.id, activityLogs.targetUserId))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(activityLogs.createdAt))
+        .limit(limit).all();
+
+    return c.json(rows);
 });
 
 app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin(), async (c) => {

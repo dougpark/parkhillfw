@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ClipboardList, FileText, FolderTree, Users } from 'lucide-vue-next';
+import { ClipboardList, FileText, FolderTree, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
+import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 
 import AdminDirectoryView from './AdminDirectoryView.vue';
@@ -18,6 +19,7 @@ const features = [
   { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText },
   { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree },
   { label: 'Users', description: 'Manage users and Login Emails.', icon: Users },
+  { label: 'Access Control', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck },
 ];
 
 function selectFeature(label: string) {
@@ -78,6 +80,9 @@ function selectFeature(label: string) {
         <AdminDirectoryView />
         
         
+      </div>
+      <div v-else-if="selectedFeature === 'Access Control'" class="p-6 sm:p-8">
+        <AdminAccessControlView />
       </div>
       <div v-else class="p-6 sm:p-8">
         <div class="flex items-start justify-between gap-4">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Home, LogIn, LogOut, Plus, Save, Trash2, X } from 'lucide-vue-next';
+import { LogIn, LogOut, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 
 interface AuthUser {
@@ -110,16 +110,6 @@ watch(() => route.fullPath, loadAuthUser);
             >
               <LogOut class="h-4 w-4" />
             </button>
-            <RouterLink
-              v-if="user.matched"
-              to="/home"
-              class="inline-flex items-center gap-1.5 rounded-full border border-[#1a73e8] px-3 py-1.5 text-sm font-medium text-[#1a73e8] transition-colors hover:bg-[#e8f0fe]"
-              aria-label="Home"
-              title="Home"
-            >
-              <Home class="h-4 w-4" />
-              <span>Home</span>
-            </RouterLink>
           </template>
           <RouterLink
             v-else

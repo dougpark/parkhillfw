@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
 import { FilePlus2, FolderPlus, Link2, List, Network, Pencil, Trash2 } from 'lucide-vue-next';
 import MenuTreeEditor from '../components/menus/MenuTreeEditor.vue';
 import MenuItemDialog from '../components/menus/MenuItemDialog.vue';
 import PagePickerPanel from '../components/menus/PagePickerPanel.vue';
 import { flattenMenus, toReorderItems, type MenuRow } from '../components/menus/menuTree';
 import { menuIcon } from '../components/menus/menuIcons';
+
+const AdminPageEditView = defineAsyncComponent(() => import('./AdminPageEditView.vue'));
 
 const emit = defineEmits<{ exit: [] }>();
 
@@ -17,6 +19,8 @@ const editing = ref<MenuRow | null>(null);
 const deleteTarget = ref<MenuRow | null>(null);
 const showPagePicker = ref(false);
 const pickerParentId = ref<number | null>(null);
+const editingPageId = ref<number | null>(null);
+const editorDirty = ref(false);
 const saveState = ref<'idle' | 'saving' | 'saved' | 'error'>('idle');
 const savedAt = ref('');
 
@@ -61,6 +65,25 @@ function addLink(): void {
 function openPagePicker(parentId: number | null): void {
   pickerParentId.value = parentId;
   showPagePicker.value = true;
+}
+
+function editPage(row: MenuRow): void {
+  if (row.pageId === null) return;
+  editingPageId.value = row.pageId;
+  editorDirty.value = false;
+}
+
+function closePageEditor(): void {
+  if (editorDirty.value && !window.confirm('You have unsaved changes. Discard them?')) return;
+  editingPageId.value = null;
+  editorDirty.value = false;
+  void load();
+}
+
+function onEditorDone(): void {
+  editingPageId.value = null;
+  editorDirty.value = false;
+  void load();
 }
 
 async function onPageSelected(page: { id: number; title: string }): Promise<void> {
@@ -135,12 +158,20 @@ onMounted(load);
     <button
       type="button"
       class="mb-4 rounded-full border border-[#e1e3e1] px-4 py-2 text-sm font-medium text-[#444746] transition-colors hover:bg-[#f0f4f9]"
-      @click="emit('exit')"
+      @click="editingPageId !== null ? closePageEditor() : emit('exit')"
     >
-      ← Admin menu
+      ← {{ editingPageId !== null ? 'Navigation list' : 'Admin menu' }}
     </button>
   </div>
 
+  <AdminPageEditView
+    v-if="editingPageId !== null"
+    :page-id="editingPageId"
+    @done="onEditorDone"
+    @dirty="editorDirty = $event"
+  />
+
+  <div v-else>
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h3 class="text-xl font-semibold">Navigation</h3>
@@ -227,7 +258,22 @@ onMounted(load);
           >
             {{ node.row.isDraft ? 'Publish' : 'Unpublish' }}
           </button>
-          <button type="button" class="rounded-lg p-2 text-[#1a73e8] hover:bg-[#f0f4f9]" :aria-label="`Edit ${node.row.title}`" @click="editing = node.row">
+          <button
+            v-if="node.row.kind === 'page' && node.row.pageId !== null"
+            type="button"
+            class="rounded-lg p-2 text-[#1a73e8] hover:bg-[#f0f4f9]"
+            :aria-label="`Edit ${node.row.pageTitle ?? node.row.title}`"
+            @click="editPage(node.row)"
+          >
+            <Pencil class="h-4 w-4" />
+          </button>
+          <button
+            v-else
+            type="button"
+            class="rounded-lg p-2 text-[#1a73e8] hover:bg-[#f0f4f9]"
+            :aria-label="`Edit ${node.row.title}`"
+            @click="editing = node.row"
+          >
             <Pencil class="h-4 w-4" />
           </button>
           <button type="button" class="rounded-lg p-2 text-[#c5221f] hover:bg-[#f0f4f9]" :aria-label="`Delete ${node.row.title}`" @click="deleteTarget = node.row">
@@ -259,5 +305,6 @@ onMounted(load);
         <button type="button" class="rounded-full bg-[#c5221f] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90" @click="confirmDelete">Delete</button>
       </div>
     </div>
+  </div>
   </div>
 </template>

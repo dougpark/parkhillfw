@@ -48,7 +48,12 @@ async function load(): Promise<void> {
     loading.value = true;
     error.value = '';
     const res = await fetch('/api/admin/pages');
-    if (res.ok) pages.value = (await res.json()) as PageRow[];
+  if (res.ok) {
+    pages.value = (await res.json() as PageRow[]).sort((left, right) => {
+      const titleOrder = left.title.localeCompare(right.title, undefined, { sensitivity: 'base' });
+      return titleOrder || left.id - right.id;
+    });
+  }
     else error.value = 'Could not load pages.';
     loading.value = false;
 }

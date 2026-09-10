@@ -20,20 +20,9 @@ import {
 } from './db/schema';
 import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE, verifyCodeAndConsume } from './lib/auth';
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
-import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor } from './middleware/auth';
+import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor, type AppBindings, type AppEnv } from './middleware/auth';
 
-type Bindings = {
-    DB: D1Database;
-    BUCKET: R2Bucket;
-    DEV_BYPASS_AUTH?: string;
-    DEV_BYPASS_ROLE?: string;
-    JWT_SECRET?: string;
-    EMAIL: {
-        send(message: Record<string, unknown>): Promise<unknown>;
-    };
-};
-
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<AppEnv>();
 
 function compareStreetAddresses(left: string, right: string): number {
     const leftMatch = left.trim().match(/^(\d+)\s+(.+)$/);
@@ -696,7 +685,7 @@ app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
             .limit(20).all(),
     ]);
 
-    const merged = new Map<string, (typeof residentRows)[number]>();
+    const merged = new Map<string, (typeof residentRows)[number] | (typeof userRows)[number] | (typeof aliasRows)[number]>();
     for (const row of [...residentRows, ...userRows, ...aliasRows]) {
         const key = row.userId ? `u${row.userId}` : `r${row.residentId}`;
         if (!merged.has(key)) merged.set(key, row);
@@ -718,7 +707,7 @@ app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
 // access before the resident's first sign-in.
 app.post('/api/admin/access-control/users', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
-    const body = await c.req.json<{ residentId?: number; email?: string }>().catch(() => ({}));
+    const body = await c.req.json<{ residentId?: number; email?: string }>().catch(() => ({}) as { residentId?: number; email?: string });
 
     let resident = null;
     if (Number.isInteger(body.residentId)) {
@@ -787,7 +776,7 @@ app.put('/api/admin/users/:userId/permissions', requireAuth(), requireAdmin(), a
     const db = drizzle(c.env.DB);
     const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
-    const body = await c.req.json<{ field?: PermissionField; value?: boolean }>().catch(() => ({}));
+    const body = await c.req.json<{ field?: PermissionField; value?: boolean }>().catch(() => ({}) as { field?: PermissionField; value?: boolean });
     if (!Number.isInteger(userId) || !body.field || !PERMISSION_FIELDS.includes(body.field) || typeof body.value !== 'boolean') {
         return c.json({ error: 'Invalid permission update.' }, 400);
     }
@@ -958,7 +947,7 @@ app.put('/api/admin/users/:userId/suspend', requireAuth(), requireAdmin(), async
     const db = drizzle(c.env.DB);
     const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
-    const body = await c.req.json<{ suspended?: boolean }>().catch(() => ({}));
+    const body = await c.req.json<{ suspended?: boolean }>().catch(() => ({}) as { suspended?: boolean });
     if (!Number.isInteger(userId) || typeof body.suspended !== 'boolean') return c.json({ error: 'Invalid suspension update.' }, 400);
     if (await ownerTargetBlocked(db, actor, userId)) return c.json({ error: 'Only an Owner can manage an Owner account.' }, 403);
 
@@ -1519,7 +1508,15 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
         targetUrl?: string | null;
         description?: string | null;
         iconName?: string | null;
-    }>().catch(() => ({}));
+    }>().catch(() => ({}) as {
+        kind?: 'menu' | 'page' | 'link';
+        title?: string;
+        parentId?: number | null;
+        pageId?: number | null;
+        targetUrl?: string | null;
+        description?: string | null;
+        iconName?: string | null;
+    });
 
     const kind = body.kind ?? 'menu';
     if (!['menu', 'page', 'link'].includes(kind)) return c.json({ error: 'Invalid menu kind.' }, 400);
@@ -1574,7 +1571,7 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
 // Registered before /:menuId so the literal path wins.
 app.put('/api/admin/menus/reorder', requireAuth(), requirePageEditor(), async (c) => {
     const db = drizzle(c.env.DB);
-    const body = await c.req.json<{ items?: Array<{ id?: number; parentId?: number | null; displayOrder?: number }> }>().catch(() => ({}));
+    const body = await c.req.json<{ items?: Array<{ id?: number; parentId?: number | null; displayOrder?: number }> }>().catch(() => ({}) as { items?: Array<{ id?: number; parentId?: number | null; displayOrder?: number }> });
     const items = body.items ?? [];
     if (!items.length) return c.json({ error: 'No items supplied.' }, 400);
 
@@ -1683,7 +1680,7 @@ app.post('/api/admin/menus/:menuId/publish', requireAuth(), requirePageEditor(),
     const existing = await db.select({ id: menus.id }).from(menus).where(eq(menus.id, menuId)).get();
     if (!existing) return c.json({ error: 'Menu not found.' }, 404);
 
-    const body = await c.req.json<{ isDraft?: boolean }>().catch(() => ({}));
+    const body = await c.req.json<{ isDraft?: boolean }>().catch(() => ({}) as { isDraft?: boolean });
     const updated = await db.update(menus).set({
         isDraft: body.isDraft ?? false,
         updatedAt: new Date(),
@@ -1710,7 +1707,7 @@ app.delete('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async
 
 type Viewer = { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean } | null;
 
-async function resolveViewer(c: { env: Bindings; req: { raw: Request } }): Promise<Viewer> {
+async function resolveViewer(c: { env: AppBindings; req: { raw: Request } }): Promise<Viewer> {
     if (c.env.DEV_BYPASS_AUTH === 'true') return devBypassUser(c.env.DEV_BYPASS_ROLE) as Viewer;
     const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
     if (!rawSession) return null;

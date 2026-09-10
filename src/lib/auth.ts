@@ -4,7 +4,8 @@ import { magicTokens, sessions, users, residents, userLoginEmails } from '../db/
 import { asc } from 'drizzle-orm';
 
 export const SESSION_COOKIE = 'parkhill_session';
-const SESSION_DAYS = 400;
+export const SESSION_DAYS = 400;
+export const SESSION_RENEW_THRESHOLD_DAYS = 300;
 const MAGIC_LINK_MINUTES = 15;
 const APPROVAL_LINK_HOURS = 48;
 const MAX_CODE_ATTEMPTS = 5;
@@ -149,14 +150,31 @@ export async function createSession(
     return { rawSession, expiresAt };
 }
 
-export async function findUserBySession(db: ReturnType<typeof drizzle>, rawSession: string) {
+export async function findUserBySession(
+    db: ReturnType<typeof drizzle>,
+    rawSession: string,
+): Promise<{ user: typeof users.$inferSelect; renewedExpiresAt?: Date } | null> {
     const sessionId = await hashToken(rawSession);
     const session = await db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
     if (!session || session.expiresAt.getTime() <= Date.now()) return null;
     const user = await db.select().from(users).where(eq(users.id, session.userId)).get();
     if (!user || user.isSuspended) return null;
-    await db.update(sessions).set({ lastSeenAt: new Date() }).where(eq(sessions.id, sessionId));
-    return user;
+
+    const now = Date.now();
+    const remainingMs = session.expiresAt.getTime() - now;
+    const thresholdMs = SESSION_RENEW_THRESHOLD_DAYS * 24 * 60 * 60_000;
+
+    if (remainingMs < thresholdMs) {
+        const renewedExpiresAt = new Date(now + SESSION_DAYS * 24 * 60 * 60_000);
+        await db
+            .update(sessions)
+            .set({ lastSeenAt: new Date(now), expiresAt: renewedExpiresAt })
+            .where(eq(sessions.id, sessionId));
+        return { user, renewedExpiresAt };
+    }
+
+    await db.update(sessions).set({ lastSeenAt: new Date(now) }).where(eq(sessions.id, sessionId));
+    return { user };
 }
 
 export function sessionCookie(value: string, expiresAt: Date, secure: boolean): string {

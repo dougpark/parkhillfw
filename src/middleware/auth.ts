@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { findUserBySession, SESSION_COOKIE } from '../lib/auth';
+import { findUserBySession, sessionCookie, SESSION_COOKIE } from '../lib/auth';
 
 function getCookie(request: Request, name: string): string | null {
     const cookies = request.headers.get('Cookie')?.split(';') ?? [];
@@ -66,11 +66,17 @@ export const requireAuth = (): MiddlewareHandler<AppEnv> => async (c, next) => {
     const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
     if (!rawSession) return c.json({ error: 'Unauthorized' }, 401);
 
-    const user = await findUserBySession(drizzle(c.env.DB), rawSession);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const authResult = await findUserBySession(drizzle(c.env.DB), rawSession);
+    if (!authResult) return c.json({ error: 'Unauthorized' }, 401);
 
-    c.set('user', user);
-    return next();
+    c.set('user', authResult.user);
+
+    await next();
+
+    if (authResult.renewedExpiresAt) {
+        const secure = new URL(c.req.url).protocol === 'https:';
+        c.header('Set-Cookie', sessionCookie(rawSession, authResult.renewedExpiresAt, secure), { append: true });
+    }
 };
 
 export const requireAdmin = (): MiddlewareHandler<AppEnv> => async (c, next) => {

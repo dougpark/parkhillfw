@@ -1707,11 +1707,16 @@ app.delete('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async
 
 type Viewer = { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean } | null;
 
-async function resolveViewer(c: { env: AppBindings; req: { raw: Request } }): Promise<Viewer> {
+async function resolveViewer(c: { env: AppBindings; req: { raw: Request }; header: (name: string, value: string, options?: { append?: boolean }) => void }): Promise<Viewer> {
     if (c.env.DEV_BYPASS_AUTH === 'true') return devBypassUser(c.env.DEV_BYPASS_ROLE) as Viewer;
     const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
     if (!rawSession) return null;
-    return (await findUserBySession(drizzle(c.env.DB), rawSession)) as Viewer;
+    const authResult = await findUserBySession(drizzle(c.env.DB), rawSession);
+    if (authResult?.renewedExpiresAt) {
+        const secure = new URL(c.req.url).protocol === 'https:';
+        c.header('Set-Cookie', sessionCookie(rawSession, authResult.renewedExpiresAt, secure), { append: true });
+    }
+    return (authResult?.user as Viewer) ?? null;
 }
 
 type NavNode = {

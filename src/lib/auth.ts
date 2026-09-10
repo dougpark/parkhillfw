@@ -153,28 +153,39 @@ export async function createSession(
 export async function findUserBySession(
     db: ReturnType<typeof drizzle>,
     rawSession: string,
-): Promise<{ user: typeof users.$inferSelect; renewedExpiresAt?: Date } | null> {
+): Promise<{ user: typeof users.$inferSelect; previousLastSeenAt?: Date | null; renewedExpiresAt?: Date } | null> {
     const sessionId = await hashToken(rawSession);
     const session = await db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
     if (!session || session.expiresAt.getTime() <= Date.now()) return null;
     const user = await db.select().from(users).where(eq(users.id, session.userId)).get();
     if (!user || user.isSuspended) return null;
 
+    const previousLastSeenAt = session.lastSeenAt;
     const now = Date.now();
     const remainingMs = session.expiresAt.getTime() - now;
     const thresholdMs = SESSION_RENEW_THRESHOLD_DAYS * 24 * 60 * 60_000;
+
+    // Throttle updating lastSeenAt: only update in DB if lastSeenAt is null or older than 15 minutes
+    const THROTTLE_MS = 15 * 60_000;
+    const needsLastSeenUpdate = !session.lastSeenAt || (now - session.lastSeenAt.getTime() > THROTTLE_MS);
 
     if (remainingMs < thresholdMs) {
         const renewedExpiresAt = new Date(now + SESSION_DAYS * 24 * 60 * 60_000);
         await db
             .update(sessions)
-            .set({ lastSeenAt: new Date(now), expiresAt: renewedExpiresAt })
+            .set({
+                ...(needsLastSeenUpdate ? { lastSeenAt: new Date(now) } : {}),
+                expiresAt: renewedExpiresAt,
+            })
             .where(eq(sessions.id, sessionId));
-        return { user, renewedExpiresAt };
+        return { user, previousLastSeenAt, renewedExpiresAt };
     }
 
-    await db.update(sessions).set({ lastSeenAt: new Date(now) }).where(eq(sessions.id, sessionId));
-    return { user };
+    if (needsLastSeenUpdate) {
+        await db.update(sessions).set({ lastSeenAt: new Date(now) }).where(eq(sessions.id, sessionId));
+    }
+
+    return { user, previousLastSeenAt };
 }
 
 export function sessionCookie(value: string, expiresAt: Date, secure: boolean): string {

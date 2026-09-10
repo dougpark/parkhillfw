@@ -129,25 +129,38 @@ describe('Rolling Session Auth Tests', () => {
         expect(result).toBeNull();
     });
 
-    test('findUserBySession returns null for suspended user', async () => {
+    test('findUserBySession captures previousLastSeenAt and throttles lastSeenAt DB updates to 15 minutes', async () => {
         const db = setupTestDb();
-        const rawSession = 'suspended-user-session';
+        const rawSession = 'throttled-session-token';
         const sessionHash = await hashToken(rawSession);
 
-        const [insertedUser] = await db.insert(users).values({
-            email: 'suspended@example.com',
-            isSuspended: true,
-        }).returning();
+        const [insertedUser] = await db.insert(users).values({ email: 'resident.throttle@example.com' }).returning();
         if (!insertedUser) throw new Error('User insertion failed');
 
-        const expiresAt = new Date(Date.now() + 200 * 24 * 60 * 60_000);
+        // Session last seen 2 hours ago
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60_000);
+        const expiresAt = new Date(Date.now() + 350 * 24 * 60 * 60_000);
         await db.insert(sessions).values({
             id: sessionHash,
             userId: insertedUser.id,
             expiresAt,
+            lastSeenAt: twoHoursAgo,
         });
 
-        const result = await findUserBySession(db as any, rawSession);
-        expect(result).toBeNull();
+        // First call: previousLastSeenAt should be twoHoursAgo (within second precision)
+        const firstResult = await findUserBySession(db as any, rawSession);
+        expect(Math.floor(firstResult!.previousLastSeenAt!.getTime() / 1000)).toBe(Math.floor(twoHoursAgo.getTime() / 1000));
+
+        // The session in DB should now have been updated to ~now
+        const sessionInDbAfterFirst = await db.select().from(sessions).where(eq(sessions.id, sessionHash)).get();
+        const firstUpdatedLastSeenAt = sessionInDbAfterFirst!.lastSeenAt;
+        expect(firstUpdatedLastSeenAt!.getTime()).toBeGreaterThan(twoHoursAgo.getTime());
+
+        // Second call immediately after: previousLastSeenAt should be firstUpdatedLastSeenAt, but DB update skipped because < 15 mins
+        const secondResult = await findUserBySession(db as any, rawSession);
+        expect(secondResult?.previousLastSeenAt?.getTime()).toBe(firstUpdatedLastSeenAt!.getTime());
+
+        const sessionInDbAfterSecond = await db.select().from(sessions).where(eq(sessions.id, sessionHash)).get();
+        expect(sessionInDbAfterSecond!.lastSeenAt!.getTime()).toBe(firstUpdatedLastSeenAt!.getTime());
     });
 });

@@ -36,7 +36,7 @@ export type AppBindings = {
     };
 };
 
-export type AppEnv = { Bindings: AppBindings; Variables: { user?: AppUser } };
+export type AppEnv = { Bindings: AppBindings; Variables: { user?: AppUser; previousLastSeenAt?: Date | null } };
 
 export const isOwner = (user?: PermissionFlags | null) => Boolean(user?.isOwner);
 export const isAdmin = (user?: PermissionFlags | null) => Boolean(user?.isAdmin || user?.isOwner);
@@ -70,6 +70,9 @@ export const requireAuth = (): MiddlewareHandler<AppEnv> => async (c, next) => {
     if (!authResult) return c.json({ error: 'Unauthorized' }, 401);
 
     c.set('user', authResult.user);
+    if (authResult.previousLastSeenAt) {
+        c.set('previousLastSeenAt', authResult.previousLastSeenAt);
+    }
 
     await next();
 

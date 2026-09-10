@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Check, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
+import { Check, Clock, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
 import modernLogo from '/modern-ph-logo.svg?raw';
 
 interface AuthUser {
   displayName: string;
+  lastActiveAt?: string | null;
   matched?: boolean;
 }
 
@@ -22,6 +23,50 @@ const isLoadingEmails = ref(false);
 const isSavingEmails = ref(false);
 const emailPanelError = ref('');
 const emailPanelSaved = ref(false);
+
+const showLastActiveBanner = ref(false);
+const lastActiveText = ref('');
+let bannerTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+function dismissLastActiveBanner() {
+  showLastActiveBanner.value = false;
+  try {
+    sessionStorage.setItem('last_active_banner_dismissed', 'true');
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+  if (bannerTimeoutTimer) {
+    clearTimeout(bannerTimeoutTimer);
+    bannerTimeoutTimer = null;
+  }
+}
+
+function formatLastActive(dateStr: string): string {
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
+
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+
+  const timeString = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+  if (isToday) {
+    return `today at ${timeString}`;
+  }
+  if (isYesterday) {
+    return `yesterday at ${timeString}`;
+  }
+
+  const dateFormatted = date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  return `${dateFormatted} at ${timeString}`;
+}
 
 async function openAccountPanel() {
   isAccountMenuOpen.value = false;
@@ -74,8 +119,10 @@ async function switchAccount() {
   isAccountMenuOpen.value = false;
   await fetch('/api/auth/logout', { method: 'POST' });
   user.value = null;
+  dismissLastActiveBanner();
   await router.push({ path: '/login', query: { switch: '1' } });
 }
+
 async function loadAuthUser() {
   try {
     const response = await fetch('/api/auth/me');
@@ -85,6 +132,30 @@ async function loadAuthUser() {
     }
     const data = await response.json() as { user: AuthUser; matched: boolean };
     user.value = { ...data.user, matched: data.matched };
+
+    // Trigger last active banner if user was previously active, hasn't dismissed it in this session,
+    // and the previous activity was at least 15 minutes ago.
+    if (data.user?.lastActiveAt) {
+      const alreadyDismissed = sessionStorage.getItem('last_active_banner_dismissed') === 'true';
+      if (!alreadyDismissed && !showLastActiveBanner.value) {
+        const lastActiveTime = new Date(data.user.lastActiveAt).getTime();
+        const diffMs = Date.now() - lastActiveTime;
+        if (diffMs > 15 * 60_000) {
+          const formatted = formatLastActive(data.user.lastActiveAt);
+          if (formatted) {
+            lastActiveText.value = formatted;
+            showLastActiveBanner.value = true;
+            if (bannerTimeoutTimer) clearTimeout(bannerTimeoutTimer);
+            bannerTimeoutTimer = setTimeout(() => {
+              showLastActiveBanner.value = false;
+              try {
+                sessionStorage.setItem('last_active_banner_dismissed', 'true');
+              } catch {}
+            }, 20000); // Stay visible for 20 seconds for elderly users to comfortably read
+          }
+        }
+      }
+    }
   } catch {
     user.value = null;
   }
@@ -172,6 +243,32 @@ watch(() => route.fullPath, loadAuthUser);
       </div>
     </header>
 
+    <Transition name="banner-fade">
+      <div
+        v-if="showLastActiveBanner && lastActiveText"
+        class="border-b border-theme-border bg-surface-subtle px-4 py-3 text-sm text-content shadow-xs"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 sm:px-4">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <Clock class="h-4 w-4 shrink-0 text-accent" />
+            <span class="truncate">
+              Welcome back! You were last active <span class="font-semibold text-accent">{{ lastActiveText }}</span>.
+            </span>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 rounded-full p-1 text-content-muted hover:bg-surface-hover hover:text-content"
+            aria-label="Dismiss last active message"
+            @click="dismissLastActiveBanner"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </Transition>
+
     <div v-if="isAccountPanelOpen" class="fixed inset-0 z-40 bg-[#1f1f1f]/20" @click="isAccountPanelOpen = false">
       <section
         class="absolute right-4 top-16 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-theme-border bg-surface p-5 shadow-xl sm:right-8"
@@ -210,5 +307,15 @@ watch(() => route.fullPath, loadAuthUser);
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.banner-fade-enter-active,
+.banner-fade-leave-active {
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.banner-fade-enter-from,
+.banner-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

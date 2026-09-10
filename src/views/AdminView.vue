@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { ClipboardList, FileText, FolderTree, ShieldCheck, Users } from 'lucide-vue-next';
+import { ClipboardList, FileText, FolderTree, Gauge, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
+import AdminStatusView from './AdminStatusView.vue';
 
 import AdminDirectoryView from './AdminDirectoryView.vue';
 
@@ -11,9 +12,10 @@ import AdminMenusView from './AdminMenusView.vue';
 
 import AdminPagesView from './AdminPagesView.vue';
 
-const selectedFeature = ref('Access Requests');
+const selectedFeature = ref('Status');
 
 const features = [
+  { label: 'Status', description: 'Review database and request counts.', icon: Gauge },
   { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList },
   { label: 'Directory', description: 'Edit households and residents.', icon: Users },
   { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText },
@@ -32,7 +34,7 @@ function selectFeature(label: string) {
     <BreadcrumbNav
       :trail="[{ title: 'Admin' }]"
       :current="selectedFeature"
-      @crumb-click="selectedFeature = 'Access Requests'"
+      @crumb-click="selectedFeature = 'Status'"
     />
 
     <div>
@@ -44,7 +46,7 @@ function selectFeature(label: string) {
       v-if="selectedFeature === 'Pages'"
       class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm sm:p-8"
     >
-      <AdminPagesView @exit="selectedFeature = 'Access Requests'" />
+      <AdminPagesView @exit="selectedFeature = 'Status'" />
     </div>
 
     <!-- Menus needs the full width for the hierarchy editor's indent guides -->
@@ -52,7 +54,7 @@ function selectFeature(label: string) {
       v-else-if="selectedFeature === 'Navigation'"
       class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm sm:p-8"
     >
-      <AdminMenusView @exit="selectedFeature = 'Access Requests'" />
+      <AdminMenusView @exit="selectedFeature = 'Status'" />
     </div>
 
     <div v-else class="grid min-h-112 overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm md:grid-cols-[16rem_1fr]">
@@ -75,6 +77,9 @@ function selectFeature(label: string) {
 
       <div v-if="selectedFeature === 'Access Requests'" class="p-6 sm:p-8">
         <AdminAccessRequestsView />
+      </div>
+      <div v-else-if="selectedFeature === 'Status'" class="p-6 sm:p-8">
+        <AdminStatusView />
       </div>
       <div v-else-if="selectedFeature === 'Directory'" class="p-6 sm:p-8">
         <AdminDirectoryView />

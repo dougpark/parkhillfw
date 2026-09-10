@@ -339,6 +339,27 @@ app.get('/api/admin/access-requests/count', requireAuth(), requireAdmin(), async
     return c.json({ count: pending.length });
 });
 
+app.get('/api/admin/status', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const [householdCount, residentCount, childCount, userCount, aliasLoginCount, openAccessRequestCount] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(households).get(),
+        db.select({ count: sql<number>`count(*)` }).from(residents).get(),
+        db.select({ count: sql<number>`count(*)` }).from(children).get(),
+        db.select({ count: sql<number>`count(*)` }).from(users).get(),
+        db.select({ count: sql<number>`count(*)` }).from(userLoginEmails).get(),
+        db.select({ count: sql<number>`count(*)` }).from(accessRequests).where(eq(accessRequests.status, 'pending')).get(),
+    ]);
+
+    return c.json({
+        households: householdCount?.count ?? 0,
+        adultResidents: residentCount?.count ?? 0,
+        children: childCount?.count ?? 0,
+        loginAccounts: userCount?.count ?? 0,
+        aliasLogins: aliasLoginCount?.count ?? 0,
+        openAccessRequests: openAccessRequestCount?.count ?? 0,
+    });
+});
+
 app.get('/api/admin/residents', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim().toLowerCase();
@@ -755,6 +776,9 @@ app.put('/api/admin/users/:userId/permissions', requireAuth(), requireAdmin(), a
     if (!target) return c.json({ error: 'User not found.' }, 404);
 
     if (body.field === 'isOwner' && !body.value) {
+        if (target.id === actor.id) {
+            return c.json({ error: 'You cannot remove your own Owner permission.' }, 409);
+        }
         const ownerCount = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.isOwner, true)).get();
         if (target.isOwner && (ownerCount?.count ?? 0) <= 1) {
             return c.json({ error: 'At least one Owner is required.' }, 409);
@@ -780,6 +804,7 @@ app.post('/api/admin/users/:userId/permissions/clear', requireAuth(), requireAdm
     const target = await db.select().from(users).where(eq(users.id, userId)).get();
     if (!target) return c.json({ error: 'User not found.' }, 404);
     if (target.isOwner && !actor.isOwner) return c.json({ error: 'Only an Owner can remove Owner access.' }, 403);
+    if (target.isOwner && target.id === actor.id) return c.json({ error: 'You cannot clear your own Owner access.' }, 409);
 
     if (target.isOwner) {
         const ownerCount = await db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.isOwner, true)).get();

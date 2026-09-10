@@ -8,15 +8,35 @@ function getCookie(request: Request, name: string): string | null {
     return value ? decodeURIComponent(value.trim().slice(name.length + 1)) : null;
 }
 
+export type PermissionFlags = {
+    isOwner?: boolean | null;
+    isAdmin?: boolean | null;
+    isPageEditor?: boolean | null;
+    isDirectoryEditor?: boolean | null;
+};
+
+export const isOwner = (user?: PermissionFlags | null) => Boolean(user?.isOwner);
+export const isAdmin = (user?: PermissionFlags | null) => Boolean(user?.isAdmin || user?.isOwner);
+export const isPageEditor = (user?: PermissionFlags | null) => Boolean(user?.isPageEditor) || isAdmin(user);
+export const isDirectoryEditor = (user?: PermissionFlags | null) => Boolean(user?.isDirectoryEditor) || isAdmin(user);
+export const hasAnyAdminRole = (user?: PermissionFlags | null) =>
+    isAdmin(user) || Boolean(user?.isPageEditor) || Boolean(user?.isDirectoryEditor);
+
+// Local-only role simulation so each permission level can be exercised without real logins.
+export function devBypassUser(role: string | undefined): PermissionFlags & Record<string, unknown> {
+    const flags = {
+        owner: { isOwner: true, isAdmin: true },
+        admin: { isAdmin: true },
+        directoryEditor: { isDirectoryEditor: true },
+        pageEditor: { isPageEditor: true },
+        user: {},
+    }[role ?? 'admin'] ?? { isAdmin: true };
+    return { id: 1, email: 'parkdn@gmail.com', householdId: 1, residentId: 1, ...flags };
+}
+
 export const requireAuth = (): MiddlewareHandler => async (c, next) => {
     if (c.env.DEV_BYPASS_AUTH === 'true') {
-        c.set('user', {
-            id: 1,
-            email: 'parkdn@gmail.com',
-            role: 'admin',
-            householdId: 1,
-            isAdmin: true,
-        });
+        c.set('user', devBypassUser(c.env.DEV_BYPASS_ROLE));
         return next();
     }
 
@@ -31,14 +51,27 @@ export const requireAuth = (): MiddlewareHandler => async (c, next) => {
 };
 
 export const requireAdmin = (): MiddlewareHandler => async (c, next) => {
-    const user = c.get('user') as { isAdmin?: boolean; isOwner?: boolean } | undefined;
-    if (!user?.isAdmin && !user?.isOwner) return c.json({ error: 'Forbidden' }, 403);
+    if (!isAdmin(c.get('user') as PermissionFlags | undefined)) return c.json({ error: 'Forbidden' }, 403);
+    return next();
+};
+
+export const requireOwner = (): MiddlewareHandler => async (c, next) => {
+    if (!isOwner(c.get('user') as PermissionFlags | undefined)) return c.json({ error: 'Forbidden' }, 403);
+    return next();
+};
+
+export const requireAnyAdminRole = (): MiddlewareHandler => async (c, next) => {
+    if (!hasAnyAdminRole(c.get('user') as PermissionFlags | undefined)) return c.json({ error: 'Forbidden' }, 403);
     return next();
 };
 
 export const requirePageEditor = (): MiddlewareHandler => async (c, next) => {
-    const user = c.get('user') as { isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean } | undefined;
-    if (!user?.isPageEditor && !user?.isAdmin && !user?.isOwner) return c.json({ error: 'Forbidden' }, 403);
+    if (!isPageEditor(c.get('user') as PermissionFlags | undefined)) return c.json({ error: 'Forbidden' }, 403);
+    return next();
+};
+
+export const requireDirectoryEditor = (): MiddlewareHandler => async (c, next) => {
+    if (!isDirectoryEditor(c.get('user') as PermissionFlags | undefined)) return c.json({ error: 'Forbidden' }, 403);
     return next();
 };
 

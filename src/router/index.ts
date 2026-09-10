@@ -36,7 +36,7 @@ const router = createRouter({
         {
             path: '/admin',
             name: 'admin',
-            meta: { requiresAdmin: true },
+            meta: { requiresAnyAdminRole: true },
             component: () => import('../views/AdminView.vue'),
         },
         {
@@ -73,7 +73,9 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
-    if (!to.meta.requiresAdmin && !to.meta.requiresDirectory && !to.meta.requiresAuth && !to.meta.guestOnly) return true;
+    const gated = to.meta.requiresAdmin || to.meta.requiresAnyAdminRole || to.meta.requiresDirectory
+        || to.meta.requiresAuth || to.meta.guestOnly;
+    if (!gated) return true;
 
     try {
         const response = await fetch('/api/auth/me');
@@ -96,8 +98,10 @@ router.beforeEach(async (to) => {
         if (to.meta.requiresDirectory && !data.matched) return '/access-request';
         if (to.meta.requiresDirectory) return true;
         const user = data.user;
-        const authorized = Boolean(user?.isOwner || user?.isAdmin || user?.isPageEditor || user?.isDirectoryEditor);
-        return authorized ? true : '/directory';
+        const isAdmin = Boolean(user?.isOwner || user?.isAdmin);
+        if (to.meta.requiresAdmin) return isAdmin ? true : '/directory';
+        const anyRole = isAdmin || Boolean(user?.isPageEditor || user?.isDirectoryEditor);
+        return anyRole ? true : '/directory';
     } catch {
         return '/login';
     }

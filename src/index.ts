@@ -20,12 +20,13 @@ import {
 } from './db/schema';
 import { approvalLinkLifetimeMinutes, createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
-import { getCookie, requireAdmin, requireAuth, requireDirectory, requirePageEditor } from './middleware/auth';
+import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor } from './middleware/auth';
 
 type Bindings = {
     DB: D1Database;
     BUCKET: R2Bucket;
     DEV_BYPASS_AUTH?: string;
+    DEV_BYPASS_ROLE?: string;
     JWT_SECRET?: string;
     EMAIL: {
         send(message: Record<string, unknown>): Promise<unknown>;
@@ -347,14 +348,14 @@ app.get('/api/admin/access-requests', requireAuth(), requireAdmin(), async (c) =
     return c.json(await db.select().from(accessRequests).orderBy(accessRequests.createdAt).all());
 });
 
-app.get('/api/admin/access-requests/count', requireAuth(), requireAdmin(), async (c) => {
+app.get('/api/admin/access-requests/count', requireAuth(), requireAnyAdminRole(), async (c) => {
     const db = drizzle(c.env.DB);
     const pending = await db.select({ id: accessRequests.id }).from(accessRequests)
         .where(eq(accessRequests.status, 'pending')).all();
     return c.json({ count: pending.length });
 });
 
-app.get('/api/admin/status', requireAuth(), requireAdmin(), async (c) => {
+app.get('/api/admin/status', requireAuth(), requireAnyAdminRole(), async (c) => {
     const db = drizzle(c.env.DB);
     const [householdCount, residentCount, childCount, userCount, aliasLoginCount, openAccessRequestCount] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(households).get(),
@@ -375,7 +376,7 @@ app.get('/api/admin/status', requireAuth(), requireAdmin(), async (c) => {
     });
 });
 
-app.get('/api/admin/residents', requireAuth(), requireAdmin(), async (c) => {
+app.get('/api/admin/residents', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim().toLowerCase();
     const data = await db.select().from(residents).all();
@@ -385,7 +386,7 @@ app.get('/api/admin/residents', requireAuth(), requireAdmin(), async (c) => {
     return c.json(filtered);
 });
 
-app.get('/api/admin/directory', requireAuth(), requireAdmin(), async (c) => {
+app.get('/api/admin/directory', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim();
     const householdsQuery = q
@@ -409,7 +410,7 @@ app.get('/api/admin/directory', requireAuth(), requireAdmin(), async (c) => {
     return c.json(results);
 });
 
-app.get('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
+app.get('/api/admin/households', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim();
     const householdRows = q
@@ -433,7 +434,7 @@ app.get('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
     }))));
 });
 
-app.post('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
+app.post('/api/admin/households', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const body = await c.req.json<{ streetAddress?: string }>();
     const streetAddress = body.streetAddress?.trim() ?? '';
@@ -445,7 +446,7 @@ app.post('/api/admin/households', requireAuth(), requireAdmin(), async (c) => {
     return c.json({ household: created[0] }, 201);
 });
 
-app.get('/api/admin/households/:householdId', requireAuth(), requireAdmin(), async (c) => {
+app.get('/api/admin/households/:householdId', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const householdId = Number(c.req.param('householdId'));
     if (!Number.isInteger(householdId)) return c.json({ error: 'Invalid household ID.' }, 400);
@@ -458,7 +459,7 @@ app.get('/api/admin/households/:householdId', requireAuth(), requireAdmin(), asy
     return c.json({ household, residents: householdResidents, children: householdChildren });
 });
 
-app.put('/api/admin/households/:householdId', requireAuth(), requireAdmin(), async (c) => {
+app.put('/api/admin/households/:householdId', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const householdId = Number(c.req.param('householdId'));
     if (!Number.isInteger(householdId)) return c.json({ error: 'Invalid household ID.' }, 400);
@@ -525,7 +526,7 @@ app.put('/api/admin/households/:householdId', requireAuth(), requireAdmin(), asy
     return c.json({ saved: true });
 });
 
-app.post('/api/admin/households/:householdId/vacate', requireAuth(), requireAdmin(), async (c) => {
+app.post('/api/admin/households/:householdId/vacate', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const householdId = Number(c.req.param('householdId'));
     if (!Number.isInteger(householdId)) return c.json({ error: 'Invalid household ID.' }, 400);
@@ -576,7 +577,7 @@ app.post('/api/admin/households/:householdId/vacate', requireAuth(), requireAdmi
     return c.json({ cleared: true, streetAddress: household.streetAddress, residentsRemoved: residentIds.length, usersReset: userIds.length });
 });
 
-app.post('/api/admin/households/:householdId/archive', requireAuth(), requireAdmin(), async (c) => {
+app.post('/api/admin/households/:householdId/archive', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const householdId = Number(c.req.param('householdId'));
     const body = await c.req.json<{ confirmation?: string; reason?: string }>();
@@ -605,11 +606,13 @@ app.get('/api/admin/users', requireAuth(), requireAdmin(), async (c) => {
 
 app.put('/api/admin/users/:userId/login-emails', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
     const body = await c.req.json<{ alternateEmails?: string[] }>();
     if (!Number.isInteger(userId) || !Array.isArray(body.alternateEmails)) {
         return c.json({ error: 'Invalid login email update.' }, 400);
     }
+    if (await ownerTargetBlocked(db, actor, userId)) return c.json({ error: 'Only an Owner can manage an Owner account.' }, 403);
 
     const user = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).get();
     if (!user) return c.json({ error: 'User not found.' }, 404);
@@ -637,6 +640,18 @@ app.put('/api/admin/users/:userId/login-emails', requireAuth(), requireAdmin(), 
 
 const PERMISSION_FIELDS = ['isOwner', 'isAdmin', 'isPageEditor', 'isDirectoryEditor'] as const;
 type PermissionField = (typeof PERMISSION_FIELDS)[number];
+
+// A non-Owner admin acting on an Owner's account could take it over (alias login email,
+// steal a magic link) or lock the Owner out, so those actions are Owner-only.
+async function ownerTargetBlocked(
+    db: ReturnType<typeof drizzle>,
+    actor: { isOwner?: boolean | null },
+    targetUserId: number,
+): Promise<boolean> {
+    if (hasOwner(actor)) return false;
+    const target = await db.select({ isOwner: users.isOwner }).from(users).where(eq(users.id, targetUserId)).get();
+    return Boolean(target?.isOwner);
+}
 
 async function logAccessControlChange(
     db: ReturnType<typeof drizzle>,
@@ -794,6 +809,7 @@ app.put('/api/admin/users/:userId/permissions', requireAuth(), requireAdmin(), a
 
     const target = await db.select().from(users).where(eq(users.id, userId)).get();
     if (!target) return c.json({ error: 'User not found.' }, 404);
+    if (target.isOwner && !actor.isOwner) return c.json({ error: 'Only an Owner can change an Owner\u2019s permissions.' }, 403);
 
     if (body.field === 'isOwner' && !body.value) {
         if (target.id === actor.id) {
@@ -919,8 +935,10 @@ app.get('/api/admin/login-users', requireAuth(), requireAdmin(), async (c) => {
 
 app.get('/api/admin/users/:userId/sessions', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
     if (!Number.isInteger(userId)) return c.json({ error: 'Invalid user ID.' }, 400);
+    if (await ownerTargetBlocked(db, actor, userId)) return c.json({ error: 'Only an Owner can manage an Owner account.' }, 403);
     const rows = await db.select({
         id: sessions.id,
         userAgent: sessions.userAgent,
@@ -935,10 +953,11 @@ app.get('/api/admin/users/:userId/sessions', requireAuth(), requireAdmin(), asyn
 
 app.delete('/api/admin/users/:userId/sessions/:sessionIndex', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
-    const actor = c.get('user') as { id: number };
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
     const sessionIndex = Number(c.req.param('sessionIndex'));
     if (!Number.isInteger(userId) || !Number.isInteger(sessionIndex) || sessionIndex < 0) return c.json({ error: 'Invalid session.' }, 400);
+    if (await ownerTargetBlocked(db, actor, userId)) return c.json({ error: 'Only an Owner can manage an Owner account.' }, 403);
 
     const rows = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId)).orderBy(desc(sessions.lastSeenAt)).all();
     const target = rows[sessionIndex];
@@ -951,10 +970,11 @@ app.delete('/api/admin/users/:userId/sessions/:sessionIndex', requireAuth(), req
 
 app.put('/api/admin/users/:userId/suspend', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
-    const actor = c.get('user') as { id: number };
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
     const body = await c.req.json<{ suspended?: boolean }>().catch(() => ({}));
     if (!Number.isInteger(userId) || typeof body.suspended !== 'boolean') return c.json({ error: 'Invalid suspension update.' }, 400);
+    if (await ownerTargetBlocked(db, actor, userId)) return c.json({ error: 'Only an Owner can manage an Owner account.' }, 403);
 
     const target = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
     if (!target) return c.json({ error: 'User not found.' }, 404);
@@ -968,9 +988,10 @@ app.put('/api/admin/users/:userId/suspend', requireAuth(), requireAdmin(), async
 
 app.post('/api/admin/users/:userId/force-logout', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
-    const actor = c.get('user') as { id: number };
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
     if (!Number.isInteger(userId)) return c.json({ error: 'Invalid user ID.' }, 400);
+    if (await ownerTargetBlocked(db, actor, userId)) return c.json({ error: 'Only an Owner can manage an Owner account.' }, 403);
 
     const target = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
     if (!target) return c.json({ error: 'User not found.' }, 404);
@@ -985,9 +1006,10 @@ app.post('/api/admin/users/:userId/force-logout', requireAuth(), requireAdmin(),
 
 app.post('/api/admin/users/:userId/send-magic-link', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
-    const actor = c.get('user') as { id: number };
+    const actor = c.get('user') as { id: number; isOwner?: boolean };
     const userId = Number(c.req.param('userId'));
     if (!Number.isInteger(userId)) return c.json({ error: 'Invalid user ID.' }, 400);
+    if (await ownerTargetBlocked(db, actor, userId)) return c.json({ error: 'Only an Owner can manage an Owner account.' }, 403);
 
     const target = await db.select({ id: users.id, email: users.email, isSuspended: users.isSuspended }).from(users).where(eq(users.id, userId)).get();
     if (!target) return c.json({ error: 'User not found.' }, 404);
@@ -1703,7 +1725,7 @@ app.delete('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async
 type Viewer = { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean } | null;
 
 async function resolveViewer(c: { env: Bindings; req: { raw: Request } }): Promise<Viewer> {
-    if (c.env.DEV_BYPASS_AUTH === 'true') return { residentId: 1, isAdmin: true };
+    if (c.env.DEV_BYPASS_AUTH === 'true') return devBypassUser(c.env.DEV_BYPASS_ROLE) as Viewer;
     const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
     if (!rawSession) return null;
     return (await findUserBySession(drizzle(c.env.DB), rawSession)) as Viewer;

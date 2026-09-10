@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { ClipboardList, FileText, FolderTree, Gauge, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
@@ -14,19 +14,53 @@ import AdminMenusView from './AdminMenusView.vue';
 
 import AdminPagesView from './AdminPagesView.vue';
 
-const selectedFeature = ref('Status');
+type Role = 'any' | 'admin' | 'directoryEditor' | 'pageEditor';
 
-const features = [
-  { label: 'Status', description: 'Review database and request counts.', icon: Gauge },
-  { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList },
-  { label: 'Directory', description: 'Edit households and residents.', icon: Users },
-  { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText },
-  { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree },
-  { label: 'Login Accounts', description: 'Manage login account status, sessions, and sign-in links.', icon: Users },
-  { label: 'Access Control', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck },
+const selectedFeature = ref('Status');
+const permissions = ref({ isOwner: false, isAdmin: false, isPageEditor: false, isDirectoryEditor: false });
+
+const allFeatures: { label: string; description: string; icon: unknown; role: Role }[] = [
+  { label: 'Status', description: 'Review database and request counts.', icon: Gauge, role: 'any' },
+  { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList, role: 'admin' },
+  { label: 'Directory', description: 'Edit households and residents.', icon: Users, role: 'directoryEditor' },
+  { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText, role: 'pageEditor' },
+  { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree, role: 'pageEditor' },
+  { label: 'Login Accounts', description: 'Manage login account status, sessions, and sign-in links.', icon: Users, role: 'admin' },
+  { label: 'Access Control', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck, role: 'admin' },
 ];
 
+const isAdmin = computed(() => permissions.value.isAdmin || permissions.value.isOwner);
+
+function allows(role: Role) {
+  if (role === 'admin') return isAdmin.value;
+  if (role === 'pageEditor') return isAdmin.value || permissions.value.isPageEditor;
+  if (role === 'directoryEditor') return isAdmin.value || permissions.value.isDirectoryEditor;
+  return true;
+}
+
+const features = computed(() => allFeatures.filter((feature) => allows(feature.role)));
+
+onMounted(async () => {
+  const response = await fetch('/api/auth/me');
+  if (!response.ok) return;
+  const data = await response.json() as { user?: Partial<typeof permissions.value> };
+  permissions.value = {
+    isOwner: Boolean(data.user?.isOwner),
+    isAdmin: Boolean(data.user?.isAdmin),
+    isPageEditor: Boolean(data.user?.isPageEditor),
+    isDirectoryEditor: Boolean(data.user?.isDirectoryEditor),
+  };
+});
+
+// Falls back to the first permitted tab so a revoked permission cannot leave a stale pane open.
+watch(features, (list) => {
+  if (!list.some((feature) => feature.label === selectedFeature.value)) {
+    selectedFeature.value = list[0]?.label ?? 'Status';
+  }
+});
+
 function selectFeature(label: string) {
+  if (!features.value.some((feature) => feature.label === label)) return;
   selectedFeature.value = label;
 }
 </script>

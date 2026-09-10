@@ -55,7 +55,7 @@ app.post('/api/auth/request-link', async (c) => {
     const existingAlias = existingUser ? null : await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails).where(eq(userLoginEmails.email, email)).get();
     const aliasUser = existingAlias ? await db.select({ isSuspended: users.isSuspended }).from(users).where(eq(users.id, existingAlias.userId)).get() : null;
     if (existingUser?.isSuspended || aliasUser?.isSuspended) {
-        return c.json({ message: 'If that email can access the directory, a sign-in link is on its way.' });
+        return c.json({ message: 'A sign-in link and code are on their way.' });
     }
 
     const dailyCount = sameDay ? existingLimit.dailyCount + 1 : 1;
@@ -82,7 +82,7 @@ app.post('/api/auth/request-link', async (c) => {
         return c.json({ error: 'We could not send the email right now. Please try again later.' }, 503);
     }
 
-    return c.json({ message: 'If that email can access the directory, a sign-in link is on its way.' });
+    return c.json({ message: 'A sign-in link and code are on their way.' });
 });
 
 app.post('/api/auth/verify-code', async (c) => {

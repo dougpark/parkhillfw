@@ -68,7 +68,7 @@ function useDifferentEmail() {
         <div class="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10 text-accent">
           <Mail class="h-5 w-5" />
         </div>
-        <h2 class="text-2xl font-semibold tracking-tight">Sign in to Park Hill</h2>
+        <h2 class="text-2xl font-semibold tracking-tight">Sign in to Park Hill Neighborhood</h2>
         <p v-if="stage === 'email'" class="mt-2 text-content-muted">Enter your email and we’ll send you a secure sign-in link and code.</p>
         <p v-else class="mt-2 text-content-muted">Enter the 6-digit code we sent to {{ email }}, or use the link in that email.</p>
       </div>
@@ -89,7 +89,7 @@ function useDifferentEmail() {
           :disabled="isSending"
           class="w-full rounded-full bg-accent px-6 py-3 font-medium text-on-accent transition-all hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
         >
-          {{ isSending ? 'Sending...' : 'Send sign-in link' }}
+          {{ isSending ? 'Sending...' : 'Send sign-in link and code' }}
         </button>
       </form>
       <form v-else class="space-y-4" @submit.prevent="verifyCode">

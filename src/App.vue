@@ -126,7 +126,7 @@ watch(() => route.fullPath, loadAuthUser);
                 role="menuitem"
                 @click="openAccountPanel"
               >
-                Edit Emails
+                Edit Login Emails
               </button>
               <button
                 type="button"

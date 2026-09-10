@@ -78,6 +78,13 @@
       "when": 1789001049830,
       "tag": "0010_quiet_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1789063591809,
+      "tag": "0011_supreme_mantis",
+      "breakpoints": true
     }
   ]
 }

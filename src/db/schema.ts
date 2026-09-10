@@ -157,11 +157,15 @@ export const magicTokens = sqliteTable(
         id: integer('id').primaryKey({ autoIncrement: true }),
         email: text('email').notNull(),
         token: text('token').notNull(),
+        // 6-digit manual-entry code, tied to the same row/TTL so either credential invalidates both.
+        codeHash: text('code_hash'),
+        codeAttempts: integer('code_attempts').notNull().default(0),
         expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     },
     (table) => [
         uniqueIndex('idx_magic_tokens_token_unique').on(table.token),
+        index('idx_magic_tokens_email').on(table.email),
     ]
 );
 

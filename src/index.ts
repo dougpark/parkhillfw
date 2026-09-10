@@ -18,7 +18,7 @@ import {
     userLoginEmails,
     users,
 } from './db/schema';
-import { approvalLinkLifetimeMinutes, createMagicLinkToken, createSession, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE } from './lib/auth';
+import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE, verifyCodeAndConsume } from './lib/auth';
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
 import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor } from './middleware/auth';
 
@@ -82,7 +82,7 @@ app.post('/api/auth/request-link', async (c) => {
 
     const token = await createMagicLinkToken(db, email);
     try {
-        await sendMagicLinkEmail(c.env.EMAIL, email, token, new URL(c.req.url).origin);
+        await sendMagicLinkEmail(c.env.EMAIL, email, token.rawToken, token.rawCode, new URL(c.req.url).origin);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Magic-link email failed', {
@@ -96,6 +96,29 @@ app.post('/api/auth/request-link', async (c) => {
     return c.json({ message: 'If that email can access the directory, a sign-in link is on its way.' });
 });
 
+app.post('/api/auth/verify-code', async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ email?: string; code?: string }>();
+    const email = normalizeEmail(body.email ?? '');
+    const code = (body.code ?? '').trim();
+    if (!email || !email.includes('@')) return c.json({ error: 'Enter a valid email address.' }, 400);
+    if (!/^\d{6}$/.test(code)) return c.json({ error: 'Enter the 6-digit code from your email.' }, 400);
+
+    const codeResult = await verifyCodeAndConsume(db, email, code);
+    if (!codeResult.ok) return c.json({ error: codeResult.error }, 400);
+
+    const loginResult = await completeLogin(db, email, {
+        userAgent: c.req.header('User-Agent'),
+        ipAddress: c.req.header('CF-Connecting-IP'),
+    });
+    if (!loginResult.ok) return c.json({ error: loginResult.error }, loginResult.status);
+
+    const secure = new URL(c.req.url).protocol === 'https:';
+    const response = c.json({ matched: Boolean(loginResult.user.residentId), userId: loginResult.user.id });
+    response.headers.set('Set-Cookie', sessionCookie(loginResult.rawSession, loginResult.expiresAt, secure));
+    return response;
+});
+
 app.get('/api/auth/verify', async (c) => {
     const db = drizzle(c.env.DB);
     const rawToken = c.req.query('token');
@@ -105,52 +128,15 @@ app.get('/api/auth/verify', async (c) => {
     if (!token || token.expiresAt.getTime() <= Date.now()) return c.json({ error: 'This sign-in link is invalid or expired.' }, 400);
     await db.delete(magicTokens).where(eq(magicTokens.id, token.id));
 
-    const email = normalizeEmail(token.email);
-    let user = await db.select().from(users).where(eq(users.email, email)).get();
-    if (!user) {
-        const alternate = await db.select({ userId: userLoginEmails.userId })
-            .from(userLoginEmails).where(eq(userLoginEmails.email, email)).get();
-        if (alternate) user = await db.select().from(users).where(eq(users.id, alternate.userId)).get();
-    }
-    if (!user) {
-        const matchedResident = await db.select().from(residents).where(eq(residents.email, email)).get();
-        user = await db.insert(users).values({
-            email,
-            residentId: matchedResident?.id ?? null,
-            linkStatus: matchedResident ? 'auto_matched' : 'unlinked',
-        }).returning().then((rows) => rows[0]);
-    } else if (!user.residentId) {
-        const matchedResident = await db.select().from(residents).where(eq(residents.email, email)).get();
-        if (matchedResident) {
-            user = await db.update(users).set({ residentId: matchedResident.id, linkStatus: 'auto_matched', updatedAt: new Date() })
-                .where(eq(users.id, user.id)).returning().then((rows) => rows[0]);
-        }
-    }
-
-    if (user.residentId) {
-        const canonicalUser = await db.select().from(users)
-            .where(eq(users.residentId, user.residentId))
-            .orderBy(asc(users.id)).get();
-        if (canonicalUser && canonicalUser.id !== user.id) {
-            if (email !== normalizeEmail(canonicalUser.email)) {
-                await db.insert(userLoginEmails).values({ userId: canonicalUser.id, email })
-                    .onConflictDoNothing();
-            }
-            user = canonicalUser;
-        }
-    }
-
-    if (user.isSuspended) return c.json({ error: 'This account has been suspended.' }, 403);
-
-    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
-
-    const { rawSession, expiresAt } = await createSession(db, user.id, {
+    const loginResult = await completeLogin(db, token.email, {
         userAgent: c.req.header('User-Agent'),
         ipAddress: c.req.header('CF-Connecting-IP'),
     });
+    if (!loginResult.ok) return c.json({ error: loginResult.error }, loginResult.status);
+
     const secure = new URL(c.req.url).protocol === 'https:';
-    const response = c.json({ matched: Boolean(user.residentId), userId: user.id });
-    response.headers.set('Set-Cookie', sessionCookie(rawSession, expiresAt, secure));
+    const response = c.json({ matched: Boolean(loginResult.user.residentId), userId: loginResult.user.id });
+    response.headers.set('Set-Cookie', sessionCookie(loginResult.rawSession, loginResult.expiresAt, secure));
     return response;
 });
 
@@ -1017,7 +1003,7 @@ app.post('/api/admin/users/:userId/send-magic-link', requireAuth(), requireAdmin
 
     const token = await createMagicLinkToken(db, target.email);
     try {
-        await sendMagicLinkEmail(c.env.EMAIL, target.email, token, new URL(c.req.url).origin);
+        await sendMagicLinkEmail(c.env.EMAIL, target.email, token.rawToken, token.rawCode, new URL(c.req.url).origin);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Admin-triggered magic-link email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });
@@ -1088,7 +1074,7 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
         if (alternateOwner && alternateOwner.userId !== user.id) return c.json({ error: 'This email is already assigned to another user.' }, 409);
         await db.insert(userLoginEmails).values({ userId: user.id, email: normalizedRequestEmail }).onConflictDoNothing();
         await db.update(users).set({ residentId: targetResident!.id, linkStatus: 'admin_linked', updatedAt: new Date() }).where(eq(users.id, user.id));
-        outcomeToken = await createMagicLinkToken(db, normalizedRequestEmail, approvalLinkLifetimeMinutes);
+        outcomeToken = (await createMagicLinkToken(db, normalizedRequestEmail, approvalLinkLifetimeMinutes)).rawToken;
     }
     await db.update(accessRequests).set({
         status: reviewStatus,

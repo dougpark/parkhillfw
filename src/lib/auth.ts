@@ -1,11 +1,13 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { magicTokens, sessions, users } from '../db/schema';
+import { magicTokens, sessions, users, residents, userLoginEmails } from '../db/schema';
+import { asc } from 'drizzle-orm';
 
 export const SESSION_COOKIE = 'parkhill_session';
 const SESSION_DAYS = 400;
 const MAGIC_LINK_MINUTES = 15;
 const APPROVAL_LINK_HOURS = 48;
+const MAX_CODE_ATTEMPTS = 5;
 
 export async function hashToken(token: string): Promise<string> {
     const bytes = new TextEncoder().encode(token);
@@ -21,15 +23,109 @@ export function createMagicToken(): string {
     return crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 }
 
+export function createSixDigitCode(): string {
+    const bytes = crypto.getRandomValues(new Uint32Array(1));
+    return (bytes[0]! % 1_000_000).toString().padStart(6, '0');
+}
+
 export async function createMagicLinkToken(
     db: ReturnType<typeof drizzle>,
     email: string,
     lifetimeMinutes = MAGIC_LINK_MINUTES,
 ) {
+    // Only one live token/code pair per email — consuming either invalidates both.
+    await db.delete(magicTokens).where(eq(magicTokens.email, email));
+
     const rawToken = createMagicToken();
+    const rawCode = createSixDigitCode();
     const expiresAt = new Date(Date.now() + lifetimeMinutes * 60_000);
-    await db.insert(magicTokens).values({ email, token: await hashToken(rawToken), expiresAt });
-    return rawToken;
+    await db.insert(magicTokens).values({
+        email,
+        token: await hashToken(rawToken),
+        codeHash: await hashToken(rawCode),
+        expiresAt,
+    });
+    return { rawToken, rawCode };
+}
+
+/**
+ * Validates a manually-entered 6-digit code and consumes its token row on success.
+ * Returns the email to complete login with, or an error to show the user.
+ */
+export async function verifyCodeAndConsume(
+    db: ReturnType<typeof drizzle>,
+    email: string,
+    code: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    const row = await db.select().from(magicTokens).where(eq(magicTokens.email, email)).get();
+    if (!row || row.expiresAt.getTime() <= Date.now() || !row.codeHash) {
+        return { ok: false, error: 'This code is invalid or has expired. Please request a new one.' };
+    }
+    if (row.codeAttempts >= MAX_CODE_ATTEMPTS) {
+        await db.delete(magicTokens).where(eq(magicTokens.id, row.id));
+        return { ok: false, error: 'Too many incorrect attempts. Please request a new code.' };
+    }
+
+    const codeHash = await hashToken(code);
+    if (codeHash !== row.codeHash) {
+        await db.update(magicTokens).set({ codeAttempts: row.codeAttempts + 1 }).where(eq(magicTokens.id, row.id));
+        return { ok: false, error: 'That code is incorrect. Please try again.' };
+    }
+
+    await db.delete(magicTokens).where(eq(magicTokens.id, row.id));
+    return { ok: true };
+}
+
+/**
+ * Shared post-credential-verification flow: resolve/create the users row (merging into the
+ * canonical account for a resident), reject suspended accounts, and issue a session.
+ */
+export async function completeLogin(
+    db: ReturnType<typeof drizzle>,
+    rawEmail: string,
+    device?: { userAgent?: string | null; ipAddress?: string | null },
+): Promise<{ ok: true; user: typeof users.$inferSelect; rawSession: string; expiresAt: Date } | { ok: false; error: string; status: 403 }> {
+    const email = normalizeEmail(rawEmail);
+    let user = await db.select().from(users).where(eq(users.email, email)).get();
+    if (!user) {
+        const alternate = await db.select({ userId: userLoginEmails.userId })
+            .from(userLoginEmails).where(eq(userLoginEmails.email, email)).get();
+        if (alternate) user = await db.select().from(users).where(eq(users.id, alternate.userId)).get();
+    }
+    if (!user) {
+        const matchedResident = await db.select().from(residents).where(eq(residents.email, email)).get();
+        user = await db.insert(users).values({
+            email,
+            residentId: matchedResident?.id ?? null,
+            linkStatus: matchedResident ? 'auto_matched' : 'unlinked',
+        }).returning().then((rows) => rows[0]);
+    } else if (!user.residentId) {
+        const matchedResident = await db.select().from(residents).where(eq(residents.email, email)).get();
+        if (matchedResident) {
+            user = await db.update(users).set({ residentId: matchedResident.id, linkStatus: 'auto_matched', updatedAt: new Date() })
+                .where(eq(users.id, user.id)).returning().then((rows) => rows[0]);
+        }
+    }
+
+    if (user!.residentId) {
+        const canonicalUser = await db.select().from(users)
+            .where(eq(users.residentId, user!.residentId))
+            .orderBy(asc(users.id)).get();
+        if (canonicalUser && canonicalUser.id !== user!.id) {
+            if (email !== normalizeEmail(canonicalUser.email)) {
+                await db.insert(userLoginEmails).values({ userId: canonicalUser.id, email })
+                    .onConflictDoNothing();
+            }
+            user = canonicalUser;
+        }
+    }
+
+    if (user!.isSuspended) return { ok: false, error: 'This account has been suspended.', status: 403 };
+
+    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user!.id));
+
+    const { rawSession, expiresAt } = await createSession(db, user!.id, device);
+    return { ok: true, user: user!, rawSession, expiresAt };
 }
 
 export const approvalLinkLifetimeMinutes = APPROVAL_LINK_HOURS * 60;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Trash2 } from 'lucide-vue-next';
+import { ShieldOff } from 'lucide-vue-next';
 import BaseInput from '../components/ui/BaseInput.vue';
 import FilterChip from '../components/ui/FilterChip.vue';
 
@@ -218,11 +218,11 @@ onMounted(() => {
           <button
             type="button"
             class="rounded-full p-2 text-danger hover:bg-danger-subtle"
-            aria-label="Remove all access for this user"
-            title="Remove all access for this user"
+            aria-label="Revoke all access for this user"
+            title="Revoke all access for this user"
             @click="clearPermissions(user)"
           >
-            <Trash2 class="h-4 w-4" />
+            <ShieldOff class="h-4 w-4" />
           </button>
         </div>
       </div>

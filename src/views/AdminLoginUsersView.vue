@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-vue-next';
+import { ChevronDown, ChevronRight, MonitorX } from 'lucide-vue-next';
 import BaseInput from '../components/ui/BaseInput.vue';
 
 interface LoginUser {
@@ -228,7 +228,7 @@ onMounted(() => {
               <span> · Last seen {{ formatDate(session.lastSeenAt) }}</span>
             </span>
             <button type="button" class="rounded-full p-1.5 text-danger hover:bg-danger-subtle" aria-label="Revoke this session" title="Revoke this session" @click="revokeSession(user, session)">
-              <Trash2 class="h-4 w-4" />
+              <MonitorX class="h-4 w-4" />
             </button>
           </div>
         </div>

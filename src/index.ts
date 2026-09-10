@@ -677,7 +677,12 @@ app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
     const [residentRows, userRows, aliasRows] = await Promise.all([
         db.select(columns).from(residents)
             .leftJoin(users, eq(users.residentId, residents.id))
-            .where(or(like(residents.firstName, term), like(residents.lastName, term), like(residents.email, term)))
+            .where(or(
+                like(residents.firstName, term),
+                like(residents.lastName, term),
+                like(residents.email, term),
+                like(sql`${residents.firstName} || ' ' || ${residents.lastName}`, term),
+            ))
             .limit(20).all(),
         db.select(columns).from(users)
             .leftJoin(residents, eq(residents.id, users.residentId))
@@ -864,7 +869,12 @@ app.get('/api/admin/login-users', requireAuth(), requireAdmin(), async (c) => {
         const [residentRows, userRows, aliasRows] = await Promise.all([
             db.select({ userId: users.id }).from(residents)
                 .innerJoin(users, eq(users.residentId, residents.id))
-                .where(or(like(residents.firstName, term), like(residents.lastName, term), like(residents.email, term)))
+                .where(or(
+                    like(residents.firstName, term),
+                    like(residents.lastName, term),
+                    like(residents.email, term),
+                    like(sql`${residents.firstName} || ' ' || ${residents.lastName}`, term),
+                ))
                 .all(),
             db.select({ userId: users.id }).from(users).where(like(users.email, term)).all(),
             db.select({ userId: userLoginEmails.userId }).from(userLoginEmails).where(like(userLoginEmails.email, term)).all(),

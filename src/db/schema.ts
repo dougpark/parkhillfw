@@ -104,6 +104,10 @@ export const users = sqliteTable(
         isPageEditor: integer('is_page_editor', { mode: 'boolean' }).default(false),
         isDirectoryEditor: integer('is_directory_editor', { mode: 'boolean' }).default(false),
 
+        // Account Security
+        isSuspended: integer('is_suspended', { mode: 'boolean' }).default(false),
+        lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
+
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
         updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     },
@@ -170,6 +174,12 @@ export const sessions = sqliteTable(
             .notNull()
             .references(() => users.id, { onDelete: 'cascade' }),
         expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+
+        // Per-device detail so an admin (or the user) can identify and revoke a single session
+        userAgent: text('user_agent'),
+        ipAddress: text('ip_address'),
+        lastSeenAt: integer('last_seen_at', { mode: 'timestamp' }),
+
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     },
     (table) => [
@@ -213,7 +223,7 @@ export const activityLogs = sqliteTable(
         id: integer('id').primaryKey({ autoIncrement: true }),
         actorUserId: integer('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
         targetUserId: integer('target_user_id').references(() => users.id, { onDelete: 'set null' }),
-        category: text('category', { enum: ['access_control', 'access_request', 'page', 'directory'] }).notNull(),
+        category: text('category', { enum: ['access_control', 'access_request', 'page', 'directory', 'user_management'] }).notNull(),
         action: text('action').notNull(),
         details: text('details'),
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),

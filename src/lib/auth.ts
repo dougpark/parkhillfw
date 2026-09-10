@@ -34,17 +34,33 @@ export async function createMagicLinkToken(
 
 export const approvalLinkLifetimeMinutes = APPROVAL_LINK_HOURS * 60;
 
-export async function createSession(db: ReturnType<typeof drizzle>, userId: number) {
+export async function createSession(
+    db: ReturnType<typeof drizzle>,
+    userId: number,
+    device?: { userAgent?: string | null; ipAddress?: string | null },
+) {
     const rawSession = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60_000);
-    await db.insert(sessions).values({ id: await hashToken(rawSession), userId, expiresAt });
+    const now = new Date();
+    await db.insert(sessions).values({
+        id: await hashToken(rawSession),
+        userId,
+        expiresAt,
+        userAgent: device?.userAgent ?? null,
+        ipAddress: device?.ipAddress ?? null,
+        lastSeenAt: now,
+    });
     return { rawSession, expiresAt };
 }
 
 export async function findUserBySession(db: ReturnType<typeof drizzle>, rawSession: string) {
-    const session = await db.select().from(sessions).where(eq(sessions.id, await hashToken(rawSession))).get();
+    const sessionId = await hashToken(rawSession);
+    const session = await db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
     if (!session || session.expiresAt.getTime() <= Date.now()) return null;
-    return db.select().from(users).where(eq(users.id, session.userId)).get();
+    const user = await db.select().from(users).where(eq(users.id, session.userId)).get();
+    if (!user || user.isSuspended) return null;
+    await db.update(sessions).set({ lastSeenAt: new Date() }).where(eq(sessions.id, sessionId));
+    return user;
 }
 
 export function sessionCookie(value: string, expiresAt: Date, secure: boolean): string {

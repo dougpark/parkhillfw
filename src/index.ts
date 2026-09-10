@@ -60,6 +60,14 @@ app.post('/api/auth/request-link', async (c) => {
     if (minuteElapsed < 60_000) return c.json({ error: 'Please wait one minute before requesting another link.' }, 429);
     if (sameDay && existingLimit.dailyCount >= 10) return c.json({ error: 'Daily sign-in link limit reached. Please try again tomorrow.' }, 429);
 
+    // Don't reveal account existence/status via a different response — suspended accounts silently get no email.
+    const existingUser = await db.select({ id: users.id, isSuspended: users.isSuspended }).from(users).where(eq(users.email, email)).get();
+    const existingAlias = existingUser ? null : await db.select({ userId: userLoginEmails.userId }).from(userLoginEmails).where(eq(userLoginEmails.email, email)).get();
+    const aliasUser = existingAlias ? await db.select({ isSuspended: users.isSuspended }).from(users).where(eq(users.id, existingAlias.userId)).get() : null;
+    if (existingUser?.isSuspended || aliasUser?.isSuspended) {
+        return c.json({ message: 'If that email can access the directory, a sign-in link is on its way.' });
+    }
+
     const dailyCount = sameDay ? existingLimit.dailyCount + 1 : 1;
     await db.insert(magicLinkRateLimits).values({
         email,
@@ -131,7 +139,14 @@ app.get('/api/auth/verify', async (c) => {
         }
     }
 
-    const { rawSession, expiresAt } = await createSession(db, user.id);
+    if (user.isSuspended) return c.json({ error: 'This account has been suspended.' }, 403);
+
+    await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
+
+    const { rawSession, expiresAt } = await createSession(db, user.id, {
+        userAgent: c.req.header('User-Agent'),
+        ipAddress: c.req.header('CF-Connecting-IP'),
+    });
     const secure = new URL(c.req.url).protocol === 'https:';
     const response = c.json({ matched: Boolean(user.residentId), userId: user.id });
     response.headers.set('Set-Cookie', sessionCookie(rawSession, expiresAt, secure));
@@ -821,6 +836,164 @@ app.post('/api/admin/users/:userId/permissions/clear', requireAuth(), requireAdm
     await logAccessControlChange(db, actor.id, userId, 'clear_permissions', { before });
 
     return c.json({ cleared: true });
+});
+
+async function logUserManagementChange(
+    db: ReturnType<typeof drizzle>,
+    actorUserId: number,
+    targetUserId: number,
+    action: string,
+    details: Record<string, unknown>,
+) {
+    await db.insert(activityLogs).values({
+        actorUserId,
+        targetUserId,
+        category: 'user_management',
+        action,
+        details: JSON.stringify(details),
+    });
+}
+
+app.get('/api/admin/login-users', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const query = (c.req.query('q') ?? '').trim();
+
+    let matchedUserIds: number[] | null = null;
+    if (query) {
+        const term = `%${query}%`;
+        const [residentRows, userRows, aliasRows] = await Promise.all([
+            db.select({ userId: users.id }).from(residents)
+                .innerJoin(users, eq(users.residentId, residents.id))
+                .where(or(like(residents.firstName, term), like(residents.lastName, term), like(residents.email, term)))
+                .all(),
+            db.select({ userId: users.id }).from(users).where(like(users.email, term)).all(),
+            db.select({ userId: userLoginEmails.userId }).from(userLoginEmails).where(like(userLoginEmails.email, term)).all(),
+        ]);
+        matchedUserIds = [...new Set([...residentRows, ...userRows, ...aliasRows].map((row) => row.userId))];
+        if (!matchedUserIds.length) return c.json([]);
+    }
+
+    const rows = await db.select({
+        id: users.id,
+        email: users.email,
+        isSuspended: users.isSuspended,
+        lastLoginAt: users.lastLoginAt,
+        firstName: residents.firstName,
+        lastName: residents.lastName,
+    }).from(users)
+        .leftJoin(residents, eq(residents.id, users.residentId))
+        .where(matchedUserIds ? inArray(users.id, matchedUserIds) : undefined)
+        .orderBy(desc(users.lastLoginAt))
+        .limit(100).all();
+
+    const userIds = rows.map((row) => row.id);
+    const sessionRows = userIds.length
+        ? await db.select({
+            userId: sessions.userId,
+            count: sql<number>`count(*)`,
+            lastSeenAt: sql<number | null>`max(${sessions.lastSeenAt})`,
+        }).from(sessions).where(inArray(sessions.userId, userIds)).groupBy(sessions.userId).all()
+        : [];
+    const sessionByUser = new Map(sessionRows.map((row) => [row.userId, row]));
+
+    return c.json(rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        displayName: row.firstName ? `${row.firstName} ${row.lastName}` : row.email,
+        isSuspended: Boolean(row.isSuspended),
+        lastLoginAt: row.lastLoginAt,
+        sessionCount: sessionByUser.get(row.id)?.count ?? 0,
+        lastSeenAt: sessionByUser.get(row.id)?.lastSeenAt ?? null,
+    })));
+});
+
+app.get('/api/admin/users/:userId/sessions', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const userId = Number(c.req.param('userId'));
+    if (!Number.isInteger(userId)) return c.json({ error: 'Invalid user ID.' }, 400);
+    const rows = await db.select({
+        id: sessions.id,
+        userAgent: sessions.userAgent,
+        ipAddress: sessions.ipAddress,
+        lastSeenAt: sessions.lastSeenAt,
+        createdAt: sessions.createdAt,
+        expiresAt: sessions.expiresAt,
+    }).from(sessions).where(eq(sessions.userId, userId)).orderBy(desc(sessions.lastSeenAt)).all();
+    // Session IDs are hashed tokens, not safe to expose to the client as-is; use row order as a stable handle instead.
+    return c.json(rows.map((row, index) => ({ ...row, id: index })));
+});
+
+app.delete('/api/admin/users/:userId/sessions/:sessionIndex', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number };
+    const userId = Number(c.req.param('userId'));
+    const sessionIndex = Number(c.req.param('sessionIndex'));
+    if (!Number.isInteger(userId) || !Number.isInteger(sessionIndex) || sessionIndex < 0) return c.json({ error: 'Invalid session.' }, 400);
+
+    const rows = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.userId, userId)).orderBy(desc(sessions.lastSeenAt)).all();
+    const target = rows[sessionIndex];
+    if (!target) return c.json({ error: 'Session not found.' }, 404);
+
+    await db.delete(sessions).where(eq(sessions.id, target.id));
+    await logUserManagementChange(db, actor.id, userId, 'revoke_session', {});
+    return c.json({ revoked: true });
+});
+
+app.put('/api/admin/users/:userId/suspend', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number };
+    const userId = Number(c.req.param('userId'));
+    const body = await c.req.json<{ suspended?: boolean }>().catch(() => ({}));
+    if (!Number.isInteger(userId) || typeof body.suspended !== 'boolean') return c.json({ error: 'Invalid suspension update.' }, 400);
+
+    const target = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
+    if (!target) return c.json({ error: 'User not found.' }, 404);
+
+    await db.update(users).set({ isSuspended: body.suspended, updatedAt: new Date() }).where(eq(users.id, userId));
+    if (body.suspended) await db.delete(sessions).where(eq(sessions.userId, userId));
+    await logUserManagementChange(db, actor.id, userId, body.suspended ? 'suspend' : 'unsuspend', {});
+
+    return c.json({ isSuspended: body.suspended });
+});
+
+app.post('/api/admin/users/:userId/force-logout', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number };
+    const userId = Number(c.req.param('userId'));
+    if (!Number.isInteger(userId)) return c.json({ error: 'Invalid user ID.' }, 400);
+
+    const target = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
+    if (!target) return c.json({ error: 'User not found.' }, 404);
+
+    const existing = await db.select({ count: sql<number>`count(*)` }).from(sessions).where(eq(sessions.userId, userId)).get();
+    await db.delete(sessions).where(eq(sessions.userId, userId));
+    const sessionsRemoved = existing?.count ?? 0;
+    await logUserManagementChange(db, actor.id, userId, 'force_logout', { sessionsRemoved });
+
+    return c.json({ sessionsRemoved });
+});
+
+app.post('/api/admin/users/:userId/send-magic-link', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number };
+    const userId = Number(c.req.param('userId'));
+    if (!Number.isInteger(userId)) return c.json({ error: 'Invalid user ID.' }, 400);
+
+    const target = await db.select({ id: users.id, email: users.email, isSuspended: users.isSuspended }).from(users).where(eq(users.id, userId)).get();
+    if (!target) return c.json({ error: 'User not found.' }, 404);
+    if (target.isSuspended) return c.json({ error: 'Cannot send a sign-in link to a suspended account.' }, 409);
+
+    const token = await createMagicLinkToken(db, target.email);
+    try {
+        await sendMagicLinkEmail(c.env.EMAIL, target.email, token, new URL(c.req.url).origin);
+    } catch (error) {
+        const emailError = error as { code?: string; message?: string };
+        console.error('Admin-triggered magic-link email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });
+        return c.json({ error: 'We could not send the email right now. Please try again later.' }, 503);
+    }
+    await logUserManagementChange(db, actor.id, userId, 'magic_link_dispatch', {});
+
+    return c.json({ sent: true });
 });
 
 app.get('/api/admin/activity-logs', requireAuth(), requireAdmin(), async (c) => {

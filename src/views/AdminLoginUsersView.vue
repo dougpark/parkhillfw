@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-vue-next';
 import BaseInput from '../components/ui/BaseInput.vue';
-import FilterChip from '../components/ui/FilterChip.vue';
 
 interface LoginUser {
   id: number;
@@ -34,8 +33,6 @@ interface LogEntry {
 }
 
 const searchQuery = ref('');
-const suspendedOnly = ref(false);
-const sortBy = ref<'lastLogin' | 'sessions'>('lastLogin');
 const loginUsers = ref<LoginUser[]>([]);
 const expandedUserId = ref<number | null>(null);
 const sessionsByUser = ref<Record<number, SessionDetail[]>>({});
@@ -46,9 +43,12 @@ const message = ref('');
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function loadLoginUsers() {
-  const params = new URLSearchParams();
-  if (searchQuery.value.trim()) params.set('q', searchQuery.value.trim());
-  const response = await fetch(`/api/admin/login-users?${params.toString()}`);
+  const query = searchQuery.value.trim();
+  if (!query) {
+    loginUsers.value = [];
+    return;
+  }
+  const response = await fetch(`/api/admin/login-users?q=${encodeURIComponent(query)}`);
   if (!response.ok) throw new Error('Unable to load users.');
   loginUsers.value = await response.json() as LoginUser[];
 }
@@ -163,16 +163,7 @@ function formatDetails(entry: LogEntry): string {
   }
 }
 
-const visibleUsers = computed(() => {
-  let rows = suspendedOnly.value ? loginUsers.value.filter((user) => user.isSuspended) : loginUsers.value;
-  rows = [...rows].sort((left, right) => sortBy.value === 'sessions'
-    ? right.sessionCount - left.sessionCount
-    : (right.lastLoginAt ? new Date(right.lastLoginAt).getTime() : 0) - (left.lastLoginAt ? new Date(left.lastLoginAt).getTime() : 0));
-  return rows;
-});
-
 onMounted(() => {
-  loadLoginUsers().catch((loadError) => { error.value = loadError instanceof Error ? loadError.message : 'Unable to load users.'; });
   loadLogs();
 });
 </script>
@@ -180,7 +171,7 @@ onMounted(() => {
 <template>
   <section class="space-y-8">
     <div>
-      <h2 class="text-2xl font-semibold tracking-tight">Login Users</h2>
+      <h2 class="text-2xl font-semibold tracking-tight">Login Accounts</h2>
       <p class="mt-2 text-content-muted">Manage login account status, sessions, and sign-in links.</p>
     </div>
 
@@ -188,17 +179,13 @@ onMounted(() => {
     <p v-if="message" class="rounded-xl bg-success-subtle p-3 text-sm text-success">{{ message }}</p>
 
     <div class="flex flex-wrap items-center gap-3">
-      <BaseInput v-model="searchQuery" placeholder="Search users by name or email..." class="max-w-sm" @update:model-value="scheduleSearch" />
-      <FilterChip v-model="suspendedOnly">Suspended only</FilterChip>
-      <select v-model="sortBy" class="rounded-xl border border-theme-border bg-surface px-3 py-2 text-sm">
-        <option value="lastLogin">Sort: Last login</option>
-        <option value="sessions">Sort: Active sessions</option>
-      </select>
+      <BaseInput v-model="searchQuery" placeholder="Search users by name or email..." class="w-full" @update:model-value="scheduleSearch" />
     </div>
 
     <div class="space-y-3">
-      <p v-if="!visibleUsers.length" class="rounded-3xl border border-theme-border bg-surface p-6 text-content-muted">No matching users.</p>
-      <div v-for="user in visibleUsers" :key="user.id" class="rounded-3xl border border-theme-border bg-surface p-5 shadow-sm">
+      <p v-if="!searchQuery.trim()" class="rounded-3xl border border-theme-border bg-surface p-6 text-content-muted">Search for a user by name or email to manage their account.</p>
+      <p v-else-if="!loginUsers.length" class="rounded-3xl border border-theme-border bg-surface p-6 text-content-muted">No matching users.</p>
+      <div v-for="user in loginUsers" :key="user.id" class="rounded-3xl border border-theme-border bg-surface p-5 shadow-sm">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p class="font-medium text-content">{{ user.displayName }}</p>

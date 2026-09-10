@@ -22,7 +22,7 @@ const features = [
   { label: 'Directory', description: 'Edit households and residents.', icon: Users },
   { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText },
   { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree },
-  { label: 'Users', description: 'Manage login account status, sessions, and sign-in links.', icon: Users },
+  { label: 'Login Accounts', description: 'Manage login account status, sessions, and sign-in links.', icon: Users },
   { label: 'Access Control', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck },
 ];
 
@@ -88,7 +88,7 @@ function selectFeature(label: string) {
         
         
       </div>
-      <div v-else-if="selectedFeature === 'Users'" class="p-6 sm:p-8">
+      <div v-else-if="selectedFeature === 'Login Accounts'" class="p-6 sm:p-8">
         <AdminLoginUsersView />
       </div>
       <div v-else-if="selectedFeature === 'Access Control'" class="p-6 sm:p-8">

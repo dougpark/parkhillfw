@@ -16,12 +16,12 @@ const isLoading = ref(true);
 const error = ref('');
 
 const rows = computed(() => [
-  { label: 'Households in database', value: status.value?.households ?? 0, icon: Home },
-  { label: 'Adult residents in database', value: status.value?.adultResidents ?? 0, icon: Users },
-  { label: 'Children in database', value: status.value?.children ?? 0, icon: Baby },
-  { label: 'Login accounts in users', value: status.value?.loginAccounts ?? 0, icon: Users },
-  { label: 'Alias alternate logins in database', value: status.value?.aliasLogins ?? 0, icon: MailPlus },
   { label: 'Open Access Requests', value: status.value?.openAccessRequests ?? 0, icon: Inbox },
+  { label: 'Households', value: status.value?.households ?? 0, icon: Home },
+  { label: 'Adult residents', value: status.value?.adultResidents ?? 0, icon: Users },
+  { label: 'Children', value: status.value?.children ?? 0, icon: Baby },
+  { label: 'Login accounts', value: status.value?.loginAccounts ?? 0, icon: Users },
+  { label: 'Alias alternate logins', value: status.value?.aliasLogins ?? 0, icon: MailPlus },
 ]);
 
 async function loadStatus() {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Shield, Home, Star } from 'lucide-vue-next';
+import { ref } from 'vue';
+import { Mail, MapPin, MessageCircle, Phone, Shield, Home, Star, X } from 'lucide-vue-next';
 
 interface Resident {
   id: number;
@@ -43,6 +44,53 @@ const props = defineProps<{
 const emit = defineEmits<{
   'toggle-favorite': [householdId: number];
 }>();
+
+const selectedPhone = ref<string | null>(null);
+
+function normalizedPhone(value: string): { digits: string; hasPlus: boolean; extension?: string } {
+  const extensionMatch = value.match(/\b(?:x|ext\.?|extension)\s*(\d{1,6})$/i);
+  const extension = extensionMatch?.[1];
+  const mainNumber = extensionMatch ? value.slice(0, extensionMatch.index).trim() : value.trim();
+  return {
+    digits: mainNumber.replace(/\D/g, ''),
+    hasPlus: mainNumber.startsWith('+'),
+    extension,
+  };
+}
+
+function phoneHref(value: string): string {
+  const { digits, hasPlus, extension } = normalizedPhone(value);
+  return `tel:${hasPlus ? '+' : ''}${digits}${extension ? `;ext=${extension}` : ''}`;
+}
+
+function smsHref(value: string): string {
+  const { digits, hasPlus } = normalizedPhone(value);
+  return `sms:${hasPlus ? '+' : ''}${digits}`;
+}
+
+function shouldShowPhoneChoice(): boolean {
+  const maybeWindow = globalThis as typeof globalThis & { matchMedia?: (query: string) => { matches: boolean } };
+  return maybeWindow.matchMedia?.('(hover: none), (pointer: coarse)').matches ?? false;
+}
+
+function choosePhoneAction(event: Event, value: string): void {
+  if (!shouldShowPhoneChoice()) return;
+  event.preventDefault();
+  selectedPhone.value = value;
+}
+
+function closePhoneActions(): void {
+  selectedPhone.value = null;
+}
+
+function emailHref(value: string): string {
+  return `mailto:${value.trim()}`;
+}
+
+function mapsHref(streetAddress: string): string {
+  const query = encodeURIComponent(`${streetAddress}, Fort Worth, TX`);
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
 </script>
 
 <template>
@@ -51,7 +99,15 @@ const emit = defineEmits<{
       <div>
         <h2 class="flex items-center gap-2 text-lg font-semibold text-content">
           <Home class="w-4 h-4 text-accent" />
-          {{ household.streetAddress }}
+          <a
+            :href="mapsHref(household.streetAddress)"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex min-h-10 items-center gap-1.5 rounded-full px-2 -mx-2 text-content underline decoration-theme-border underline-offset-4 transition-colors hover:text-accent hover:decoration-accent"
+          >
+            <span>{{ household.streetAddress }}</span>
+            <MapPin class="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+          </a>
           <button
             type="button"
             class="rounded-full p-1 text-[#f4b400] hover:bg-warning-subtle transition-colors"
@@ -103,9 +159,24 @@ const emit = defineEmits<{
           <tr v-for="resident in household.residents" :key="resident.id" class="border-b border-theme-border last:border-0">
             <td class="py-2 pr-4">{{ resident.firstName }} {{ resident.lastName }}</td>
             <td class="py-2 pr-4">{{ resident.isPrimaryContact ? 'Yes' : '' }}</td>
-            <td class="py-2 pr-4">{{ resident.email ?? '' }}</td>
-            <td class="py-2 pr-4">{{ resident.phoneMobile ?? '' }}</td>
-            <td class="py-2 pr-4">{{ resident.phoneHome ?? '' }}</td>
+            <td class="py-2 pr-4">
+              <a v-if="resident.email" :href="emailHref(resident.email)" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 -mx-2 text-accent hover:underline">
+                <Mail class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ resident.email }}
+              </a>
+            </td>
+            <td class="py-2 pr-4">
+              <a v-if="resident.phoneMobile" :href="phoneHref(resident.phoneMobile)" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 -mx-2 text-accent hover:underline">
+                <Phone class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ resident.phoneMobile }}
+              </a>
+            </td>
+            <td class="py-2 pr-4">
+              <a v-if="resident.phoneHome" :href="phoneHref(resident.phoneHome)" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 -mx-2 text-accent hover:underline">
+                <Phone class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ resident.phoneHome }}
+              </a>
+            </td>
             <td class="py-2">{{ resident.occupation ?? '' }}</td>
           </tr>
         </tbody>
@@ -121,13 +192,68 @@ const emit = defineEmits<{
             {{ resident.firstName }} {{ resident.lastName }}
             <span v-if="resident.isPrimaryContact" class="text-accent">· Primary</span>
           </p>
-          <p class="text-content-muted">{{ resident.email ?? '' }}</p>
-          <p v-if="resident.phoneMobile" class="text-content-muted">M: {{ resident.phoneMobile }}</p>
-          <p v-if="resident.phoneHome" class="text-content-muted">H: {{ resident.phoneHome }}</p>
+          <a v-if="resident.email" :href="emailHref(resident.email)" class="mt-2 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 -mx-2 text-accent hover:underline">
+            <Mail class="h-4 w-4" aria-hidden="true" />
+            {{ resident.email }}
+          </a>
+          <a v-if="resident.phoneMobile" :href="phoneHref(resident.phoneMobile)" class="flex min-h-11 items-center gap-2 rounded-xl px-2 -mx-2 text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneMobile)">
+            <Phone class="h-4 w-4" aria-hidden="true" />
+            <span>M: {{ resident.phoneMobile }}</span>
+          </a>
+          <a v-if="resident.phoneHome" :href="phoneHref(resident.phoneHome)" class="flex min-h-11 items-center gap-2 rounded-xl px-2 -mx-2 text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneHome)">
+            <Phone class="h-4 w-4" aria-hidden="true" />
+            <span>H: {{ resident.phoneHome }}</span>
+          </a>
           <p class="text-content-muted">{{ resident.occupation ?? '' }}</p>
         </li>
       </ul>
     </section>
+
+    <Teleport to="body">
+      <div
+        v-if="selectedPhone"
+        class="fixed inset-0 z-50 flex items-end bg-[#1f1f1f]/35 p-3 sm:hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose phone action"
+        @click="closePhoneActions"
+      >
+        <div class="w-full rounded-3xl border border-theme-border bg-surface p-4 shadow-2xl" @click.stop>
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-sm font-semibold text-content">What would you like to do?</p>
+              <p class="mt-1 text-sm text-content-muted">{{ selectedPhone }}</p>
+            </div>
+            <button
+              type="button"
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-content-muted hover:bg-surface-hover"
+              aria-label="Close phone actions"
+              @click="closePhoneActions"
+            >
+              <X class="h-5 w-5" />
+            </button>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <a
+              :href="phoneHref(selectedPhone)"
+              class="flex min-h-14 items-center justify-center gap-2 rounded-full bg-accent px-4 text-sm font-medium text-on-accent"
+              @click="closePhoneActions"
+            >
+              <Phone class="h-5 w-5" aria-hidden="true" />
+              Call
+            </a>
+            <a
+              :href="smsHref(selectedPhone)"
+              class="flex min-h-14 items-center justify-center gap-2 rounded-full border border-theme-border bg-surface px-4 text-sm font-medium text-content hover:bg-surface-hover"
+              @click="closePhoneActions"
+            >
+              <MessageCircle class="h-5 w-5 text-accent" aria-hidden="true" />
+              Text
+            </a>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <section v-if="household.children.length" class="mt-5">
       <h3 class="text-sm font-semibold text-content-muted uppercase tracking-wide mb-2">Children</h3>

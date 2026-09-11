@@ -68,13 +68,7 @@ function smsHref(value: string): string {
   return `sms:${hasPlus ? '+' : ''}${digits}`;
 }
 
-function shouldShowPhoneChoice(): boolean {
-  const maybeWindow = globalThis as typeof globalThis & { matchMedia?: (query: string) => { matches: boolean } };
-  return maybeWindow.matchMedia?.('(hover: none), (pointer: coarse)').matches ?? false;
-}
-
 function choosePhoneAction(event: Event, value: string): void {
-  if (!shouldShowPhoneChoice()) return;
   event.preventDefault();
   selectedPhone.value = value;
 }
@@ -166,16 +160,16 @@ function mapsHref(streetAddress: string): string {
               </a>
             </td>
             <td class="py-2 pr-4">
-              <a v-if="resident.phoneMobile" :href="phoneHref(resident.phoneMobile)" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 -mx-2 text-accent hover:underline">
+              <button v-if="resident.phoneMobile" type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 -mx-2 text-left text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneMobile)">
                 <Phone class="h-3.5 w-3.5" aria-hidden="true" />
                 {{ resident.phoneMobile }}
-              </a>
+              </button>
             </td>
             <td class="py-2 pr-4">
-              <a v-if="resident.phoneHome" :href="phoneHref(resident.phoneHome)" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 -mx-2 text-accent hover:underline">
+              <button v-if="resident.phoneHome" type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg px-2 -mx-2 text-left text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneHome)">
                 <Phone class="h-3.5 w-3.5" aria-hidden="true" />
                 {{ resident.phoneHome }}
-              </a>
+              </button>
             </td>
             <td class="py-2">{{ resident.occupation ?? '' }}</td>
           </tr>
@@ -196,14 +190,14 @@ function mapsHref(streetAddress: string): string {
             <Mail class="h-4 w-4" aria-hidden="true" />
             {{ resident.email }}
           </a>
-          <a v-if="resident.phoneMobile" :href="phoneHref(resident.phoneMobile)" class="flex min-h-11 items-center gap-2 rounded-xl px-2 -mx-2 text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneMobile)">
+          <button v-if="resident.phoneMobile" type="button" class="flex min-h-11 items-center gap-2 rounded-xl px-2 -mx-2 text-left text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneMobile)">
             <Phone class="h-4 w-4" aria-hidden="true" />
             <span>M: {{ resident.phoneMobile }}</span>
-          </a>
-          <a v-if="resident.phoneHome" :href="phoneHref(resident.phoneHome)" class="flex min-h-11 items-center gap-2 rounded-xl px-2 -mx-2 text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneHome)">
+          </button>
+          <button v-if="resident.phoneHome" type="button" class="flex min-h-11 items-center gap-2 rounded-xl px-2 -mx-2 text-left text-accent hover:underline" @click="choosePhoneAction($event, resident.phoneHome)">
             <Phone class="h-4 w-4" aria-hidden="true" />
             <span>H: {{ resident.phoneHome }}</span>
-          </a>
+          </button>
           <p class="text-content-muted">{{ resident.occupation ?? '' }}</p>
         </li>
       </ul>
@@ -212,13 +206,13 @@ function mapsHref(streetAddress: string): string {
     <Teleport to="body">
       <div
         v-if="selectedPhone"
-        class="fixed inset-0 z-50 flex items-end bg-[#1f1f1f]/35 p-3 sm:hidden"
+        class="fixed inset-0 z-50 flex items-end justify-center bg-[#1f1f1f]/35 p-3 sm:items-center sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-label="Choose phone action"
         @click="closePhoneActions"
       >
-        <div class="w-full rounded-3xl border border-theme-border bg-surface p-4 shadow-2xl" @click.stop>
+        <div class="w-full max-w-sm rounded-3xl border border-theme-border bg-surface p-4 shadow-2xl" @click.stop>
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-sm font-semibold text-content">What would you like to do?</p>

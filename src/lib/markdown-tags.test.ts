@@ -77,4 +77,12 @@ describe('Custom Markdown Tags & Callout Tests', () => {
         expect(output).toContain('width="300"');
         expect(output).toContain('class="img-rounded"');
     });
+
+    test('renders alignment classes for text headings and images', () => {
+        const input = `Plain text {.text-center}\n\n## Heading {.text-right}\n\n![Sign](/images/sign.jpg){width=300 class="img-rounded img-left"}`;
+        const output = md.render(input);
+        expect(output).toContain('<p class="text-center">Plain text</p>');
+        expect(output).toContain('<h2 class="text-right">Heading</h2>');
+        expect(output).toContain('class="img-rounded img-left"');
+    });
 });

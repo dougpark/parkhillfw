@@ -14,7 +14,13 @@ export type MarkdownCommand =
     | 'callout-info'
     | 'callout-warning'
     | 'callout-danger'
-    | 'row';
+    | 'row'
+    | 'align';
+
+type Alignment = 'left' | 'center' | 'right';
+const alignmentOrder: Alignment[] = ['left', 'center', 'right'];
+const blockAlignmentClasses = ['text-left', 'text-center', 'text-right'];
+const imageAlignmentClasses = ['img-left', 'img-center', 'img-right'];
 
 function wrapSelection(view: EditorView, before: string, after: string, placeholder = 'text'): void {
     const { from, to } = view.state.selection.main;
@@ -51,6 +57,81 @@ function selectedLineNumbers(view: EditorView): number[] {
     const numbers: number[] = [];
     for (let lineNo = start.number; lineNo <= end.number; lineNo++) numbers.push(lineNo);
     return numbers;
+}
+
+function classForAlignment(alignment: Alignment, target: 'block' | 'image'): string {
+    return target === 'image' ? `img-${alignment}` : `text-${alignment}`;
+}
+
+function nextAlignment(current: Alignment | null): Alignment {
+    if (!current) return 'left';
+    const index = alignmentOrder.indexOf(current);
+    return alignmentOrder[(index + 1) % alignmentOrder.length]!;
+}
+
+function parseClassAttribute(attrs: string): string[] {
+    const match = attrs.match(/(?:^|\s)class=(['"])(.*?)\1/);
+    return match ? match[2]!.split(/\s+/).filter(Boolean) : [];
+}
+
+function alignmentFromClasses(classes: string[]): Alignment | null {
+    if (classes.includes('text-left') || classes.includes('img-left')) return 'left';
+    if (classes.includes('text-center') || classes.includes('img-center')) return 'center';
+    if (classes.includes('text-right') || classes.includes('img-right')) return 'right';
+    return null;
+}
+
+function upsertClassAttribute(attrs: string, className: string, target: 'block' | 'image'): string {
+    const classes = parseClassAttribute(attrs)
+        .filter((name) => !blockAlignmentClasses.includes(name) && !imageAlignmentClasses.includes(name));
+    classes.push(className);
+
+    if (/(?:^|\s)class=(['"])(.*?)\1/.test(attrs)) {
+        return attrs.replace(/(?:^|\s)class=(['"])(.*?)\1/, ` class="${classes.join(' ')}"`).trim();
+    }
+
+    return `${attrs.trim()} class="${classes.join(' ')}"`.trim();
+}
+
+function alignImageLine(text: string, alignment: Alignment): string {
+    const imageAttrs = text.match(/^(.*!\[[^\]]*\]\([^)]*\))(?:\{([^}]*)\})?(.*)$/);
+    if (!imageAttrs) return text;
+
+    const [, imageMarkdown, attrs = '', after = ''] = imageAttrs;
+    const nextAttrs = upsertClassAttribute(attrs, classForAlignment(alignment, 'image'), 'image');
+    return `${imageMarkdown}{${nextAttrs}}${after}`;
+}
+
+function alignBlockLine(text: string, alignment: Alignment): string {
+    const blockAttrs = text.match(/^(.*?)(?:\s*\{([^}]*)\})?\s*$/);
+    if (!blockAttrs) return text;
+
+    const [, content, attrs = ''] = blockAttrs;
+    const nextAttrs = upsertClassAttribute(attrs, classForAlignment(alignment, 'block'), 'block');
+    return `${content.trimEnd()} {${nextAttrs}}`;
+}
+
+function currentAlignmentForLine(text: string): Alignment | null {
+    const attrs = text.match(/\{([^}]*)\}\s*$/)?.[1] ?? '';
+    return alignmentFromClasses(parseClassAttribute(attrs));
+}
+
+function cycleAlignment(view: EditorView): void {
+    const lines = selectedLineNumbers(view)
+        .map((lineNo) => view.state.doc.line(lineNo))
+        .filter((line) => line.text.trim());
+    if (!lines.length) return;
+
+    const target = nextAlignment(currentAlignmentForLine(lines[0]!.text));
+    const changes = lines.map((line) => {
+        const replacement = /!\[[^\]]*\]\([^)]*\)/.test(line.text)
+            ? alignImageLine(line.text, target)
+            : alignBlockLine(line.text, target);
+        return { from: line.from, to: line.to, insert: replacement };
+    });
+
+    view.dispatch({ changes });
+    view.focus();
 }
 
 function cycleHeading(view: EditorView): void {
@@ -205,5 +286,6 @@ export function applyMarkdownCommand(view: EditorView, command: MarkdownCommand)
         case 'callout-warning': return insertCallout(view, 'warning');
         case 'callout-danger': return insertCallout(view, 'danger');
         case 'row': return insertRow(view);
+        case 'align': return cycleAlignment(view);
     }
 }

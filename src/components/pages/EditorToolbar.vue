@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import {
+  AlignCenter,
     AlertTriangle,
     Bold,
     Code,
@@ -119,6 +120,16 @@ function selectCallout(type: 'info' | 'warning' | 'danger') {
       @click="emit('command', 'row')"
     >
       <LayoutGrid class="h-4 w-4" />
+    </button>
+
+    <button
+      type="button"
+      title="Cycle current row alignment: left, center, right"
+      aria-label="Cycle current row alignment"
+      class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-surface hover:text-accent"
+      @click="emit('command', 'align')"
+    >
+      <AlignCenter class="h-4 w-4" />
     </button>
 
     <!-- Preview Toggle Button on Far Right -->

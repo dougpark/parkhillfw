@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Check, CheckCircle2, Clock, Edit3, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
+import { Check, CheckCircle2, Clock, Edit3, Info, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
+import AboutModal from './components/common/AboutModal.vue';
 import modernLogo from '/modern-ph-logo.svg?raw';
 
 interface AuthUser {
@@ -19,6 +20,7 @@ const navbarLogo = modernLogo.replace('viewBox="0 0 512.000000 512.000000"', 'vi
 const { theme, themeOptions, applyTheme } = useTheme();
 const isAccountMenuOpen = ref(false);
 const isAccountPanelOpen = ref(false);
+const isAboutModalOpen = ref(false);
 const loginEmails = ref<string[]>([]);
 const isLoadingEmails = ref(false);
 const isSavingEmails = ref(false);
@@ -30,6 +32,11 @@ const lastActiveText = ref('');
 let bannerTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
 const isConfirmingDirectory = ref(false);
+
+function openAboutPanel() {
+  isAccountMenuOpen.value = false;
+  isAboutModalOpen.value = true;
+}
 
 async function confirmDirectoryLooksGood() {
   isConfirmingDirectory.value = true;
@@ -97,7 +104,7 @@ async function openAccountPanel() {
   emailPanelSaved.value = false;
   try {
     const response = await fetch('/api/account/login-emails');
-    const data = await response.json();
+    const data = await response.json() as { error?: string; emails: string[] };
     if (!response.ok) throw new Error(data.error ?? 'Unable to load Login Emails.');
     loginEmails.value = data.emails;
   } catch (error) {
@@ -125,7 +132,7 @@ async function saveLoginEmails() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ emails: loginEmails.value }),
     });
-    const data = await response.json();
+    const data = await response.json() as { error?: string; emails: string[] };
     if (!response.ok) throw new Error(data.error ?? 'Unable to save Login Emails.');
     loginEmails.value = data.emails;
     emailPanelSaved.value = true;
@@ -214,6 +221,15 @@ watch(() => route.fullPath, loadAuthUser);
             >
               <button
                 type="button"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
+                role="menuitem"
+                @click="openAboutPanel"
+              >
+                <Info class="h-4 w-4 text-accent" />
+                About
+              </button>
+              <button
+                type="button"
                 class="block w-full rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
                 role="menuitem"
                 @click="openAccountPanel"
@@ -251,15 +267,25 @@ watch(() => route.fullPath, loadAuthUser);
               </button>
             </div>
           </template>
-          <RouterLink
-            v-else
-            to="/login"
-            class="rounded-full p-2 text-content-muted transition-colors hover:bg-surface-hover"
-            aria-label="Sign in"
-            title="Sign in"
-          >
-            <LogIn class="h-5 w-5" />
-          </RouterLink>
+          <div v-else class="flex items-center gap-1">
+            <button
+              type="button"
+              class="rounded-full p-2 text-content-muted transition-colors hover:bg-surface-hover"
+              aria-label="About"
+              title="About"
+              @click="isAboutModalOpen = true"
+            >
+              <Info class="h-5 w-5" />
+            </button>
+            <RouterLink
+              to="/login"
+              class="rounded-full p-2 text-content-muted transition-colors hover:bg-surface-hover"
+              aria-label="Sign in"
+              title="Sign in"
+            >
+              <LogIn class="h-5 w-5" />
+            </RouterLink>
+          </div>
         </div>
       </div>
     </header>
@@ -355,6 +381,8 @@ watch(() => route.fullPath, loadAuthUser);
     <main class="max-w-5xl mx-auto px-4 py-6 sm:px-8">
       <router-view />
     </main>
+
+    <AboutModal :open="isAboutModalOpen" @close="isAboutModalOpen = false" />
   </div>
 </template>
 

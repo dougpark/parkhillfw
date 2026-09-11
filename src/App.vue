@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Check, CheckCircle2, Clock, Edit3, Info, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
+import { Check, CheckCircle2, ChevronDown, Clock, Edit3, Info, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
 import AboutModal from './components/common/AboutModal.vue';
@@ -209,11 +209,18 @@ watch(() => route.fullPath, loadAuthUser);
           <template v-if="user">
             <button
               type="button"
-              class="max-w-32 truncate text-xs font-medium text-content-muted underline decoration-theme-border underline-offset-4 hover:text-accent sm:max-w-none sm:text-sm"
+              class="inline-flex min-h-[44px] max-w-44 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-content transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-subtle sm:max-w-none"
               :aria-expanded="isAccountMenuOpen"
               aria-haspopup="menu"
               @click="toggleAccountMenu"
-            >{{ user.displayName }}</button>
+            >
+              <span class="truncate">{{ user.displayName }}</span>
+              <ChevronDown
+                class="h-4 w-4 shrink-0 text-content-muted transition-transform duration-200"
+                :class="{ 'rotate-180 text-accent': isAccountMenuOpen }"
+                aria-hidden="true"
+              />
+            </button>
             <div
               v-if="isAccountMenuOpen"
               class="absolute right-0 top-full z-30 mt-2 w-56 rounded-xl border border-theme-border bg-surface p-1.5 shadow-lg"
@@ -270,7 +277,7 @@ watch(() => route.fullPath, loadAuthUser);
           <div v-else class="flex items-center gap-1">
             <button
               type="button"
-              class="rounded-full p-2 text-content-muted transition-colors hover:bg-surface-hover"
+              class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
               aria-label="About"
               title="About"
               @click="isAboutModalOpen = true"
@@ -279,7 +286,7 @@ watch(() => route.fullPath, loadAuthUser);
             </button>
             <RouterLink
               to="/login"
-              class="rounded-full p-2 text-content-muted transition-colors hover:bg-surface-hover"
+              class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
               aria-label="Sign in"
               title="Sign in"
             >

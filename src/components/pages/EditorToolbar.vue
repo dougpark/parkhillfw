@@ -4,6 +4,7 @@ import {
     AlertTriangle,
     Bold,
     Code,
+    Eye,
     Heading,
     Image as ImageIcon,
     Info,
@@ -19,7 +20,14 @@ import {
 } from 'lucide-vue-next';
 import type { MarkdownCommand } from './markdownCommands';
 
-const emit = defineEmits<{ command: [name: MarkdownCommand] }>();
+defineProps<{
+    showPreview?: boolean;
+}>();
+
+const emit = defineEmits<{
+    command: [name: MarkdownCommand];
+    togglePreview: [];
+}>();
 
 const isCalloutMenuOpen = ref(false);
 
@@ -43,14 +51,14 @@ function selectCallout(type: 'info' | 'warning' | 'danger') {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-1 rounded-xl border border-theme-border bg-app-bg p-2" role="toolbar" aria-label="Markdown formatting">
+  <div class="flex flex-wrap items-center gap-1 rounded-xl border border-theme-border bg-surface p-2" role="toolbar" aria-label="Markdown formatting">
     <button
       v-for="button in buttons"
       :key="button.name"
       type="button"
       :title="button.label"
       :aria-label="button.label"
-      class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-surface hover:text-accent"
+      class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-surface-hover hover:text-accent"
       @click="emit('command', button.name)"
     >
       <component :is="button.icon" class="h-4 w-4" />
@@ -112,5 +120,21 @@ function selectCallout(type: 'info' | 'warning' | 'danger') {
     >
       <LayoutGrid class="h-4 w-4" />
     </button>
+
+    <!-- Preview Toggle Button on Far Right -->
+    <div class="ml-auto flex items-center gap-1">
+      <button
+        type="button"
+        title="Toggle Markdown Preview"
+        aria-label="Toggle Markdown Preview"
+        :aria-pressed="showPreview"
+        class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+        :class="showPreview ? 'bg-accent text-on-accent shadow-xs' : 'text-content-muted hover:bg-surface hover:text-accent'"
+        @click="emit('togglePreview')"
+      >
+        <Eye class="h-3.5 w-3.5" />
+        <span>Preview</span>
+      </button>
+    </div>
   </div>
 </template>

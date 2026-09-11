@@ -195,7 +195,7 @@ watch(() => route.fullPath, loadAuthUser);
 
 <template>
   <div class="min-h-screen bg-app-bg text-content font-sans" @click="isAccountMenuOpen = false">
-    <header class="sticky top-0 z-20 border-b border-theme-border bg-surface">
+    <header class="sticky top-0 z-30 border-b border-theme-border bg-surface">
       <div class="max-w-5xl mx-auto flex items-center justify-between px-4 py-3 sm:px-8">
         <RouterLink
           to="/home"

@@ -319,15 +319,6 @@ onBeforeUnmount(() => {
         </span>
         <button
           type="button"
-          class="rounded-full px-4 py-2 text-sm font-medium transition-colors"
-          :class="showPreview ? 'bg-accent text-on-accent shadow' : 'border border-theme-border bg-surface text-content-muted hover:bg-app-bg'"
-          :aria-pressed="showPreview"
-          @click="showPreview = !showPreview"
-        >
-          Preview
-        </button>
-        <button
-          type="button"
           class="rounded-full px-4 py-2 text-sm font-medium transition-all"
           :class="dirty ? 'bg-accent text-on-accent shadow hover:opacity-90' : 'bg-accent/10 text-accent'"
           :disabled="saving"
@@ -342,13 +333,18 @@ onBeforeUnmount(() => {
       {{ saveError }}
     </p>
 
-    <EditorToolbar @command="onCommand" />
+    <EditorToolbar
+      class="sticky top-16 z-20 shadow-sm"
+      :show-preview="showPreview"
+      @command="onCommand"
+      @toggle-preview="showPreview = !showPreview"
+    />
 
     <div class="relative min-h-[24rem] flex-1">
       <div ref="editorHost" class="h-full overflow-hidden rounded-xl border border-theme-border bg-surface" />
       <div
         v-if="showPreview"
-        class="absolute inset-0 z-10 flex flex-col overflow-hidden rounded-xl border border-theme-border bg-surface shadow-lg"
+        class="absolute inset-0 z-0 flex flex-col overflow-hidden rounded-xl border border-theme-border bg-surface shadow-lg"
       >
         <div class="flex items-center justify-between border-b border-theme-border bg-app-bg px-4 py-2">
           <p class="text-sm font-medium text-content-muted">Preview — unsaved changes shown as-is</p>

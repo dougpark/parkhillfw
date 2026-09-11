@@ -1,40 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import MarkdownIt from 'markdown-it';
-import markdownItContainer from 'markdown-it-container';
-import markdownItAttrs from 'markdown-it-attrs';
-
-function createMarkdownRenderer() {
-    const md = new MarkdownIt({ html: true, linkify: true })
-        .use(markdownItAttrs, {
-            leftDelimiter: '{',
-            rightDelimiter: '}',
-            allowedAttributes: ['class', 'width', 'height', 'style', 'id', 'align'],
-        });
-
-    ['info', 'warning', 'danger'].forEach((type) => {
-        md.use(markdownItContainer, type, {
-            render(tokens: any[], idx: number) {
-                const token = tokens[idx];
-                if (token.nesting === 1) {
-                    return `<div class="callout callout-${type}" role="alert">\n`;
-                }
-                return '</div>\n';
-            },
-        });
-    });
-
-    md.use(markdownItContainer, 'row', {
-        render(tokens: any[], idx: number) {
-            const token = tokens[idx];
-            if (token.nesting === 1) {
-                return `<div class="callout-row row">\n`;
-            }
-            return '</div>\n';
-        },
-    });
-
-    return md;
-}
+import { createMarkdownRenderer } from './markdown';
 
 describe('Custom Markdown Tags & Callout Tests', () => {
     const md = createMarkdownRenderer();
@@ -84,5 +49,17 @@ describe('Custom Markdown Tags & Callout Tests', () => {
         expect(output).toContain('<p class="text-center">Plain text</p>');
         expect(output).toContain('<h2 class="text-right">Heading</h2>');
         expect(output).toContain('class="img-rounded img-left"');
+    });
+
+    test('turns raw phone numbers into tel links', () => {
+        const output = md.render('Call the pool chair at (817) 555-1212 or 817.555.3434 x12.');
+        expect(output).toContain('<a href="tel:8175551212">(817) 555-1212</a>');
+        expect(output).toContain('<a href="tel:8175553434;ext=12">817.555.3434 x12</a>');
+    });
+
+    test('does not relink phone numbers already inside markdown links', () => {
+        const output = md.render('[Call us](tel:8175551212)');
+        expect(output).toContain('<a href="tel:8175551212">Call us</a>');
+        expect(output).not.toContain('tel:8175551212">8175551212</a>');
     });
 });

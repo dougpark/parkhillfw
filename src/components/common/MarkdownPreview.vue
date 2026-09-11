@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import MarkdownIt from 'markdown-it';
-import taskLists from 'markdown-it-task-lists';
-import markdownItContainer from 'markdown-it-container';
-import markdownItAttrs from 'markdown-it-attrs';
+import { createMarkdownRenderer } from '../../lib/markdown';
 import 'github-markdown-css/github-markdown.css';
 
 // Shared renderer for the editor preview overlay AND the public page view,
@@ -12,37 +9,7 @@ const props = defineProps<{ source: string }>();
 
 // html: true is required for underline (<u>) support. Page authoring is
 // restricted to page editors/admins, matching the CMS trust model.
-const md = new MarkdownIt({ html: true, linkify: true })
-    .use(taskLists, { enabled: false, label: true })
-    .use(markdownItAttrs, {
-        leftDelimiter: '{',
-        rightDelimiter: '}',
-        allowedAttributes: ['class', 'width', 'height', 'style', 'id', 'align'],
-    });
-
-// Register callout alert containers (info, warning, danger)
-['info', 'warning', 'danger'].forEach((type) => {
-    md.use(markdownItContainer, type, {
-        render(tokens: any[], idx: number) {
-            const token = tokens[idx];
-            if (token.nesting === 1) {
-                return `<div class="callout callout-${type}" role="alert">\n`;
-            }
-            return '</div>\n';
-        },
-    });
-});
-
-// Register row/grid container for side-by-side layouts & image grids
-md.use(markdownItContainer, 'row', {
-    render(tokens: any[], idx: number) {
-        const token = tokens[idx];
-        if (token.nesting === 1) {
-            return `<div class="callout-row row">\n`;
-        }
-        return '</div>\n';
-    },
-});
+const md = createMarkdownRenderer();
 
 const rendered = computed(() => md.render(props.source ?? ''));
 </script>

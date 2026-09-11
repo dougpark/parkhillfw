@@ -85,6 +85,13 @@
       "when": 1789063591809,
       "tag": "0011_supreme_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789087905281,
+      "tag": "0012_common_phalanx",
+      "breakpoints": true
     }
   ]
 }

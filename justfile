@@ -52,3 +52,22 @@ count-local:
     UNION ALL \
     SELECT 'children' AS table_name, COUNT(*) AS count FROM children; \
     "
+
+# build and deploy to remote
+deploy:
+    bun run build
+    bun run deploy
+    date
+
+# migrate -- remote
+migrate-remote:
+    bun x wrangler d1 migrations apply DB --remote
+    date
+
+# Reset directory confirmation & update timestamps (remote)
+reset-reminders-remote:
+    bun run scripts/reset-directory-reminders.ts --remote
+
+# Reset directory confirmation & update timestamps (local)
+reset-reminders-local:
+    bun run scripts/reset-directory-reminders.ts

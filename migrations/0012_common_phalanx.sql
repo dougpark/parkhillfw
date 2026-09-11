@@ -1,0 +1,1 @@
+ALTER TABLE `households` ADD `directory_confirmed_at` integer;

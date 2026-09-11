@@ -131,19 +131,45 @@ app.get('/api/auth/verify', async (c) => {
 
 app.get('/api/auth/me', requireAuth(), async (c) => {
     const db = drizzle(c.env.DB);
-    const user = c.get('user') as { id: number; email: string; residentId?: number | null };
+    const user = c.get('user') as { id: number; email: string; residentId?: number | null; householdId?: number };
     const previousLastSeenAt = c.get('previousLastSeenAt');
     const resident = user.residentId
-        ? await db.select({ firstName: residents.firstName, lastName: residents.lastName })
+        ? await db.select({ id: residents.id, householdId: residents.householdId, firstName: residents.firstName, lastName: residents.lastName })
             .from(residents).where(eq(residents.id, user.residentId)).get()
-        : await db.select({ firstName: residents.firstName, lastName: residents.lastName })
-            .from(residents).where(eq(residents.email, user.email)).get();
+        : user.householdId
+            ? await db.select({ id: residents.id, householdId: residents.householdId, firstName: residents.firstName, lastName: residents.lastName })
+                .from(residents).where(eq(residents.householdId, user.householdId)).get()
+            : await db.select({ id: residents.id, householdId: residents.householdId, firstName: residents.firstName, lastName: residents.lastName })
+                .from(residents).where(eq(residents.email, user.email)).get();
     const displayName = resident ? `${resident.firstName} ${resident.lastName}` : user.email;
+
+    let needsDirectoryReview = false;
+    const householdId = resident?.householdId ?? user.householdId;
+    if (householdId) {
+        const household = await db.select({
+            updatedAt: households.updatedAt,
+            directoryConfirmedAt: households.directoryConfirmedAt,
+        }).from(households).where(eq(households.id, householdId)).get();
+
+        if (household) {
+            const SIX_MONTHS_MS = 180 * 24 * 60 * 60_000;
+            const lastTouchTime = Math.max(
+                household.updatedAt ? new Date(household.updatedAt).getTime() : 0,
+                household.directoryConfirmedAt ? new Date(household.directoryConfirmedAt).getTime() : 0
+            );
+            // If never updated/confirmed or older than 6 months (180 days)
+            if (lastTouchTime === 0 || Date.now() - lastTouchTime > SIX_MONTHS_MS) {
+                needsDirectoryReview = true;
+            }
+        }
+    }
+
     return c.json({
         user: {
             ...user,
             displayName,
             lastActiveAt: previousLastSeenAt ? new Date(previousLastSeenAt).toISOString() : null,
+            needsDirectoryReview,
         },
         matched: Boolean(user.residentId || resident),
     });
@@ -321,6 +347,24 @@ app.put('/api/my-directory', requireAuth(), async (c) => {
     }
 
     return c.json({ saved: true });
+});
+
+app.post('/api/my-directory/confirm', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { email: string; residentId?: number | null; householdId?: number };
+    const linkedResident = user.residentId
+        ? await db.select().from(residents).where(eq(residents.id, user.residentId)).get()
+        : user.householdId
+            ? await db.select().from(residents).where(eq(residents.householdId, user.householdId)).get()
+            : await db.select().from(residents).where(eq(residents.email, user.email)).get();
+    if (!linkedResident) return c.json({ error: 'Your account is not linked to a directory household.' }, 403);
+
+    const now = new Date();
+    await db.update(households).set({
+        directoryConfirmedAt: now,
+    }).where(eq(households.id, linkedResident.householdId));
+
+    return c.json({ ok: true, confirmedAt: now.toISOString() });
 });
 
 app.get('/api/admin/access-requests', requireAuth(), requireAdmin(), async (c) => {
@@ -1712,15 +1756,12 @@ app.delete('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async
 
 type Viewer = { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean } | null;
 
-async function resolveViewer(c: { env: AppBindings; req: { raw: Request }; header: (name: string, value: string, options?: { append?: boolean }) => void }): Promise<Viewer> {
+async function resolveViewer(c: { env: AppBindings; req: any }): Promise<Viewer> {
     if (c.env.DEV_BYPASS_AUTH === 'true') return devBypassUser(c.env.DEV_BYPASS_ROLE) as Viewer;
-    const rawSession = getCookie(c.req.raw, SESSION_COOKIE);
+    const rawReq = c.req.raw ?? c.req;
+    const rawSession = getCookie(rawReq, SESSION_COOKIE);
     if (!rawSession) return null;
     const authResult = await findUserBySession(drizzle(c.env.DB), rawSession);
-    if (authResult?.renewedExpiresAt) {
-        const secure = new URL(c.req.url).protocol === 'https:';
-        c.header('Set-Cookie', sessionCookie(rawSession, authResult.renewedExpiresAt, secure), { append: true });
-    }
     return (authResult?.user as Viewer) ?? null;
 }
 

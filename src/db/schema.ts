@@ -21,6 +21,8 @@ export const households = sqliteTable(
         photoKey: text('photo_key'), // R2 Storage Key
         notes: text('notes'),
 
+        directoryConfirmedAt: integer('directory_confirmed_at', { mode: 'timestamp' }),
+
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
         updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     },

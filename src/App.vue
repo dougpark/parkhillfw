@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Check, Clock, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
+import { Check, CheckCircle2, Clock, Edit3, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
 import modernLogo from '/modern-ph-logo.svg?raw';
@@ -8,6 +8,7 @@ import modernLogo from '/modern-ph-logo.svg?raw';
 interface AuthUser {
   displayName: string;
   lastActiveAt?: string | null;
+  needsDirectoryReview?: boolean;
   matched?: boolean;
 }
 
@@ -27,6 +28,26 @@ const emailPanelSaved = ref(false);
 const showLastActiveBanner = ref(false);
 const lastActiveText = ref('');
 let bannerTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+
+const isConfirmingDirectory = ref(false);
+
+async function confirmDirectoryLooksGood() {
+  isConfirmingDirectory.value = true;
+  try {
+    const response = await fetch('/api/my-directory/confirm', { method: 'POST' });
+    if (response.ok && user.value) {
+      user.value.needsDirectoryReview = false;
+    }
+  } catch {
+    // Ignore error, allow re-click
+  } finally {
+    isConfirmingDirectory.value = false;
+  }
+}
+
+function goToEditHousehold() {
+  router.push('/directory/edit');
+}
 
 function dismissLastActiveBanner() {
   showLastActiveBanner.value = false;
@@ -246,7 +267,7 @@ watch(() => route.fullPath, loadAuthUser);
     <Transition name="banner-fade">
       <div
         v-if="showLastActiveBanner && lastActiveText"
-        class="border-b border-theme-border bg-surface-subtle px-4 py-3 text-sm text-content shadow-xs"
+        class="border-b border-theme-border bg-surface-subtle px-4 py-2.5 text-sm text-content shadow-xs"
         role="status"
         aria-live="polite"
       >
@@ -268,6 +289,41 @@ watch(() => route.fullPath, loadAuthUser);
         </div>
       </div>
     </Transition>
+
+    <div
+      v-if="user && user.needsDirectoryReview"
+      class="border-b border-accent/20 bg-accent/5 px-4 py-3 sm:py-3.5"
+      role="region"
+      aria-label="Directory update reminder"
+    >
+      <div class="mx-auto flex max-w-5xl flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:px-4">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <Edit3 class="h-4 w-4 shrink-0 text-accent" />
+          <p class="text-sm font-medium text-content">
+            Is your household directory information still current?
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-on-accent transition-all hover:opacity-90 shadow-xs"
+            @click="goToEditHousehold"
+          >
+            <Edit3 class="h-3.5 w-3.5" />
+            Edit My Household Info
+          </button>
+          <button
+            type="button"
+            :disabled="isConfirmingDirectory"
+            class="inline-flex items-center gap-1.5 rounded-full border border-theme-border bg-surface px-4 py-1.5 text-xs font-medium text-content transition-all hover:bg-surface-hover hover:border-accent/40 shadow-xs disabled:opacity-60"
+            @click="confirmDirectoryLooksGood"
+          >
+            <CheckCircle2 class="h-3.5 w-3.5 text-success" />
+            {{ isConfirmingDirectory ? 'Confirming...' : 'Looks Good' }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div v-if="isAccountPanelOpen" class="fixed inset-0 z-40 bg-[#1f1f1f]/20" @click="isAccountPanelOpen = false">
       <section

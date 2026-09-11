@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Check, CheckCircle2, ChevronDown, Clock, Edit3, Info, LogIn, LogOut, Palette, Plus, Save, Trash2, X } from 'lucide-vue-next';
+import { Check, CheckCircle2, ChevronDown, Clock, Edit3, Info, LogIn, LogOut, Palette, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
 import AboutModal from './components/common/AboutModal.vue';
@@ -8,6 +8,10 @@ import modernLogo from '/modern-ph-logo.svg?raw';
 
 interface AuthUser {
   displayName: string;
+  isOwner?: boolean;
+  isAdmin?: boolean;
+  isPageEditor?: boolean;
+  isDirectoryEditor?: boolean;
   lastActiveAt?: string | null;
   needsDirectoryReview?: boolean;
   matched?: boolean;
@@ -36,6 +40,10 @@ const isConfirmingDirectory = ref(false);
 function openAboutPanel() {
   isAccountMenuOpen.value = false;
   isAboutModalOpen.value = true;
+}
+
+function canAdmin(authUser: AuthUser | null): boolean {
+  return Boolean(authUser?.isOwner || authUser?.isAdmin || authUser?.isPageEditor || authUser?.isDirectoryEditor);
 }
 
 async function confirmDirectoryLooksGood() {
@@ -209,7 +217,7 @@ watch(() => route.fullPath, loadAuthUser);
           <template v-if="user">
             <button
               type="button"
-              class="inline-flex min-h-[44px] max-w-44 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-content transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-subtle sm:max-w-none"
+              class="inline-flex min-h-11 max-w-44 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium text-content transition-colors hover:bg-surface-hover hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-subtle sm:max-w-none"
               :aria-expanded="isAccountMenuOpen"
               aria-haspopup="menu"
               @click="toggleAccountMenu"
@@ -226,7 +234,7 @@ watch(() => route.fullPath, loadAuthUser);
               class="absolute right-0 top-full z-30 mt-2 w-56 rounded-xl border border-theme-border bg-surface p-1.5 shadow-lg"
               role="menu"
             >
-              <button
+            <button
                 type="button"
                 class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
                 role="menuitem"
@@ -235,14 +243,38 @@ watch(() => route.fullPath, loadAuthUser);
                 <Info class="h-4 w-4 text-accent" />
                 About
               </button>
+
+              <RouterLink
+                to="/directory/edit"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
+                role="menuitem"
+                @click="isAccountMenuOpen = false"
+              >
+                <Pencil class="h-4 w-4 text-success" />
+                Edit My Household
+              </RouterLink>
+              
+              
               <button
                 type="button"
-                class="block w-full rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
-                role="menuitem"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
+              role="menuitem"
                 @click="openAccountPanel"
               >
+                <Pencil class="h-4 w-4 text-success" />
                 Edit Login Emails
               </button>
+
+              <RouterLink
+                v-if="canAdmin(user)"
+                to="/admin"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
+                role="menuitem"
+                @click="isAccountMenuOpen = false"
+              >
+                <ShieldCheck class="h-4 w-4 text-accent-secondary" />
+                Admin
+              </RouterLink>
               <button
                 type="button"
                 class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-content hover:bg-surface-hover"
@@ -277,7 +309,7 @@ watch(() => route.fullPath, loadAuthUser);
           <div v-else class="flex items-center gap-1">
             <button
               type="button"
-              class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
+              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
               aria-label="About"
               title="About"
               @click="isAboutModalOpen = true"
@@ -286,7 +318,7 @@ watch(() => route.fullPath, loadAuthUser);
             </button>
             <RouterLink
               to="/login"
-              class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
+              class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
               aria-label="Sign in"
               title="Sign in"
             >

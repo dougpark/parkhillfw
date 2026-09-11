@@ -14,6 +14,8 @@ Directory:
 - Directory - Homeowner and Renters information
 - Unarchive Address - Restore previously archived addresses
 - Unarchive Household - Restore prev archived households
+- x Clickable email and phone links to email, call or sms
+- x clickable address to open in google maps
 
 - Mobile Actions:
 - View address in maps

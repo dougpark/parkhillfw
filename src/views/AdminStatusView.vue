@@ -19,7 +19,7 @@ const error = ref('');
 const rows = computed(() => [
   { label: 'Open Access Requests', value: status.value?.openAccessRequests ?? 0, icon: Inbox },
   { label: 'Households', value: status.value?.households ?? 0, icon: Home },
-  { label: 'Verified Households (6 mo)', value: status.value?.verifiedHouseholds ?? 0, icon: CheckCircle2 },
+  { label: 'Verified Households last 6 months', value: status.value?.verifiedHouseholds ?? 0, icon: CheckCircle2 },
   { label: 'Adult residents', value: status.value?.adultResidents ?? 0, icon: Users },
   { label: 'Children', value: status.value?.children ?? 0, icon: Baby },
   { label: 'Login accounts', value: status.value?.loginAccounts ?? 0, icon: Users },

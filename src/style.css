@@ -88,3 +88,86 @@ html,
 body {
 	background: var(--theme-app-bg);
 }
+
+/* Custom Markdown Callout Panels & Image Utilities */
+.markdown-body .callout {
+	padding: 1rem 1.25rem;
+	margin: 1.5rem 0;
+	border-left: 4px solid var(--theme-accent);
+	border-radius: 0.75rem;
+	background-color: var(--theme-surface-subtle);
+	color: var(--theme-text);
+}
+
+.markdown-body .callout > *:first-child {
+	margin-top: 0;
+}
+
+.markdown-body .callout > *:last-child {
+	margin-bottom: 0;
+}
+
+.markdown-body .callout-info {
+	border-left-color: var(--theme-accent);
+	background-color: var(--theme-surface-subtle);
+}
+
+.markdown-body .callout-warning {
+	border-left-color: var(--theme-warning);
+	background-color: var(--theme-warning-subtle);
+}
+
+.markdown-body .callout-danger {
+	border-left-color: var(--theme-danger);
+	background-color: var(--theme-danger-subtle);
+}
+
+/* Layout Container for Rows / Image Grids */
+.markdown-body .callout-row,
+.markdown-body div.row {
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	flex-wrap: wrap;
+	margin: 1.5rem 0;
+}
+
+.markdown-body .callout-row > p,
+.markdown-body div.row > p {
+	margin: 0;
+	display: flex;
+	gap: 1rem;
+	align-items: center;
+	flex-wrap: wrap;
+	width: 100%;
+}
+
+/* Image Utilities */
+.markdown-body img.img-thumb {
+	flex: 1 1 200px;
+	max-width: 100%;
+	height: auto;
+	border-radius: 0.5rem;
+	object-fit: cover;
+	margin: 0;
+}
+
+.markdown-body img.img-rounded {
+	border-radius: 0.75rem;
+	box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.markdown-body img.img-left {
+	margin-left: 0;
+	margin-right: auto;
+}
+
+.markdown-body img.img-center {
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.markdown-body img.img-right {
+	margin-left: auto;
+	margin-right: 0;
+}

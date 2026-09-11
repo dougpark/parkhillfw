@@ -31,7 +31,7 @@ function fileUrl(attachment: Attachment): string {
 function snippetFor(attachment: Attachment): string {
     const url = fileUrl(attachment);
     return attachment.mimeType.startsWith('image/')
-        ? `![${attachment.filename}](${url})`
+        ? `![${attachment.filename}](${url}){width=300 class="img-rounded"}`
         : `[${attachment.filename}](${url})`;
 }
 

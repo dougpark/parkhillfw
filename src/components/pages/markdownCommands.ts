@@ -10,7 +10,11 @@ export type MarkdownCommand =
     | 'image'
     | 'table'
     | 'bullet'
-    | 'checklist';
+    | 'checklist'
+    | 'callout-info'
+    | 'callout-warning'
+    | 'callout-danger'
+    | 'row';
 
 function wrapSelection(view: EditorView, before: string, after: string, placeholder = 'text'): void {
     const { from, to } = view.state.selection.main;
@@ -161,6 +165,30 @@ function insertTable(view: EditorView): void {
     view.focus();
 }
 
+function insertCallout(view: EditorView, type: 'info' | 'warning' | 'danger'): void {
+    const { from, to } = view.state.selection.main;
+    const selected = view.state.doc.sliceString(from, to).trim();
+    const content = selected || 'Important note text goes here...';
+    const insert = `::: ${type}\n${content}\n:::`;
+    view.dispatch({
+        changes: { from, to, insert },
+        selection: { anchor: from + type.length + 5, head: from + type.length + 5 + content.length },
+    });
+    view.focus();
+}
+
+function insertRow(view: EditorView): void {
+    const { from, to } = view.state.selection.main;
+    const selected = view.state.doc.sliceString(from, to).trim();
+    const content = selected || '![Photo 1](/api/files/example1.jpg){class="img-thumb"}\n![Photo 2](/api/files/example2.jpg){class="img-thumb"}';
+    const insert = `::: row\n${content}\n:::`;
+    view.dispatch({
+        changes: { from, to, insert },
+        selection: { anchor: from + 8, head: from + 8 + content.length },
+    });
+    view.focus();
+}
+
 export function applyMarkdownCommand(view: EditorView, command: MarkdownCommand): void {
     switch (command) {
         case 'bold': return wrapSelection(view, '**', '**');
@@ -173,5 +201,9 @@ export function applyMarkdownCommand(view: EditorView, command: MarkdownCommand)
         case 'table': return insertTable(view);
         case 'bullet': return toggleBullet(view);
         case 'checklist': return cycleChecklist(view);
+        case 'callout-info': return insertCallout(view, 'info');
+        case 'callout-warning': return insertCallout(view, 'warning');
+        case 'callout-danger': return insertCallout(view, 'danger');
+        case 'row': return insertRow(view);
     }
 }

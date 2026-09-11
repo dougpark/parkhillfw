@@ -1,17 +1,26 @@
 # Feature Creep
 
-- Users - reset login tokens to force re-authentication
-- User Admins - Manage Admin users and their permissions
+Admin:
+- x Users - reset login tokens to force re-authentication
+- x User Admins - Manage Admin users and their permissions
 - User Blocks - Manage user block lists and restrictions
 - Info Msg - Show message at top of home page
 - Drive - Manage and store files in the cloud
-- Admin Stats Page - Show counts and usages stats
+- x Admin Stats Page - Show counts and usages stats
 - Login Request email - Send admin email for login request
 
+Directory:
 - Directory - Additional fields: interest, hobbies, and skills, Address History
 - Directory - Homeowner and Renters information
 - Unarchive Address - Restore previously archived addresses
 - Unarchive Household - Restore prev archived households
+
+- Mobile Actions:
+- View address in maps
+- Call or message phone number
+- save to local contacts card
+- add email to list for starting a group email
+- add phone number to list for starting a group message
 
 - Mail Blast to send emails to the group
 - Mail Group to allow Google Groups peers to all emails

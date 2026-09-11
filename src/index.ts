@@ -381,17 +381,22 @@ app.get('/api/admin/access-requests/count', requireAuth(), requireAnyAdminRole()
 
 app.get('/api/admin/status', requireAuth(), requireAnyAdminRole(), async (c) => {
     const db = drizzle(c.env.DB);
-    const [householdCount, residentCount, childCount, userCount, aliasLoginCount, openAccessRequestCount] = await Promise.all([
+    const sixMonthsAgoSec = Math.floor((Date.now() - 180 * 24 * 60 * 60_000) / 1000);
+    const [householdCount, residentCount, childCount, userCount, aliasLoginCount, openAccessRequestCount, verifiedHouseholdCount] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(households).get(),
         db.select({ count: sql<number>`count(*)` }).from(residents).get(),
         db.select({ count: sql<number>`count(*)` }).from(children).get(),
         db.select({ count: sql<number>`count(*)` }).from(users).get(),
         db.select({ count: sql<number>`count(*)` }).from(userLoginEmails).get(),
         db.select({ count: sql<number>`count(*)` }).from(accessRequests).where(eq(accessRequests.status, 'pending')).get(),
+        db.select({ count: sql<number>`count(*)` }).from(households).where(
+            sql`max(coalesce(${households.updatedAt}, 0), coalesce(${households.directoryConfirmedAt}, 0)) >= ${sixMonthsAgoSec}`
+        ).get(),
     ]);
 
     return c.json({
         households: householdCount?.count ?? 0,
+        verifiedHouseholds: verifiedHouseholdCount?.count ?? 0,
         adultResidents: residentCount?.count ?? 0,
         children: childCount?.count ?? 0,
         loginAccounts: userCount?.count ?? 0,

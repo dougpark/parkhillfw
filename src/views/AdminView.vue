@@ -126,6 +126,8 @@ const breadcrumbTrail = computed(() => {
   return trail;
 });
 
+const fullWidthAdminFeature = computed(() => selectedFeature.value === 'Pages' || selectedFeature.value === 'Navigation');
+
 onMounted(async () => {
   const savedExpandedSection = localStorage.getItem(ACCORDION_STORAGE_KEY);
   if (savedExpandedSection && adminMenuSections.some((section) => section.label === savedExpandedSection && section.children?.length)) {
@@ -211,8 +213,15 @@ function handleCrumbClick(index: number) {
       <h2 class="mt-1 text-2xl font-semibold tracking-tight">Administration</h2>
       </div>
 
-    <div class="grid min-h-112 overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm md:grid-cols-[17rem_minmax(0,1fr)]">
-      <nav class="border-b border-theme-border bg-app-bg p-3 md:border-b-0 md:border-r" aria-label="Admin features">
+    <div
+      class="grid min-h-112 overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm"
+      :class="fullWidthAdminFeature ? 'md:grid-cols-1' : 'md:grid-cols-[17rem_minmax(0,1fr)]'"
+    >
+      <nav
+        v-if="!fullWidthAdminFeature"
+        class="border-b border-theme-border bg-app-bg p-3 md:border-b-0 md:border-r"
+        aria-label="Admin features"
+      >
         <div class="space-y-1">
           <div v-for="section in menuSections" :key="section.label">
             <button

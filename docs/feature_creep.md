@@ -4,8 +4,8 @@ Admin:
 - x Users - reset login tokens to force re-authentication
 - x User Admins - Manage Admin users and their permissions
 - User Blocks - Manage user block lists and restrictions
-- Info Msg - Show message at top of home page
-- Drive - Manage and store files in the cloud
+- x Info Msg - Show message at top of home page
+- Documents - Manage and store files in the cloud
 - x Admin Stats Page - Show counts and usages stats
 - Login Request email - Send admin email for login request
 
@@ -18,8 +18,8 @@ Directory:
 - x clickable address to open in google maps
 
 - Mobile Actions:
-- View address in maps
-- Call or message phone number
+- x View address in maps
+- x Call or message phone number
 - save to local contacts card
 - add email to list for starting a group email
 - add phone number to list for starting a group message
@@ -39,6 +39,7 @@ Directory:
 - Stats - Track usage and client device in
 
 - Integrations - Connect with third-party services and APIs
+- Quickbooks Payments
 - Payments - Manage and process user payments
 - Accounting - Manage and track financial records
 - Calendar - Manage and view calendar events

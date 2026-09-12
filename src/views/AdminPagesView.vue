@@ -140,57 +140,61 @@ onMounted(load);
       <div
         v-for="page in pages"
         :key="page.id"
-        class="flex flex-wrap items-center gap-3 border-b border-theme-border px-4 py-3 last:border-b-0 sm:px-5"
+        class="flex flex-col gap-3 border-b border-theme-border px-4 py-3 last:border-b-0 sm:flex-row sm:flex-wrap sm:items-center sm:px-5"
       >
-        <div class="min-w-0 flex-1">
+        <div class="min-w-0 sm:flex-1">
           <p class="truncate font-medium">{{ page.title }}</p>
-          <p class="mt-0.5 truncate text-xs text-content-muted">
+          <p class="mt-0.5 wrap-break-word text-xs text-content-muted sm:truncate">
             /pages/{{ page.slug }} · by {{ page.authorEmail ?? 'unknown' }} · edited {{ formatDate(page.updatedAt) }}
           </p>
         </div>
-        <span
-          class="rounded-full px-2.5 py-1 text-xs font-medium"
-          :class="page.isDraft ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'"
-        >
-          {{ page.isDraft ? 'Draft' : 'Published' }}
-        </span>
-        <span
-          class="rounded-full px-2.5 py-1 text-xs font-medium"
-          :class="page.isPublic ? 'bg-accent/10 text-accent' : 'bg-app-bg text-content-muted'"
-        >
-          {{ page.isPublic ? 'Public' : 'Members only' }}
-        </span>
-        <button
-          type="button"
-          title="Edit page"
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-accent/10 hover:text-accent"
-          @click="editPage(page)"
-        >
-          <Pencil class="h-4 w-4" />
-        </button>
-        <span
-          v-if="page.attachmentCount > 0"
-          class="flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent"
-          :title="`${page.attachmentCount} attachment${page.attachmentCount === 1 ? '' : 's'} attached`"
-        >
-          <Paperclip class="h-3.5 w-3.5" />
-          {{ page.attachmentCount }}
-        </span>
-        <span
-          v-else
-          class="flex h-9 w-9 items-center justify-center text-content-muted/50"
-          title="No attachments"
-        >
-          <Paperclip class="h-4 w-4" />
-        </span>
-        <button
-          type="button"
-          title="Delete page"
-          class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-danger-subtle hover:text-danger"
-          @click="deleteTarget = page"
-        >
-          <Trash2 class="h-4 w-4" />
-        </button>
+        <div class="flex flex-wrap items-center gap-2 sm:contents">
+          <span
+            class="rounded-full px-2.5 py-1 text-xs font-medium"
+            :class="page.isDraft ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'"
+          >
+            {{ page.isDraft ? 'Draft' : 'Published' }}
+          </span>
+          <span
+            class="rounded-full px-2.5 py-1 text-xs font-medium"
+            :class="page.isPublic ? 'bg-accent/10 text-accent' : 'bg-app-bg text-content-muted'"
+          >
+            {{ page.isPublic ? 'Public' : 'Members only' }}
+          </span>
+        </div>
+        <div class="flex items-center gap-2 sm:contents">
+          <button
+            type="button"
+            title="Edit page"
+            class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-accent/10 hover:text-accent"
+            @click="editPage(page)"
+          >
+            <Pencil class="h-4 w-4" />
+          </button>
+          <span
+            v-if="page.attachmentCount > 0"
+            class="flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent"
+            :title="`${page.attachmentCount} attachment${page.attachmentCount === 1 ? '' : 's'} attached`"
+          >
+            <Paperclip class="h-3.5 w-3.5" />
+            {{ page.attachmentCount }}
+          </span>
+          <span
+            v-else
+            class="flex h-9 w-9 items-center justify-center text-content-muted/50"
+            title="No attachments"
+          >
+            <Paperclip class="h-4 w-4" />
+          </span>
+          <button
+            type="button"
+            title="Delete page"
+            class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-danger-subtle hover:text-danger"
+            @click="deleteTarget = page"
+          >
+            <Trash2 class="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
     <p v-else class="mt-6 rounded-2xl border border-dashed border-theme-border bg-surface-subtle p-6 text-center text-sm text-content-muted">

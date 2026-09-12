@@ -226,23 +226,25 @@ onMounted(load);
       <div
         v-for="node in flat"
         :key="node.row.id"
-        class="flex flex-wrap items-center gap-3 border-b border-theme-border px-4 py-3 last:border-b-0 sm:px-5"
+        class="flex flex-col gap-3 border-b border-theme-border px-4 py-3 last:border-b-0 sm:flex-row sm:flex-wrap sm:items-center sm:px-5"
       >
-        <component :is="menuIcon(node.row.iconName, node.row.kind)" class="h-5 w-5 shrink-0 text-accent" />
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="truncate font-medium text-content">{{ node.row.title }}</span>
-            <span v-if="node.row.isDraft" class="rounded-full bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning">Draft</span>
-            <span v-else-if="node.row.isPublic" class="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-medium text-success">Public</span>
-            <span v-else class="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Members</span>
+        <div class="flex min-w-0 items-start gap-3 sm:contents">
+          <component :is="menuIcon(node.row.iconName, node.row.kind)" class="mt-0.5 h-5 w-5 shrink-0 text-accent sm:mt-0" />
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="min-w-0 wrap-break-word font-medium text-content sm:truncate">{{ node.row.title }}</span>
+              <span v-if="node.row.isDraft" class="rounded-full bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning">Draft</span>
+              <span v-else-if="node.row.isPublic" class="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-medium text-success">Public</span>
+              <span v-else class="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Members</span>
+            </div>
+            <p class="mt-0.5 wrap-break-word text-xs text-content-muted">
+              {{ node.row.kind === 'menu' ? 'Menu' : node.row.kind === 'page' ? `Page · ${node.row.pageTitle ?? 'missing'}` : `Link · ${node.row.targetUrl}` }}
+              · in {{ parentTitle(node.row) }}
+              <template v-if="node.row.kind === 'menu'"> · {{ childCount(node.row) }} item{{ childCount(node.row) === 1 ? '' : 's' }}</template>
+            </p>
           </div>
-          <p class="mt-0.5 text-xs text-content-muted">
-            {{ node.row.kind === 'menu' ? 'Menu' : node.row.kind === 'page' ? `Page · ${node.row.pageTitle ?? 'missing'}` : `Link · ${node.row.targetUrl}` }}
-            · in {{ parentTitle(node.row) }}
-            <template v-if="node.row.kind === 'menu'"> · {{ childCount(node.row) }} item{{ childCount(node.row) === 1 ? '' : 's' }}</template>
-          </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <button
             v-if="node.row.kind === 'menu'"
             type="button"

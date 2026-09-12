@@ -12,6 +12,7 @@ const emit = defineEmits<{
 }>();
 
 const INDENT_PX = 24;
+const MOBILE_INDENT_PX = 12;
 
 const collapsed = ref(new Set<number>());
 const armedId = ref<number | null>(null);
@@ -200,52 +201,60 @@ function isBroken(row: MenuRow): boolean {
       <div
         v-if="dropIndex === index && projection"
         class="h-0.5 rounded-full bg-accent"
-        :style="{ marginLeft: `${(projection.depth - 1) * INDENT_PX + 12}px` }"
+        :style="{
+          '--menu-indent': `${(projection.depth - 1) * INDENT_PX + 12}px`,
+          '--menu-indent-mobile': `${(projection.depth - 1) * MOBILE_INDENT_PX + 12}px`,
+        }"
         aria-hidden="true"
       />
       <div
         :draggable="armedId === node.row.id"
-        class="group flex items-center gap-2 rounded-xl px-2 py-2 transition-colors hover:bg-app-bg"
+        class="menu-tree-row group flex flex-col gap-2 rounded-xl px-2 py-2 transition-colors hover:bg-app-bg sm:flex-row sm:items-center"
         :class="draggedIds.includes(node.row.id) ? 'opacity-40' : ''"
-        :style="{ marginLeft: `${(node.depth - 1) * INDENT_PX}px` }"
+        :style="{
+          '--menu-indent': `${(node.depth - 1) * INDENT_PX}px`,
+          '--menu-indent-mobile': `${(node.depth - 1) * MOBILE_INDENT_PX}px`,
+        }"
         @dragstart="onDragStart($event, node.row)"
         @dragover="onRowDragOver($event, index)"
       >
-        <button
-          type="button"
-          class="cursor-grab rounded-lg p-1 text-content-muted hover:bg-surface active:cursor-grabbing"
-          :aria-label="`Drag ${node.row.title}`"
-          @mousedown="armDrag(node.row.id)"
-          @touchstart.passive="armDrag(node.row.id)"
-        >
-          <GripVertical class="h-4 w-4" />
-        </button>
+        <div class="flex min-w-0 items-start gap-2 sm:contents">
+          <button
+            type="button"
+            class="cursor-grab rounded-lg p-1 text-content-muted hover:bg-surface active:cursor-grabbing"
+            :aria-label="`Drag ${node.row.title}`"
+            @mousedown="armDrag(node.row.id)"
+            @touchstart.passive="armDrag(node.row.id)"
+          >
+            <GripVertical class="h-4 w-4" />
+          </button>
 
-        <button
-          v-if="node.row.kind === 'menu' && hasChildren(node.row.id)"
-          type="button"
-          class="rounded-lg p-1 text-content-muted hover:bg-surface"
-          :aria-label="collapsed.has(node.row.id) ? `Expand ${node.row.title}` : `Collapse ${node.row.title}`"
-          @click="toggleCollapse(node.row.id)"
-        >
-          <component :is="collapsed.has(node.row.id) ? ChevronRight : ChevronDown" class="h-4 w-4" />
-        </button>
-        <span v-else class="w-6" aria-hidden="true" />
+          <button
+            v-if="node.row.kind === 'menu' && hasChildren(node.row.id)"
+            type="button"
+            class="rounded-lg p-1 text-content-muted hover:bg-surface"
+            :aria-label="collapsed.has(node.row.id) ? `Expand ${node.row.title}` : `Collapse ${node.row.title}`"
+            @click="toggleCollapse(node.row.id)"
+          >
+            <component :is="collapsed.has(node.row.id) ? ChevronRight : ChevronDown" class="h-4 w-4" />
+          </button>
+          <span v-else class="w-6 shrink-0" aria-hidden="true" />
 
-        <component :is="menuIcon(node.row.iconName, node.row.kind)" class="h-4 w-4 shrink-0 text-accent" />
+          <component :is="menuIcon(node.row.iconName, node.row.kind)" class="mt-1 h-4 w-4 shrink-0 text-accent sm:mt-0" />
 
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="truncate text-sm font-medium text-content">{{ node.row.title }}</span>
-            <span v-if="node.row.isDraft" class="rounded-full bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning">Draft</span>
-            <span v-else-if="node.row.isPublic" class="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-medium text-success">Public</span>
-            <span v-else class="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Members</span>
-            <span v-if="isBroken(node.row)" class="rounded-full bg-danger-subtle px-2 py-0.5 text-xs font-medium text-danger">Broken target</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="min-w-0 wrap-break-word text-sm font-medium text-content sm:truncate">{{ node.row.title }}</span>
+              <span v-if="node.row.isDraft" class="rounded-full bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning">Draft</span>
+              <span v-else-if="node.row.isPublic" class="rounded-full bg-success-subtle px-2 py-0.5 text-xs font-medium text-success">Public</span>
+              <span v-else class="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Members</span>
+              <span v-if="isBroken(node.row)" class="rounded-full bg-danger-subtle px-2 py-0.5 text-xs font-medium text-danger">Broken target</span>
+            </div>
+            <p class="wrap-break-word text-xs text-content-muted sm:truncate">{{ targetLabel(node.row) }}</p>
           </div>
-          <p class="truncate text-xs text-content-muted">{{ targetLabel(node.row) }}</p>
         </div>
 
-        <div class="flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <div class="flex flex-wrap items-center gap-1 pl-8 transition-opacity sm:flex-nowrap sm:pl-0 sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
           <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canMoveUp(node.row)" :aria-label="`Move ${node.row.title} up`" @click="moveUp(node.row)">
             <MoveUp class="h-4 w-4" />
           </button>
@@ -271,8 +280,25 @@ function isBroken(row: MenuRow): boolean {
     <div
       v-if="dropIndex === nodes.length && projection"
       class="h-0.5 rounded-full bg-accent"
-      :style="{ marginLeft: `${(projection.depth - 1) * INDENT_PX + 12}px` }"
+      :style="{
+        '--menu-indent': `${(projection.depth - 1) * INDENT_PX + 12}px`,
+        '--menu-indent-mobile': `${(projection.depth - 1) * MOBILE_INDENT_PX + 12}px`,
+      }"
       aria-hidden="true"
     />
   </div>
 </template>
+
+<style scoped>
+.menu-tree-row,
+[style*="--menu-indent"] {
+  margin-left: var(--menu-indent-mobile);
+}
+
+@media (min-width: 40rem) {
+  .menu-tree-row,
+  [style*="--menu-indent"] {
+    margin-left: var(--menu-indent);
+  }
+}
+</style>

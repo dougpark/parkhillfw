@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { ClipboardList, FileText, FolderTree, Gauge, ShieldCheck, Users } from 'lucide-vue-next';
+import { ChevronDown, ClipboardList, FileText, FolderTree, Gauge, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
@@ -16,17 +16,74 @@ import AdminPagesView from './AdminPagesView.vue';
 
 type Role = 'any' | 'admin' | 'directoryEditor' | 'pageEditor';
 
+interface AdminFeature {
+  label: string;
+  description: string;
+  icon: unknown;
+  role: Role;
+}
+
+interface AdminMenuSection {
+  label: string;
+  description: string;
+  icon: unknown;
+  role: Role;
+  disabled?: boolean;
+  badge?: string;
+  feature?: AdminFeature;
+  children?: AdminFeature[];
+}
+
+const ACCORDION_STORAGE_KEY = 'parkhillfw.admin.expandedSection';
+
 const selectedFeature = ref('Status');
+const expandedSection = ref<string | null>(null);
 const permissions = ref({ isOwner: false, isAdmin: false, isPageEditor: false, isDirectoryEditor: false });
 
-const allFeatures: { label: string; description: string; icon: unknown; role: Role }[] = [
-  { label: 'Status', description: 'Review database and request counts.', icon: Gauge, role: 'any' },
-  { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList, role: 'admin' },
-  { label: 'Directory', description: 'Edit households and residents.', icon: Users, role: 'directoryEditor' },
-  { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText, role: 'pageEditor' },
-  { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree, role: 'pageEditor' },
-  { label: 'Login Accounts', description: 'Manage login account status, sessions, and sign-in links.', icon: Users, role: 'admin' },
-  { label: 'Access Control', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck, role: 'admin' },
+const adminMenuSections: AdminMenuSection[] = [
+  {
+    label: 'Status',
+    description: 'Review database and request counts.',
+    icon: Gauge,
+    role: 'any',
+    feature: { label: 'Status', description: 'Review database and request counts.', icon: Gauge, role: 'any' },
+  },
+  {
+    label: 'Directory',
+    description: 'Edit households and residents.',
+    icon: Users,
+    role: 'directoryEditor',
+    feature: { label: 'Directory', description: 'Edit households and residents.', icon: Users, role: 'directoryEditor' },
+  },
+  {
+    label: 'Site Content',
+    description: 'Manage pages and navigation.',
+    icon: FileText,
+    role: 'pageEditor',
+    children: [
+      { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText, role: 'pageEditor' },
+      { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree, role: 'pageEditor' },
+    ],
+  },
+  {
+    label: 'User Management',
+    description: 'Review requests, accounts, and permissions.',
+    icon: ShieldCheck,
+    role: 'admin',
+    children: [
+      { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList, role: 'admin' },
+      { label: 'Login Accounts', description: 'Manage login account status, sessions, and sign-in links.', icon: Users, role: 'admin' },
+      { label: 'Access Control', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck, role: 'admin' },
+    ],
+  },
+  {
+    label: 'Documents',
+    description: 'Document management tools.',
+    icon: FileText,
+    role: 'any',
+    disabled: true,
+    badge: 'Coming soon',
+  },
 ];
 
 const isAdmin = computed(() => permissions.value.isAdmin || permissions.value.isOwner);
@@ -38,9 +95,43 @@ function allows(role: Role) {
   return true;
 }
 
-const features = computed(() => allFeatures.filter((feature) => allows(feature.role)));
+const menuSections = computed(() => adminMenuSections
+  .map((section) => {
+    if (section.children?.length) {
+      return {
+        ...section,
+        children: section.children.filter((child) => allows(child.role)),
+      };
+    }
+
+    return section;
+  })
+  .filter((section) => section.disabled || (section.children?.length ? section.children.length > 0 : allows(section.role))));
+
+const features = computed(() => menuSections.value.flatMap((section) => {
+  if (section.children?.length) return section.children;
+  return section.feature && !section.disabled ? [section.feature] : [];
+}));
+
+const selectedSection = computed(() => menuSections.value.find((section) => {
+  if (section.feature?.label === selectedFeature.value) return true;
+  return section.children?.some((child) => child.label === selectedFeature.value) ?? false;
+}));
+
+const selectedChild = computed(() => selectedSection.value?.children?.find((child) => child.label === selectedFeature.value) ?? null);
+
+const breadcrumbTrail = computed(() => {
+  const trail = [{ title: 'Admin' }];
+  if (selectedChild.value && selectedSection.value) trail.push({ title: selectedSection.value.label });
+  return trail;
+});
 
 onMounted(async () => {
+  const savedExpandedSection = localStorage.getItem(ACCORDION_STORAGE_KEY);
+  if (savedExpandedSection && adminMenuSections.some((section) => section.label === savedExpandedSection && section.children?.length)) {
+    expandedSection.value = savedExpandedSection;
+  }
+
   const response = await fetch('/api/auth/me');
   if (!response.ok) return;
   const data = await response.json() as { user?: Partial<typeof permissions.value> };
@@ -59,76 +150,149 @@ watch(features, (list) => {
   }
 });
 
+watch(menuSections, (sections) => {
+  if (expandedSection.value && !sections.some((section) => section.label === expandedSection.value && section.children?.length)) {
+    expandedSection.value = null;
+    localStorage.removeItem(ACCORDION_STORAGE_KEY);
+  }
+});
+
 function selectFeature(label: string) {
   if (!features.value.some((feature) => feature.label === label)) return;
   selectedFeature.value = label;
+}
+
+function saveExpandedSection(label: string | null) {
+  expandedSection.value = label;
+  if (label) localStorage.setItem(ACCORDION_STORAGE_KEY, label);
+  else localStorage.removeItem(ACCORDION_STORAGE_KEY);
+}
+
+function toggleSection(section: AdminMenuSection) {
+  if (section.disabled) return;
+  if (section.children?.length) {
+    saveExpandedSection(expandedSection.value === section.label ? null : section.label);
+    return;
+  }
+  if (section.feature) selectFeature(section.feature.label);
+}
+
+function selectChild(section: AdminMenuSection, child: AdminFeature) {
+  saveExpandedSection(section.label);
+  selectFeature(child.label);
+}
+
+function isSectionActive(section: AdminMenuSection) {
+  if (section.feature?.label === selectedFeature.value) return true;
+  return section.children?.some((child) => child.label === selectedFeature.value) ?? false;
+}
+
+function handleCrumbClick(index: number) {
+  if (index === 0) {
+    selectedFeature.value = 'Status';
+    return;
+  }
+
+  if (index === 1 && selectedSection.value?.children?.length) {
+    saveExpandedSection(selectedSection.value.label);
+  }
 }
 </script>
 
 <template>
   <section class="space-y-6">
     <BreadcrumbNav
-      :trail="[{ title: 'Admin' }]"
+      :trail="breadcrumbTrail"
       :current="selectedFeature"
-      @crumb-click="selectedFeature = 'Status'"
+      @crumb-click="handleCrumbClick"
     />
 
     <div>
       <h2 class="mt-1 text-2xl font-semibold tracking-tight">Administration</h2>
       </div>
 
-    <!-- Pages renders full-width so the markdown editor is not squeezed by the sidebar -->
-    <div
-      v-if="selectedFeature === 'Pages'"
-      class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm sm:p-8"
-    >
-      <AdminPagesView @exit="selectedFeature = 'Status'" />
-    </div>
-
-    <!-- Menus needs the full width for the hierarchy editor's indent guides -->
-    <div
-      v-else-if="selectedFeature === 'Navigation'"
-      class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm sm:p-8"
-    >
-      <AdminMenusView @exit="selectedFeature = 'Status'" />
-    </div>
-
-    <div v-else class="grid min-h-112 overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm md:grid-cols-[16rem_1fr]">
+    <div class="grid min-h-112 overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm md:grid-cols-[17rem_minmax(0,1fr)]">
       <nav class="border-b border-theme-border bg-app-bg p-3 md:border-b-0 md:border-r" aria-label="Admin features">
-        <button
-          v-for="feature in features"
-          :key="feature.label"
-          type="button"
-          class="mb-1 flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition-colors"
-          :class="selectedFeature === feature.label ? 'bg-surface text-accent shadow-sm' : 'text-content-muted hover:bg-surface/70'"
-          @click="selectFeature(feature.label)"
-        >
-          <component :is="feature.icon" class="mt-0.5 h-5 w-5 shrink-0" />
-          <span>
-            <span class="block text-sm font-medium">{{ feature.label }}</span>
-            <span class="mt-0.5 block text-xs text-content-muted">{{ feature.description }}</span>
-          </span>
-        </button>
+        <div class="space-y-1">
+          <div v-for="section in menuSections" :key="section.label">
+            <button
+              type="button"
+              class="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition-colors"
+              :class="[
+                section.disabled
+                  ? 'cursor-not-allowed text-content-muted/60'
+                  : isSectionActive(section)
+                    ? 'bg-surface text-accent shadow-sm'
+                    : 'text-content-muted hover:bg-surface/70',
+              ]"
+              :aria-expanded="section.children?.length ? expandedSection === section.label : undefined"
+              :aria-controls="section.children?.length ? `admin-section-${section.label.replaceAll(' ', '-')}` : undefined"
+              :disabled="section.disabled"
+              @click="toggleSection(section)"
+            >
+              <component :is="section.icon" class="mt-0.5 h-5 w-5 shrink-0" />
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-medium">{{ section.label }}</span>
+                <span class="mt-0.5 block text-xs text-content-muted">{{ section.description }}</span>
+                <span
+                  v-if="section.badge"
+                  class="mt-2 inline-flex rounded-full bg-surface px-2.5 py-1 text-xs font-medium text-content-muted"
+                >
+                  {{ section.badge }}
+                </span>
+              </span>
+              <ChevronDown
+                v-if="section.children?.length"
+                class="mt-1 h-4 w-4 shrink-0 transition-transform"
+                :class="expandedSection === section.label ? 'rotate-180' : ''"
+                aria-hidden="true"
+              />
+            </button>
+
+            <div
+              v-if="section.children?.length && expandedSection === section.label"
+              :id="`admin-section-${section.label.replaceAll(' ', '-')}`"
+              class="mt-1 space-y-1 pb-1 pl-8"
+            >
+              <button
+                v-for="child in section.children"
+                :key="child.label"
+                type="button"
+                class="block w-full truncate rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors"
+                :class="selectedFeature === child.label ? 'bg-accent text-on-accent shadow-sm' : 'text-content-muted hover:bg-surface/70 hover:text-content'"
+                @click="selectChild(section, child)"
+              >
+                {{ child.label }}
+              </button>
+            </div>
+          </div>
+        </div>
       </nav>
 
-      <div v-if="selectedFeature === 'Access Requests'" class="p-6 sm:p-8">
+      <div v-if="selectedFeature === 'Pages'" class="min-w-0 p-6 sm:p-8">
+        <AdminPagesView @exit="selectedFeature = 'Status'" />
+      </div>
+      <div v-else-if="selectedFeature === 'Navigation'" class="min-w-0 p-6 sm:p-8">
+        <AdminMenusView @exit="selectedFeature = 'Status'" />
+      </div>
+      <div v-else-if="selectedFeature === 'Access Requests'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessRequestsView />
       </div>
-      <div v-else-if="selectedFeature === 'Status'" class="p-6 sm:p-8">
+      <div v-else-if="selectedFeature === 'Status'" class="min-w-0 p-6 sm:p-8">
         <AdminStatusView />
       </div>
-      <div v-else-if="selectedFeature === 'Directory'" class="p-6 sm:p-8">
+      <div v-else-if="selectedFeature === 'Directory'" class="min-w-0 p-6 sm:p-8">
         <AdminDirectoryView />
         
         
       </div>
-      <div v-else-if="selectedFeature === 'Login Accounts'" class="p-6 sm:p-8">
+      <div v-else-if="selectedFeature === 'Login Accounts'" class="min-w-0 p-6 sm:p-8">
         <AdminLoginUsersView />
       </div>
-      <div v-else-if="selectedFeature === 'Access Control'" class="p-6 sm:p-8">
+      <div v-else-if="selectedFeature === 'Access Control'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessControlView />
       </div>
-      <div v-else class="p-6 sm:p-8">
+      <div v-else class="min-w-0 p-6 sm:p-8">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h3 class="text-xl font-semibold">{{ selectedFeature }}</h3>

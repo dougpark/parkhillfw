@@ -1,4 +1,4 @@
-# Welcome to the New Park Hill Directory
+# Welcome to the Park Hill Directory
 We designed the neighborhood directory to make staying connected easier, safer, and more comfortable for everyone in our community. By focusing on accessibility, modern security, and clean visual design, the new site removes friction so you can quickly find the information you need.
 
 ## Designed for Effortless Usability

@@ -1,8 +1,16 @@
 # Feature Creep
 
+Details:
+- show homepage or directory on first login?
+- directory default sort by resident last name or street name?
+- directory blank until first search?
+
 Admin:
 - x Users - reset login tokens to force re-authentication
 - x User Admins - Manage Admin users and their permissions
+- Archive households instead of deleting them
+- Archive addresses instead of deleting them
+- Add History button next directory address to see previous households
 - User Blocks - Manage user block lists and restrictions
 - x Info Msg - Show message at top of home page
 - Documents - Manage and store files in the cloud
@@ -39,7 +47,7 @@ Directory:
 - Stats - Track usage and client device in
 
 - Integrations - Connect with third-party services and APIs
-- Quickbooks Payments
+- Quickbooks Payments, Stripe
 - Payments - Manage and process user payments
 - Accounting - Manage and track financial records
 - Calendar - Manage and view calendar events
@@ -53,3 +61,6 @@ Directory:
 - Surveys - Create and manage user surveys
 - Polls - Create and manage user polls
 - Emergency Request - Submit and manage emergency requests
+
+Alumni:
+- Alumni Directory - Manage and view alumni information

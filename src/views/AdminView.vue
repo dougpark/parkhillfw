@@ -73,7 +73,7 @@ const adminMenuSections: AdminMenuSection[] = [
     children: [
       { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList, role: 'admin' },
       { label: 'Login Accounts', description: 'Manage login account status, sessions, and sign-in links.', icon: Users, role: 'admin' },
-      { label: 'Access Control', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck, role: 'admin' },
+      { label: 'Permissions', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck, role: 'admin' },
     ],
   },
   {
@@ -298,7 +298,7 @@ function handleCrumbClick(index: number) {
       <div v-else-if="selectedFeature === 'Login Accounts'" class="min-w-0 p-6 sm:p-8">
         <AdminLoginUsersView />
       </div>
-      <div v-else-if="selectedFeature === 'Access Control'" class="min-w-0 p-6 sm:p-8">
+      <div v-else-if="selectedFeature === 'Permissions'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessControlView />
       </div>
       <div v-else class="min-w-0 p-6 sm:p-8">

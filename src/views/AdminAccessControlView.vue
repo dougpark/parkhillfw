@@ -171,7 +171,7 @@ onMounted(() => {
 <template>
   <section class="space-y-8">
     <div>
-      <h2 class="text-2xl font-semibold tracking-tight">Access Control</h2>
+      <h2 class="text-2xl font-semibold tracking-tight">Permissions</h2>
       <p class="mt-2 text-content-muted">Search for a user to grant or revoke Admin, Page Editor, and Directory Editor access.</p>
     </div>
 

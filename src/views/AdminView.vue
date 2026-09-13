@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { ChevronDown, ClipboardList, FileText, FolderTree, Gauge, ShieldCheck, Users } from 'lucide-vue-next';
+import { ChevronDown, ClipboardList, FileText, FolderTree, Gauge, Settings, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
@@ -13,6 +13,8 @@ import AdminLoginUsersView from './AdminLoginUsersView.vue';
 import AdminMenusView from './AdminMenusView.vue';
 
 import AdminPagesView from './AdminPagesView.vue';
+
+import AdminSettingsView from './AdminSettingsView.vue';
 
 type Role = 'any' | 'admin' | 'directoryEditor' | 'pageEditor';
 
@@ -76,8 +78,13 @@ const adminMenuSections: AdminMenuSection[] = [
       { label: 'Permissions', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck, role: 'admin' },
     ],
   },
-  {
-    label: 'Documents',
+  {    label: 'Settings',
+    description: 'Configure site-wide settings.',
+    icon: Settings,
+    role: 'admin',
+    feature: { label: 'Settings', description: 'Configure site-wide settings.', icon: Settings, role: 'admin' },
+  },
+  {    label: 'Documents',
     description: 'Document management tools.',
     icon: FileText,
     role: 'any',
@@ -300,8 +307,9 @@ function handleCrumbClick(index: number) {
       </div>
       <div v-else-if="selectedFeature === 'Permissions'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessControlView />
-      </div>
-      <div v-else class="min-w-0 p-6 sm:p-8">
+      </div>      <div v-else-if="selectedFeature === 'Settings'" class="min-w-0 p-6 sm:p-8">
+        <AdminSettingsView />
+      </div>      <div v-else class="min-w-0 p-6 sm:p-8">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h3 class="text-xl font-semibold">{{ selectedFeature }}</h3>

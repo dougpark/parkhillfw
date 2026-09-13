@@ -20,6 +20,9 @@ import {
 } from './db/schema';
 import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE, verifyCodeAndConsume } from './lib/auth';
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
+import { getSetting, getSettings, setSetting } from './lib/settings';
+
+const DEFAULT_ADMIN_EMAIL = 'parkdn@gmail.com';
 import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor, type AppBindings, type AppEnv } from './middleware/auth';
 
 const app = new Hono<AppEnv>();
@@ -71,7 +74,8 @@ app.post('/api/auth/request-link', async (c) => {
 
     const token = await createMagicLinkToken(db, email);
     try {
-        await sendMagicLinkEmail(c.env.EMAIL, email, token.rawToken, token.rawCode, new URL(c.req.url).origin);
+        const adminEmail = await getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL);
+        await sendMagicLinkEmail(c.env.EMAIL, email, token.rawToken, token.rawCode, new URL(c.req.url).origin, adminEmail);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Magic-link email failed', {
@@ -403,6 +407,29 @@ app.get('/api/admin/status', requireAuth(), requireAnyAdminRole(), async (c) => 
         aliasLogins: aliasLoginCount?.count ?? 0,
         openAccessRequests: openAccessRequestCount?.count ?? 0,
     });
+});
+
+app.get('/api/admin/settings', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const stored = await getSettings(db);
+    return c.json({ adminEmail: DEFAULT_ADMIN_EMAIL, ...stored });
+});
+
+app.put('/api/admin/settings', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number };
+    const body = await c.req.json<{ adminEmail?: string }>();
+
+    if (body.adminEmail !== undefined) {
+        const adminEmail = body.adminEmail.trim();
+        if (!adminEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+            return c.json({ error: 'Enter a valid admin email address.' }, 400);
+        }
+        await setSetting(db, 'admin_email', adminEmail, actor.id);
+    }
+
+    const stored = await getSettings(db);
+    return c.json({ adminEmail: DEFAULT_ADMIN_EMAIL, ...stored });
 });
 
 app.get('/api/admin/residents', requireAuth(), requireDirectoryEditor(), async (c) => {
@@ -1046,7 +1073,8 @@ app.post('/api/admin/users/:userId/send-magic-link', requireAuth(), requireAdmin
 
     const token = await createMagicLinkToken(db, target.email);
     try {
-        await sendMagicLinkEmail(c.env.EMAIL, target.email, token.rawToken, token.rawCode, new URL(c.req.url).origin);
+        const adminEmail = await getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL);
+        await sendMagicLinkEmail(c.env.EMAIL, target.email, token.rawToken, token.rawCode, new URL(c.req.url).origin, adminEmail);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Admin-triggered magic-link email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });
@@ -1126,7 +1154,8 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
         notes: body.notes ?? null,
     }).where(eq(accessRequests.id, requestId));
     try {
-        await sendAccessRequestOutcomeEmail(c.env.EMAIL, normalizedRequestEmail, reviewStatus, outcomeToken, new URL(c.req.url).origin);
+        const adminEmail = await getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL);
+        await sendAccessRequestOutcomeEmail(c.env.EMAIL, normalizedRequestEmail, reviewStatus, outcomeToken, new URL(c.req.url).origin, adminEmail);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Access request outcome email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });

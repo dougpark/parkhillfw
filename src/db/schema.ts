@@ -311,6 +311,23 @@ export const infoMessages = sqliteTable('info_messages', {
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
+// General-purpose site settings store: one row per key, JSON-encoded value,
+// so new settings can be added without a schema migration.
+export const settings = sqliteTable(
+    'settings',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        key: text('key').notNull(),
+        value: text('value', { mode: 'json' }).notNull(),
+
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+        updatedByUserId: integer('updated_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+    },
+    (table) => [
+        uniqueIndex('idx_settings_key_unique').on(table.key),
+    ]
+);
+
 // ==========================================
 // 4. DOCUMENTS & ATTACHMENTS (R2 Storage)
 // ==========================================

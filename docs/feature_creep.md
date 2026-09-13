@@ -1,9 +1,9 @@
 # Feature Creep
 
 Details:
-- show homepage or directory on first login?
-- directory default sort by resident last name or street name?
-- directory blank until first search?
+- x show homepage or directory on first login?
+- x directory default sort by resident last name or street name?
+- x directory blank until first search? No
 
 Admin:
 - x Users - reset login tokens to force re-authentication
@@ -11,7 +11,7 @@ Admin:
 - Archive households instead of deleting them
 - Archive addresses instead of deleting them
 - Add History button next directory address to see previous households
-- User Blocks - Manage user block lists and restrictions
+- x User Blocks - Manage user block lists and restrictions: Suspend
 - x Info Msg - Show message at top of home page
 - Documents - Manage and store files in the cloud
 - x Admin Stats Page - Show counts and usages stats

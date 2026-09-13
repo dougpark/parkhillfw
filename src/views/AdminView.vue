@@ -221,8 +221,8 @@ function handleCrumbClick(index: number) {
       </div>
 
     <div
-      class="grid min-h-112 overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm"
-      :class="fullWidthAdminFeature ? 'md:grid-cols-1' : 'md:grid-cols-[17rem_minmax(0,1fr)]'"
+      class="grid min-h-112 rounded-3xl border border-theme-border bg-surface shadow-sm"
+      :class="fullWidthAdminFeature ? 'md:grid-cols-1' : 'overflow-hidden md:grid-cols-[17rem_minmax(0,1fr)]'"
     >
       <nav
         v-if="!fullWidthAdminFeature"

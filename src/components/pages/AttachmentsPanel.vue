@@ -191,8 +191,8 @@ defineExpose({ load });
     </ul>
     <p v-else class="mt-3 text-sm text-content-muted">No attachments yet.</p>
 
-    <div v-if="showLibrary" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="showLibrary = false">
-      <div class="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-3xl bg-surface p-6 shadow-xl">
+    <div v-if="showLibrary" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4" @click.self="showLibrary = false">
+      <div class="flex h-full w-full max-w-2xl flex-col bg-surface p-6 shadow-xl sm:h-auto sm:max-h-[80vh] sm:rounded-3xl">
         <div class="flex items-center justify-between">
           <h4 class="text-lg font-semibold">Image library</h4>
           <button
@@ -204,22 +204,24 @@ defineExpose({ load });
             <X class="h-4 w-4" />
           </button>
         </div>
-        <p class="mt-1 text-sm text-content-muted">Pick an image uploaded for any page to insert its link here.</p>
+        <p class="mt-1 text-sm text-content-muted">Pick an image uploaded for any page to insert its link here. Newest first.</p>
 
         <p v-if="libraryLoading" class="py-8 text-center text-sm text-content-muted">Loading images…</p>
         <p v-else-if="!libraryImages.length" class="py-8 text-center text-sm text-content-muted">No other images have been uploaded yet.</p>
-        <div v-else class="mt-4 grid flex-1 grid-cols-2 gap-3 overflow-auto sm:grid-cols-3 md:grid-cols-4">
-          <button
-            v-for="image in libraryImages"
-            :key="image.id"
-            type="button"
-            class="group overflow-hidden rounded-xl border border-theme-border bg-surface text-left transition-shadow hover:shadow-md"
-            :title="`Insert ${image.filename}`"
-            @click="pickLibraryImage(image)"
-          >
-            <img :src="fileUrl(image)" :alt="image.filename" class="h-24 w-full bg-app-bg object-cover" loading="lazy" />
-            <span class="block truncate px-2 py-1.5 text-xs text-content-muted group-hover:text-accent">{{ image.filename }}</span>
-          </button>
+        <div v-else class="mt-4 min-h-0 flex-1 overflow-y-auto">
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            <button
+              v-for="image in libraryImages"
+              :key="image.id"
+              type="button"
+              class="group overflow-hidden rounded-xl border border-theme-border bg-surface text-left transition-shadow hover:shadow-md"
+              :title="`Insert ${image.filename}`"
+              @click="pickLibraryImage(image)"
+            >
+              <img :src="fileUrl(image)" :alt="image.filename" class="h-24 w-full bg-app-bg object-cover sm:h-28" loading="lazy" />
+              <span class="block truncate px-2 py-1.5 text-xs text-content-muted group-hover:text-accent">{{ image.filename }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

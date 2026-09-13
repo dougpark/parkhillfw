@@ -336,16 +336,16 @@ watch(() => route.fullPath, loadAuthUser);
         role="status"
         aria-live="polite"
       >
-        <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 sm:px-4">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <Clock class="h-4 w-4 shrink-0 text-accent" />
-            <span class="truncate">
+        <div class="mx-auto flex max-w-5xl flex-col items-start justify-between gap-2 sm:flex-row sm:items-center sm:gap-3 sm:px-4">
+          <div class="flex min-w-0 items-start gap-2.5 sm:items-center">
+            <Clock class="mt-0.5 h-4 w-4 shrink-0 text-accent sm:mt-0" />
+            <span class="wrap-break-word sm:truncate">
               Welcome back! You were last active <span class="font-semibold text-accent">{{ lastActiveText }}</span>.
             </span>
           </div>
           <button
             type="button"
-            class="shrink-0 rounded-full p-1 text-content-muted hover:bg-surface-hover hover:text-content"
+            class="shrink-0 self-end rounded-full p-1 text-content-muted hover:bg-surface-hover hover:text-content sm:self-auto"
             aria-label="Dismiss last active message"
             @click="dismissLastActiveBanner"
           >
@@ -361,10 +361,10 @@ watch(() => route.fullPath, loadAuthUser);
       role="region"
       aria-label="Directory update reminder"
     >
-      <div class="mx-auto flex max-w-5xl flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:px-4">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <Edit3 class="h-4 w-4 shrink-0 text-accent" />
-          <p class="text-sm font-medium text-content">
+      <div class="mx-auto flex max-w-5xl flex-col justify-between gap-3 sm:flex-row sm:items-center sm:px-4">
+        <div class="flex min-w-0 items-start gap-2.5 sm:items-center">
+          <Edit3 class="mt-0.5 h-4 w-4 shrink-0 text-accent sm:mt-0" />
+          <p class="wrap-break-word text-sm font-medium text-content">
             Is your household directory information still current?
           </p>
         </div>

@@ -240,6 +240,21 @@ export const activityLogs = sqliteTable(
     ]
 );
 
+export const householdArchive = sqliteTable(
+    'household_archive',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        addressId: integer('address_id').notNull().references(() => households.id),
+        archivedAt: integer('archived_at', { mode: 'timestamp' }).notNull(),
+        archivedByAdminId: integer('archived_by_admin_id').references(() => users.id, { onDelete: 'set null' }),
+        snapshot: text('snapshot').notNull(),
+    },
+    (table) => [
+        index('idx_household_archive_address').on(table.addressId),
+        index('idx_household_archive_archived_at').on(table.archivedAt),
+    ]
+);
+
 // ==========================================
 // 3. CONTENT & NAVIGATION (Pages, Menus, Messages)
 // ==========================================

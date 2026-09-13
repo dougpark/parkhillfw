@@ -8,6 +8,7 @@ import {
     children,
     documents,
     householdFavorites,
+    householdArchive,
     households,
     magicLinkRateLimits,
     magicTokens,
@@ -605,55 +606,103 @@ app.put('/api/admin/households/:householdId', requireAuth(), requireDirectoryEdi
     return c.json({ saved: true });
 });
 
-app.post('/api/admin/households/:householdId/vacate', requireAuth(), requireDirectoryEditor(), async (c) => {
+app.post('/api/admin/households/:householdId/archive-household', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const householdId = Number(c.req.param('householdId'));
+    const actor = c.get('user');
+    const body = await c.req.json<{ confirmation?: string }>();
     if (!Number.isInteger(householdId)) return c.json({ error: 'Invalid household ID.' }, 400);
 
-    const household = await db.select({ id: households.id, streetAddress: households.streetAddress })
-        .from(households).where(eq(households.id, householdId)).get();
+    const household = await db.select().from(households)
+        .where(eq(households.id, householdId)).get();
     if (!household) return c.json({ error: 'Household not found.' }, 404);
+    if (body.confirmation?.trim() !== household.streetAddress) return c.json({ error: 'Type the exact street address to confirm archiving.' }, 400);
 
-    const householdResidents = await db.select({ id: residents.id, email: residents.email })
-        .from(residents).where(eq(residents.householdId, householdId)).all();
+    const [householdResidents, householdChildren] = await Promise.all([
+        db.select().from(residents).where(eq(residents.householdId, householdId)).all(),
+        db.select().from(children).where(eq(children.householdId, householdId)).all(),
+    ]);
     const residentIds = householdResidents.map((resident) => resident.id);
     const residentEmails = householdResidents.flatMap((resident) => resident.email ? [normalizeEmail(resident.email)] : []);
     const linkedUsers = residentIds.length
-        ? await db.select({ id: users.id }).from(users).where(inArray(users.residentId, residentIds)).all()
+        ? await db.select({ id: users.id, email: users.email }).from(users).where(inArray(users.residentId, residentIds)).all()
         : [];
     const userIds = linkedUsers.map((user) => user.id);
-    if (residentEmails.length) await db.delete(magicTokens).where(inArray(magicTokens.email, residentEmails));
-
+    const linkedLoginEmails = userIds.length
+        ? await db.select({ email: userLoginEmails.email }).from(userLoginEmails)
+            .where(inArray(userLoginEmails.userId, userIds)).all()
+        : [];
+    const authEmails = [...new Set([
+        ...residentEmails,
+        ...linkedUsers.map((user) => normalizeEmail(user.email)),
+        ...linkedLoginEmails.map((item) => normalizeEmail(item.email)),
+    ])];
+    const primaryContact = householdResidents.find((resident) => resident.isPrimaryContact) ?? householdResidents[0] ?? null;
+    const now = new Date();
+    const snapshot = {
+        household: {
+            id: household.id,
+            streetAddress: household.streetAddress,
+            status: household.status,
+            yearMovedIn: household.yearMovedIn,
+            parkHillMember: household.parkHillMember,
+            securityMember: household.securityMember,
+            pets: household.pets,
+            photoKey: household.photoKey,
+            notes: household.notes,
+            directoryConfirmedAt: household.directoryConfirmedAt,
+        },
+        primaryContact,
+        residents: householdResidents,
+        children: householdChildren,
+        archivedBy: actor ? { id: actor.id, email: actor.email } : null,
+    };
+    const statements = [
+        db.insert(householdArchive).values({
+            addressId: household.id,
+            archivedAt: now,
+            archivedByAdminId: actor?.id ?? null,
+            snapshot: JSON.stringify(snapshot),
+        }),
+        db.insert(activityLogs).values({
+            actorUserId: actor?.id ?? null,
+            category: 'directory',
+            action: 'household_archived',
+            details: JSON.stringify({
+                householdAddress: household.streetAddress,
+                primaryResidentName: primaryContact ? `${primaryContact.firstName} ${primaryContact.lastName}` : null,
+                adminUser: actor?.email ?? null,
+                timestamp: now.toISOString(),
+            }),
+        }),
+    ];
+    if (authEmails.length) statements.push(db.delete(magicTokens).where(inArray(magicTokens.email, authEmails)));
     if (userIds.length) {
-        const linkedUserEmails = await db.select({ email: users.email }).from(users).where(inArray(users.id, userIds)).all();
-        const linkedLoginEmails = await db.select({ email: userLoginEmails.email }).from(userLoginEmails)
-            .where(inArray(userLoginEmails.userId, userIds)).all();
-        const authEmails = [...new Set([
-            ...residentEmails,
-            ...linkedUserEmails.map((item) => normalizeEmail(item.email)),
-            ...linkedLoginEmails.map((item) => normalizeEmail(item.email)),
-        ])];
-        if (authEmails.length) await db.delete(magicTokens).where(inArray(magicTokens.email, authEmails));
-        await db.delete(sessions).where(inArray(sessions.userId, userIds));
-        await db.delete(userLoginEmails).where(inArray(userLoginEmails.userId, userIds));
-        await db.update(users).set({ residentId: null, linkStatus: 'unlinked', updatedAt: new Date() })
-            .where(inArray(users.id, userIds));
+        statements.push(
+            db.delete(sessions).where(inArray(sessions.userId, userIds)),
+            db.delete(userLoginEmails).where(inArray(userLoginEmails.userId, userIds)),
+            db.update(users).set({ residentId: null, linkStatus: 'unlinked', updatedAt: now }).where(inArray(users.id, userIds)),
+        );
     }
-    await db.delete(householdFavorites).where(eq(householdFavorites.householdId, householdId));
-    await db.delete(children).where(eq(children.householdId, householdId));
-    await db.delete(residents).where(eq(residents.householdId, householdId));
-    await db.update(households).set({
-        status: 'vacant',
-        yearMovedIn: null,
-        parkHillMember: null,
-        securityMember: false,
-        pets: null,
-        photoKey: null,
-        notes: null,
-        updatedAt: new Date(),
-    }).where(eq(households.id, householdId));
+    statements.push(
+        db.delete(householdFavorites).where(eq(householdFavorites.householdId, householdId)),
+        db.delete(children).where(eq(children.householdId, householdId)),
+        db.delete(residents).where(eq(residents.householdId, householdId)),
+        db.update(households).set({
+            status: 'vacant',
+            yearMovedIn: null,
+            parkHillMember: null,
+            securityMember: false,
+            pets: null,
+            photoKey: null,
+            notes: null,
+            directoryConfirmedAt: null,
+            updatedAt: now,
+        }).where(eq(households.id, householdId)),
+    );
+    await db.batch(statements as [typeof statements[number], ...typeof statements]);
 
-    return c.json({ cleared: true, streetAddress: household.streetAddress, residentsRemoved: residentIds.length, usersReset: userIds.length });
+    return c.json({ archived: true, streetAddress: household.streetAddress, residentsRemoved: residentIds.length, usersReset: userIds.length });
 });
 
 app.post('/api/admin/households/:householdId/archive', requireAuth(), requireDirectoryEditor(), async (c) => {
@@ -1213,7 +1262,6 @@ app.delete('/api/households/:householdId/favorite', requireAuth(), requireDirect
     const householdId = Number(c.req.param('householdId'));
 
     if (!Number.isInteger(householdId)) return c.json({ error: 'Invalid household ID' }, 400);
-
     const favoriteFilter = and(eq(householdFavorites.userId, userId), eq(householdFavorites.householdId, householdId));
     if (favoriteFilter) await db.delete(householdFavorites).where(favoriteFilter);
     return c.json({ favorited: false });
@@ -1253,28 +1301,15 @@ app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
         if (serviceFilter) filters.push(serviceFilter);
     }
 
-    // Households matching the search term directly, or via a resident/child match.
     const combinedFilter = filters.length ? and(...filters) : undefined;
     const matchedHouseholdIds = combinedFilter
-        ? new Set(
-            (
-                await db
-                    .select({ id: households.id })
-                    .from(households)
-                    .leftJoin(residents, eq(residents.householdId, households.id))
-                    .leftJoin(children, eq(children.householdId, households.id))
-                    .where(combinedFilter)
-                    .all()
-            ).map((row) => row.id)
-        )
+        ? new Set((await db.select({ id: households.id }).from(households)
+            .leftJoin(residents, eq(residents.householdId, households.id))
+            .leftJoin(children, eq(children.householdId, households.id))
+            .where(combinedFilter).all()).map((row) => row.id))
         : null;
-
-    const favoriteHouseholdIds = new Set(
-        (await db.select({ householdId: householdFavorites.householdId })
-            .from(householdFavorites)
-            .where(eq(householdFavorites.userId, userId))
-            .all()).map((row) => row.householdId)
-    );
+    const favoriteHouseholdIds = new Set((await db.select({ householdId: householdFavorites.householdId })
+        .from(householdFavorites).where(eq(householdFavorites.userId, userId)).all()).map((row) => row.householdId));
 
     // Default ordering: favorited households first; if the user has none favorited, their own household leads instead.
     const requestingUser = c.get('user') as { residentId?: number | null };

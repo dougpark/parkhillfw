@@ -3,7 +3,6 @@ import { ref } from 'vue';
 import { ChevronDown, Search } from 'lucide-vue-next';
 import DirectoryEditView from './DirectoryEditView.vue';
 import AdminArchiveAddressView from './AdminArchiveAddressView.vue';
-import AdminHouseholdResetView from './AdminHouseholdResetView.vue';
 
 interface HouseholdResult {
   id: number;
@@ -97,9 +96,6 @@ async function createAddress() {
 
 
     <DirectoryEditView v-if="selectedId" :key="selectedId" :admin-household-id="selectedId" />
-<div class="mt-10 border-t border-theme-border pt-10">
-          <AdminHouseholdResetView />
-        </div>
     </section>
 
     <!-- Hidden Show Advanced Section -->

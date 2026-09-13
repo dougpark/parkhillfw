@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-vue-next';
+import { Archive, Plus, Save, ShieldAlert, Trash2 } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 
@@ -48,6 +48,10 @@ const isLoading = ref(true);
 const isSaving = ref(false);
 const saved = ref(false);
 const error = ref('');
+const showArchiveModal = ref(false);
+const archiveConfirmation = ref('');
+const isArchiving = ref(false);
+const archiveNotice = ref('');
 
 const inputClass = 'mt-1 w-full rounded-xl border border-theme-border bg-surface px-3 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30';
 
@@ -93,6 +97,30 @@ async function saveDirectory() {
   }
 }
 
+async function archiveHousehold() {
+  if (!props.adminHouseholdId || archiveConfirmation.value.trim() !== household.value.streetAddress) return;
+  isArchiving.value = true;
+  error.value = '';
+  archiveNotice.value = '';
+  try {
+    const response = await fetch(`/api/admin/households/${props.adminHouseholdId}/archive-household`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmation: archiveConfirmation.value }),
+    });
+    const data = await response.json() as { error?: string; residentsRemoved?: number; usersReset?: number };
+    if (!response.ok) throw new Error(data.error ?? 'Unable to archive household.');
+    showArchiveModal.value = false;
+    archiveConfirmation.value = '';
+    archiveNotice.value = `${household.value.streetAddress} was archived and reset for a new household. ${data.residentsRemoved ?? 0} resident records and ${data.usersReset ?? 0} account associations were cleared.`;
+    await loadDirectory();
+  } catch (archiveError) {
+    error.value = archiveError instanceof Error ? archiveError.message : 'Unable to archive household.';
+  } finally {
+    isArchiving.value = false;
+  }
+}
+
 function addResident() {
   residents.value.push({ firstName: '', lastName: '', isPrimaryContact: false, email: null, phoneMobile: null, phoneHome: null, phoneWork: null, occupation: null });
 }
@@ -114,12 +142,18 @@ onMounted(loadDirectory);
         <h2 class="mt-3 text-2xl font-semibold tracking-tight">{{ adminHouseholdId ? 'Edit Household' : 'Edit My Household' }}</h2>
         <p v-if="!adminHouseholdId" class="mt-2 text-content-muted">Update information for your household and everyone who lives there.</p>
       </div>
-      <button type="button" :disabled="isSaving || isLoading" class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60" @click="saveDirectory">
-        <Save class="h-4 w-4" /> {{ isSaving ? 'Saving...' : 'Save changes' }}
-      </button>
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <button v-if="adminHouseholdId" type="button" :disabled="isSaving || isLoading || isArchiving" class="inline-flex items-center gap-2 rounded-full bg-danger px-5 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60" @click="showArchiveModal = true">
+          <Archive class="h-4 w-4" /> Archive Household
+        </button>
+        <button type="button" :disabled="isSaving || isLoading || isArchiving" class="inline-flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60" @click="saveDirectory">
+          <Save class="h-4 w-4" /> {{ isSaving ? 'Saving...' : 'Save changes' }}
+        </button>
+      </div>
     </div>
 
     <p v-if="saved" class="rounded-xl bg-success-subtle p-3 text-sm text-success">Your directory information was saved.</p>
+    <p v-if="archiveNotice" class="rounded-xl bg-success-subtle p-3 text-sm text-success">{{ archiveNotice }}</p>
     <p v-if="error" class="rounded-xl bg-danger-subtle p-3 text-sm text-danger">{{ error }}</p>
     <p v-if="isLoading" class="py-12 text-center text-content-muted">Loading household information...</p>
 
@@ -176,5 +210,24 @@ onMounted(loadDirectory);
       </section>
       <button type="submit" :disabled="isSaving" class="w-full rounded-full bg-accent px-6 py-3 font-medium text-on-accent hover:opacity-90 disabled:opacity-60">Save all changes</button>
     </form>
+
+    <div v-if="showArchiveModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="archive-household-title">
+      <section class="w-full max-w-lg rounded-3xl bg-surface p-6 shadow-xl">
+        <div class="flex items-start gap-3">
+          <ShieldAlert class="mt-0.5 h-5 w-5 shrink-0 text-danger" />
+          <div>
+            <h3 id="archive-household-title" class="text-lg font-semibold">Archive {{ household.streetAddress }}?</h3>
+            <p class="mt-2 text-sm text-content-muted">Are you sure you want to archive this household? This will wipe all resident profiles and reset the address for new occupants.</p>
+          </div>
+        </div>
+        <label class="mt-5 block text-sm font-medium">Type the address to confirm
+          <input v-model="archiveConfirmation" class="mt-2 w-full rounded-xl border border-theme-border bg-surface px-3 py-2.5 text-sm focus:border-danger focus:outline-none focus:ring-2 focus:ring-danger/30" :placeholder="household.streetAddress" @keyup.enter="archiveHousehold" />
+        </label>
+        <div class="mt-5 flex flex-wrap justify-end gap-2">
+          <button type="button" class="rounded-full border border-theme-border px-4 py-2.5 text-sm font-medium" @click="showArchiveModal = false">Cancel</button>
+          <button type="button" :disabled="isArchiving || archiveConfirmation.trim() !== household.streetAddress" class="inline-flex items-center gap-2 rounded-full bg-danger px-4 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50" @click="archiveHousehold"><Archive class="h-4 w-4" /> {{ isArchiving ? 'Archiving...' : 'Archive Household' }}</button>
+        </div>
+      </section>
+    </div>
   </section>
 </template>

@@ -1276,15 +1276,29 @@ app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
             .all()).map((row) => row.householdId)
     );
 
+    // Default ordering: favorited households first; if the user has none favorited, their own household leads instead.
+    const requestingUser = c.get('user') as { residentId?: number | null };
+    let ownHouseholdId: number | null = null;
+    if (requestingUser.residentId) {
+        const ownResident = await db.select({ householdId: residents.householdId })
+            .from(residents)
+            .where(eq(residents.id, requestingUser.residentId))
+            .get();
+        ownHouseholdId = ownResident?.householdId ?? null;
+    }
+    const priorityHouseholdIds = favoriteHouseholdIds.size > 0
+        ? favoriteHouseholdIds
+        : new Set(ownHouseholdId !== null ? [ownHouseholdId] : []);
+
     const householdRows = (await db.select().from(households).where(or(eq(households.status, 'active'), eq(households.status, 'vacant'))).all()).sort((left, right) =>
         compareStreetAddresses(left.streetAddress, right.streetAddress)
     );
     const filteredHouseholds = matchedHouseholdIds
         ? householdRows.filter((h) => matchedHouseholdIds.has(h.id))
         : householdRows;
-    const visibleHouseholds = filteredHouseholds.filter((household) =>
-        !favoritesOnly || favoriteHouseholdIds.has(household.id)
-    );
+    const visibleHouseholds = filteredHouseholds
+        .filter((household) => !favoritesOnly || favoriteHouseholdIds.has(household.id))
+        .sort((left, right) => Number(priorityHouseholdIds.has(right.id)) - Number(priorityHouseholdIds.has(left.id)));
 
     const [allResidents, allChildren] = await Promise.all([
         db.select().from(residents).all(),

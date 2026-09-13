@@ -20,7 +20,7 @@ export async function sendMagicLinkEmail(email: EmailBinding, toEmail: string, t
         subject: `Your ${siteName} sign-in link`,
         html,
         text,
-        replyTo: `"Doug Park" <${adminEmail}>`,
+        replyTo: `"Admin" <${adminEmail}>`,
     });
 }
 
@@ -49,6 +49,6 @@ export async function sendAccessRequestOutcomeEmail(
         subject,
         html,
         text,
-        replyTo: `"Doug Park" <${adminEmail}>`,
+        replyTo: `"Admin" <${adminEmail}>`,
     });
 }

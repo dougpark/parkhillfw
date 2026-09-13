@@ -9,15 +9,15 @@ type EmailBinding = {
     }): Promise<unknown>;
 };
 
-export async function sendMagicLinkEmail(email: EmailBinding, toEmail: string, token: string, code: string, origin: string, adminEmail: string) {
+export async function sendMagicLinkEmail(email: EmailBinding, toEmail: string, token: string, code: string, origin: string, adminEmail: string, siteName: string) {
     const loginUrl = `${origin}/auth/verify?token=${encodeURIComponent(token)}`;
-    const html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1f1f1f"><h1 style="font-size:24px">Park Hill Directory</h1><p>Use the button below to sign in.</p><p><a href="${loginUrl}" style="display:inline-block;background:#1a73e8;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:600">Sign in</a></p><p style="color:#444746;font-size:14px">Or enter this code on the sign-in screen:</p><p style="font-size:32px;font-weight:700;letter-spacing:4px;margin:8px 0">${code}</p><p style="color:#444746;font-size:14px">This link and code expire in 15 minutes and can only be used once. If you did not request it, you can ignore this email.</p></div>`;
-    const text = `Park Hill Directory\n\nSign in using this link:\n${loginUrl}\n\nOr enter this code on the sign-in screen:\n${code}\n\nThis link and code expire in 15 minutes and can only be used once.`;
+    const html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1f1f1f"><h1 style="font-size:24px">${siteName}</h1><p>Use the button below to sign in.</p><p><a href="${loginUrl}" style="display:inline-block;background:#1a73e8;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:600">Sign in</a></p><p style="color:#444746;font-size:14px">Or enter this code on the sign-in screen:</p><p style="font-size:32px;font-weight:700;letter-spacing:4px;margin:8px 0">${code}</p><p style="color:#444746;font-size:14px">This link and code expire in 15 minutes and can only be used once. If you did not request it, you can ignore this email.</p></div>`;
+    const text = `${siteName}\n\nSign in using this link:\n${loginUrl}\n\nOr enter this code on the sign-in screen:\n${code}\n\nThis link and code expire in 15 minutes and can only be used once.`;
 
     await email.send({
         to: toEmail,
-        from: '"Park Hill Directorty" <auth@parkhillfw.org>',
-        subject: 'Your Park Hill Directory sign-in link',
+        from: `"${siteName}" <auth@parkhillfw.org>`,
+        subject: `Your ${siteName} sign-in link`,
         html,
         text,
         replyTo: `"Doug Park" <${adminEmail}>`,
@@ -31,20 +31,21 @@ export async function sendAccessRequestOutcomeEmail(
     token: string | null,
     origin: string,
     adminEmail: string,
+    siteName: string,
 ) {
     const loginUrl = token ? `${origin}/auth/verify?token=${encodeURIComponent(token)}` : null;
     const approved = outcome === 'approved';
-    const subject = approved ? 'Your Park Hill Directory access was approved' : 'Update on your Park Hill Directory request';
+    const subject = approved ? `Your ${siteName} access was approved` : `Update on your ${siteName} request`;
     const text = approved
-        ? `Your Park Hill Directory access was approved. This sign-in link is valid for 48 hours. Sign in here: ${loginUrl}`
-        : `Your Park Hill Directory access request was not approved. Please contact ${adminEmail} if you believe this was a mistake.`;
+        ? `Your ${siteName} access was approved. This sign-in link is valid for 48 hours. Sign in here: ${loginUrl}`
+        : `Your ${siteName} access request was not approved. Please contact ${adminEmail} if you believe this was a mistake.`;
     const html = approved
-        ? `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1f1f1f"><h1>Access approved</h1><p>Your Park Hill Directory access was approved and your email is connected to the directory.</p><p><a href="${loginUrl}" style="display:inline-block;background:#1a73e8;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:600">Sign in to the directory</a></p><p style="color:#444746;font-size:14px">This approval sign-in link is valid for 48 hours and can only be used once.</p></div>`
-        : `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1f1f1f"><h1>Request update</h1><p>We were unable to approve your Park Hill Directory access request at this time.</p><p style="color:#444746;font-size:14px">Please contact ${adminEmail} if you believe this was a mistake.</p></div>`;
+        ? `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1f1f1f"><h1>Access approved</h1><p>Your ${siteName} access was approved and your email is connected to the directory.</p><p><a href="${loginUrl}" style="display:inline-block;background:#1a73e8;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:600">Sign in to the directory</a></p><p style="color:#444746;font-size:14px">This approval sign-in link is valid for 48 hours and can only be used once.</p></div>`
+        : `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1f1f1f"><h1>Request update</h1><p>We were unable to approve your ${siteName} access request at this time.</p><p style="color:#444746;font-size:14px">Please contact ${adminEmail} if you believe this was a mistake.</p></div>`;
 
     await email.send({
         to: toEmail,
-        from: '"Park Hill Directory" <auth@parkhillfw.org>',
+        from: `"${siteName}" <auth@parkhillfw.org>`,
         subject,
         html,
         text,

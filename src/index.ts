@@ -20,9 +20,10 @@ import {
 } from './db/schema';
 import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE, verifyCodeAndConsume } from './lib/auth';
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
-import { getSetting, getSettings, setSetting } from './lib/settings';
+import { getSetting, setSetting } from './lib/settings';
 
 const DEFAULT_ADMIN_EMAIL = 'parkdn@gmail.com';
+const DEFAULT_SITE_NAME = 'Park Hill Directory';
 import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor, type AppBindings, type AppEnv } from './middleware/auth';
 
 const app = new Hono<AppEnv>();
@@ -38,6 +39,13 @@ function compareStreetAddresses(left: string, right: string): number {
 }
 
 app.get('/api/health', (c) => c.json({ status: 'ok', runtime: 'bun-cloudflare' }));
+
+// Public, unauthenticated: the site name is used in the navbar and login screen before sign-in.
+app.get('/api/settings', async (c) => {
+    const db = drizzle(c.env.DB);
+    const siteName = await getSetting(db, 'site_name', DEFAULT_SITE_NAME);
+    return c.json({ siteName });
+});
 
 app.post('/api/auth/request-link', async (c) => {
     const db = drizzle(c.env.DB);
@@ -74,8 +82,11 @@ app.post('/api/auth/request-link', async (c) => {
 
     const token = await createMagicLinkToken(db, email);
     try {
-        const adminEmail = await getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL);
-        await sendMagicLinkEmail(c.env.EMAIL, email, token.rawToken, token.rawCode, new URL(c.req.url).origin, adminEmail);
+        const [adminEmail, siteName] = await Promise.all([
+            getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL),
+            getSetting(db, 'site_name', DEFAULT_SITE_NAME),
+        ]);
+        await sendMagicLinkEmail(c.env.EMAIL, email, token.rawToken, token.rawCode, new URL(c.req.url).origin, adminEmail, siteName);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Magic-link email failed', {
@@ -411,14 +422,17 @@ app.get('/api/admin/status', requireAuth(), requireAnyAdminRole(), async (c) => 
 
 app.get('/api/admin/settings', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
-    const stored = await getSettings(db);
-    return c.json({ adminEmail: DEFAULT_ADMIN_EMAIL, ...stored });
+    const [adminEmail, siteName] = await Promise.all([
+        getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL),
+        getSetting(db, 'site_name', DEFAULT_SITE_NAME),
+    ]);
+    return c.json({ adminEmail, siteName });
 });
 
 app.put('/api/admin/settings', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
     const actor = c.get('user') as { id: number };
-    const body = await c.req.json<{ adminEmail?: string }>();
+    const body = await c.req.json<{ adminEmail?: string; siteName?: string }>();
 
     if (body.adminEmail !== undefined) {
         const adminEmail = body.adminEmail.trim();
@@ -428,8 +442,17 @@ app.put('/api/admin/settings', requireAuth(), requireAdmin(), async (c) => {
         await setSetting(db, 'admin_email', adminEmail, actor.id);
     }
 
-    const stored = await getSettings(db);
-    return c.json({ adminEmail: DEFAULT_ADMIN_EMAIL, ...stored });
+    if (body.siteName !== undefined) {
+        const siteName = body.siteName.trim();
+        if (!siteName) return c.json({ error: 'Enter a site name.' }, 400);
+        await setSetting(db, 'site_name', siteName, actor.id);
+    }
+
+    const [adminEmail, siteName] = await Promise.all([
+        getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL),
+        getSetting(db, 'site_name', DEFAULT_SITE_NAME),
+    ]);
+    return c.json({ adminEmail, siteName });
 });
 
 app.get('/api/admin/residents', requireAuth(), requireDirectoryEditor(), async (c) => {
@@ -1073,8 +1096,11 @@ app.post('/api/admin/users/:userId/send-magic-link', requireAuth(), requireAdmin
 
     const token = await createMagicLinkToken(db, target.email);
     try {
-        const adminEmail = await getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL);
-        await sendMagicLinkEmail(c.env.EMAIL, target.email, token.rawToken, token.rawCode, new URL(c.req.url).origin, adminEmail);
+        const [adminEmail, siteName] = await Promise.all([
+            getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL),
+            getSetting(db, 'site_name', DEFAULT_SITE_NAME),
+        ]);
+        await sendMagicLinkEmail(c.env.EMAIL, target.email, token.rawToken, token.rawCode, new URL(c.req.url).origin, adminEmail, siteName);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Admin-triggered magic-link email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });
@@ -1154,8 +1180,11 @@ app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin()
         notes: body.notes ?? null,
     }).where(eq(accessRequests.id, requestId));
     try {
-        const adminEmail = await getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL);
-        await sendAccessRequestOutcomeEmail(c.env.EMAIL, normalizedRequestEmail, reviewStatus, outcomeToken, new URL(c.req.url).origin, adminEmail);
+        const [adminEmail, siteName] = await Promise.all([
+            getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL),
+            getSetting(db, 'site_name', DEFAULT_SITE_NAME),
+        ]);
+        await sendAccessRequestOutcomeEmail(c.env.EMAIL, normalizedRequestEmail, reviewStatus, outcomeToken, new URL(c.req.url).origin, adminEmail, siteName);
     } catch (error) {
         const emailError = error as { code?: string; message?: string };
         console.error('Access request outcome email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });

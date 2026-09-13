@@ -2,8 +2,11 @@
 import { onMounted, ref } from 'vue';
 import { Save } from 'lucide-vue-next';
 import BaseInput from '../components/ui/BaseInput.vue';
+import { useSiteSettings } from '../composables/useSiteSettings';
 
+const { siteName: sharedSiteName } = useSiteSettings();
 const adminEmail = ref('');
+const siteName = ref('');
 const loading = ref(true);
 const saving = ref(false);
 const error = ref('');
@@ -15,8 +18,9 @@ async function load(): Promise<void> {
   try {
     const response = await fetch('/api/admin/settings');
     if (!response.ok) throw new Error('Unable to load settings.');
-    const data = await response.json() as { adminEmail: string };
+    const data = await response.json() as { adminEmail: string; siteName: string };
     adminEmail.value = data.adminEmail;
+    siteName.value = data.siteName;
   } catch (loadError) {
     error.value = loadError instanceof Error ? loadError.message : 'Unable to load settings.';
   } finally {
@@ -32,11 +36,13 @@ async function save(): Promise<void> {
     const response = await fetch('/api/admin/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminEmail: adminEmail.value }),
+      body: JSON.stringify({ adminEmail: adminEmail.value, siteName: siteName.value }),
     });
-    const data = await response.json() as { error?: string; adminEmail: string };
+    const data = await response.json() as { error?: string; adminEmail: string; siteName: string };
     if (!response.ok) throw new Error(data.error ?? 'Unable to save settings.');
     adminEmail.value = data.adminEmail;
+    siteName.value = data.siteName;
+    sharedSiteName.value = data.siteName;
     saved.value = true;
   } catch (saveError) {
     error.value = saveError instanceof Error ? saveError.message : 'Unable to save settings.';
@@ -56,6 +62,12 @@ onMounted(load);
     <p v-if="loading" class="mt-6 text-sm text-content-muted">Loading settings…</p>
 
     <div v-else class="mt-6 max-w-md space-y-4 rounded-2xl border border-theme-border bg-surface p-5">
+      <div>
+        <label class="mb-1 block text-sm font-medium text-content" for="site-name">Site Name</label>
+        <BaseInput id="site-name" v-model="siteName" type="text" placeholder="Park Hill Directory" />
+        <p class="mt-1 text-xs text-content-muted">Shown in the navbar, browser tab title, sign-in screen, and outgoing emails.</p>
+      </div>
+
       <div>
         <label class="mb-1 block text-sm font-medium text-content" for="admin-email">Admin Email</label>
         <BaseInput id="admin-email" v-model="adminEmail" type="email" placeholder="admin@example.com" />

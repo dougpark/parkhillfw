@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue';
 import { Check, CheckCircle2, ChevronDown, Clock, Edit3, Info, LogIn, LogOut, Palette, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
+import { useSiteSettings } from './composables/useSiteSettings';
 import AboutModal from './components/common/AboutModal.vue';
 import modernLogo from '/modern-ph-logo.svg?raw';
 
@@ -22,6 +23,7 @@ const route = useRoute();
 const router = useRouter();
 const navbarLogo = modernLogo.replace('viewBox="0 0 512.000000 512.000000"', 'viewBox="145 45 220 300"');
 const { theme, themeOptions, applyTheme } = useTheme();
+const { siteName, loadSiteSettings } = useSiteSettings();
 const isAccountMenuOpen = ref(false);
 const isAccountPanelOpen = ref(false);
 const isAboutModalOpen = ref(false);
@@ -198,7 +200,9 @@ async function loadAuthUser() {
 }
 
 onMounted(loadAuthUser);
+onMounted(loadSiteSettings);
 watch(() => route.fullPath, loadAuthUser);
+watch(siteName, (value) => { document.title = value; }, { immediate: true });
 </script>
 
 <template>
@@ -211,7 +215,7 @@ watch(() => route.fullPath, loadAuthUser);
           aria-label="Go to directory"
         >
           <span class="themed-logo h-10 w-10 shrink-0" aria-hidden="true" v-html="navbarLogo" />
-          <span class="truncate">Park Hill Directory</span>
+          <span class="truncate">{{ siteName }}</span>
         </RouterLink>
         <div class="relative flex items-center gap-2" @click.stop>
           <template v-if="user">

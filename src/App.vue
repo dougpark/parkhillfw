@@ -211,7 +211,7 @@ watch(() => route.fullPath, loadAuthUser);
           aria-label="Go to directory"
         >
           <span class="themed-logo h-10 w-10 shrink-0" aria-hidden="true" v-html="navbarLogo" />
-          <span class="truncate">Park Hill Neighborhood</span>
+          <span class="truncate">Park Hill Directory</span>
         </RouterLink>
         <div class="relative flex items-center gap-2" @click.stop>
           <template v-if="user">

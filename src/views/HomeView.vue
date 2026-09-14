@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { BookOpen, Pencil, ShieldCheck } from 'lucide-vue-next';
+import { BookOpen, DollarSign, Pencil, ShieldCheck } from 'lucide-vue-next';
 import NavCardGrid from '../components/menus/NavCardGrid.vue';
 import type { NavNode } from '../components/menus/menuTree';
 
@@ -28,6 +28,13 @@ const baseCards = [
     description: 'Edit my household information',
     to: '/directory/edit',
     icon: Pencil,
+    color: 'bg-success-subtle text-success',
+  },
+  {
+    title: 'Pay Dues',
+    description: 'Secure online payments for membership & security',
+    to: '/dues/pay',
+    icon: DollarSign,
     color: 'bg-success-subtle text-success',
   },
 ];

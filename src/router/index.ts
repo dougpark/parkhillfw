@@ -58,6 +58,12 @@ const router = createRouter({
             component: () => import('../views/DirectoryEditView.vue'),
         },
         {
+            path: '/dues/pay',
+            name: 'dues-pay',
+            meta: { requiresAuth: true },
+            component: () => import('../views/ComingSoonView.vue'),
+        },
+        {
             path: '/pages/:slug',
             name: 'page',
             meta: { requiresAuth: true },

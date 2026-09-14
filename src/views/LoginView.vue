@@ -47,7 +47,7 @@ async function verifyCode() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? 'Unable to verify code.');
-    await router.replace(data.matched ? '/directory' : '/access-request');
+    await router.replace(data.matched ? '/home' : '/access-request');
   } catch (verifyError) {
     error.value = verifyError instanceof Error ? verifyError.message : 'Unable to verify code.';
   } finally {

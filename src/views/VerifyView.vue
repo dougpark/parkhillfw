@@ -18,7 +18,7 @@ onMounted(async () => {
     const response = await fetch(`/api/auth/verify?token=${encodeURIComponent(token)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error ?? 'This sign-in link is invalid or expired.');
-    await router.replace(data.matched ? '/directory' : '/access-request');
+    await router.replace(data.matched ? '/home' : '/access-request');
   } catch (verificationError) {
     error.value = verificationError instanceof Error ? verificationError.message : 'Unable to verify sign-in link.';
   }

@@ -88,7 +88,7 @@ router.beforeEach(async (to) => {
         if (to.meta.guestOnly) {
             if (to.query.switch === '1' || !response.ok) return true;
             const data = await response.json() as { matched?: boolean };
-            return data.matched ? '/directory' : '/access-request';
+            return data.matched ? '/home' : '/access-request';
         }
         if (!response.ok) return '/login';
         if (to.meta.requiresAuth) return true;
@@ -105,9 +105,9 @@ router.beforeEach(async (to) => {
         if (to.meta.requiresDirectory) return true;
         const user = data.user;
         const isAdmin = Boolean(user?.isOwner || user?.isAdmin);
-        if (to.meta.requiresAdmin) return isAdmin ? true : '/directory';
+        if (to.meta.requiresAdmin) return isAdmin ? true : '/home';
         const anyRole = isAdmin || Boolean(user?.isPageEditor || user?.isDirectoryEditor);
-        return anyRole ? true : '/directory';
+        return anyRole ? true : '/home';
     } catch {
         return '/login';
     }

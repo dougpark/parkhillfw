@@ -51,6 +51,7 @@ function formatDetails(entry: LogEntry): string {
     const parsed = JSON.parse(entry.details);
     if (entry.action === 'set_permission') return `${parsed.field}: ${parsed.from ? 'on' : 'off'} → ${parsed.to ? 'on' : 'off'}`;
     if (entry.action === 'clear_permissions') return 'cleared all permissions';
+    if (entry.action === 'household_archived') return `archived household at ${parsed.householdAddress}`;
     return entry.action;
   } catch {
     return entry.action;

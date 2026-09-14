@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue';
 import { BookOpen, DollarSign, Pencil, ShieldCheck } from 'lucide-vue-next';
 import NavCardGrid from '../components/menus/NavCardGrid.vue';
 import type { NavNode } from '../components/menus/menuTree';
+import heroLogo from '/modern-ph-logo-clear.svg?raw';
 
 interface AuthUser {
   isOwner?: boolean;
@@ -71,7 +72,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="space-y-8 py-4 sm:py-8">
+  <div
+    aria-hidden="true"
+    class="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-5"
+  >
+    <div class="hero-watermark w-[600px] max-w-none select-none md:w-[800px] lg:w-[1000px]" v-html="heroLogo" />
+  </div>
+
+  <section class="relative z-10 space-y-8 py-4 sm:py-8">
     <div>
       <h2 class="mt-2 text-3xl font-semibold tracking-tight text-content">Welcome home</h2>
       <p class="mt-2 max-w-xl text-content-muted">Find neighborhood information and keep your household details current.</p>
@@ -117,3 +125,14 @@ onMounted(async () => {
     <NavCardGrid v-if="navItems.length" :items="navItems" />
   </section>
 </template>
+
+<style scoped>
+.hero-watermark :deep(svg) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.hero-watermark :deep(g) {
+  fill: #14532d;
+}
+</style>

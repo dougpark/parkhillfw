@@ -133,10 +133,10 @@ function choosePhoneAction(event: Event, value: string): void {
             </button>
             <button
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-full border border-theme-border px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
+              class="inline-flex items-center gap-1 text-sm font-normal text-content-muted hover:text-content"
               @click="expanded = true"
             >
-              Show more
+              More
               <ChevronDown class="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
@@ -148,10 +148,10 @@ function choosePhoneAction(event: Event, value: string): void {
     <div class="flex justify-end">
       <button
         type="button"
-        class="inline-flex items-center gap-1.5 rounded-full border border-theme-border px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
+        class="inline-flex items-center gap-1 text-sm font-normal text-content-muted hover:text-content"
         @click="expanded = false"
       >
-        Show less
+        Less
         <ChevronUp class="h-4 w-4" aria-hidden="true" />
       </button>
     </div>

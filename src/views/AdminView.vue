@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { ChevronDown, ClipboardList, FileText, FolderTree, Gauge, Settings, ShieldCheck, Users } from 'lucide-vue-next';
+import { Archive, ChevronDown, ClipboardList, FileText, FolderTree, Gauge, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
+import AdminArchiveBrowserView from './AdminArchiveBrowserView.vue';
+import AdminLogsView from './AdminLogsView.vue';
 import AdminStatusView from './AdminStatusView.vue';
 
 import AdminDirectoryView from './AdminDirectoryView.vue';
@@ -76,6 +78,16 @@ const adminMenuSections: AdminMenuSection[] = [
       { label: 'Access Requests', description: 'Review unmatched resident requests.', icon: ClipboardList, role: 'admin' },
       { label: 'Login Accounts', description: 'Manage login account status, sessions, and sign-in links.', icon: Users, role: 'admin' },
       { label: 'Permissions', description: 'Grant and revoke Admin, Page, and Directory permissions.', icon: ShieldCheck, role: 'admin' },
+    ],
+  },
+  {
+    label: 'Log Viewer',
+    description: 'Browse activity logs and archived households.',
+    icon: ScrollText,
+    role: 'any',
+    children: [
+      { label: 'Logs', description: 'Search and filter the activity log.', icon: ScrollText, role: 'any' },
+      { label: 'Archives', description: 'Browse archived household records.', icon: Archive, role: 'any' },
     ],
   },
   {    label: 'Settings',
@@ -307,6 +319,10 @@ function handleCrumbClick(index: number) {
       </div>
       <div v-else-if="selectedFeature === 'Permissions'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessControlView />
+      </div>      <div v-else-if="selectedFeature === 'Logs'" class="min-w-0 p-6 sm:p-8">
+        <AdminLogsView />
+      </div>      <div v-else-if="selectedFeature === 'Archives'" class="min-w-0 p-6 sm:p-8">
+        <AdminArchiveBrowserView />
       </div>      <div v-else-if="selectedFeature === 'Settings'" class="min-w-0 p-6 sm:p-8">
         <AdminSettingsView />
       </div>      <div v-else class="min-w-0 p-6 sm:p-8">

@@ -1160,18 +1160,13 @@ app.post('/api/admin/users/:userId/send-magic-link', requireAuth(), requireAdmin
     return c.json({ sent: true });
 });
 
-app.get('/api/admin/activity-logs', requireAuth(), requireAdmin(), async (c) => {
-    const db = drizzle(c.env.DB);
-    const category = c.req.query('category');
-    const query = (c.req.query('q') ?? '').trim();
-    const limit = Math.min(Number(c.req.query('limit')) || 50, 200);
-
+async function fetchActivityLogRows(db: ReturnType<typeof drizzle>, options: { category?: string; query?: string; limit?: number }) {
     const targetUsers = alias(users, 'target_users');
     const conditions: SQL[] = [];
-    if (category) conditions.push(eq(activityLogs.category, category as typeof activityLogs.$inferSelect.category));
-    if (query) conditions.push(or(like(users.email, `%${query}%`), like(targetUsers.email, `%${query}%`), like(activityLogs.action, `%${query}%`))!);
+    if (options.category) conditions.push(eq(activityLogs.category, options.category as typeof activityLogs.$inferSelect.category));
+    if (options.query) conditions.push(or(like(users.email, `%${options.query}%`), like(targetUsers.email, `%${options.query}%`), like(activityLogs.action, `%${options.query}%`))!);
 
-    const rows = await db.select({
+    return db.select({
         id: activityLogs.id,
         category: activityLogs.category,
         action: activityLogs.action,
@@ -1184,9 +1179,96 @@ app.get('/api/admin/activity-logs', requireAuth(), requireAdmin(), async (c) => 
         .leftJoin(targetUsers, eq(targetUsers.id, activityLogs.targetUserId))
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(desc(activityLogs.createdAt))
+        .limit(Math.min(options.limit ?? 50, 200)).all();
+}
+
+app.get('/api/admin/activity-logs', requireAuth(), requireAdmin(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const rows = await fetchActivityLogRows(db, {
+        category: c.req.query('category'),
+        query: (c.req.query('q') ?? '').trim(),
+        limit: Number(c.req.query('limit')) || 50,
+    });
+    return c.json(rows);
+});
+
+// Open to any admin-page role (not just isAdmin) per the Log Viewer spec.
+app.get('/api/admin/log-viewer/logs', requireAuth(), requireAnyAdminRole(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const rows = await fetchActivityLogRows(db, {
+        category: c.req.query('category'),
+        query: (c.req.query('q') ?? '').trim(),
+        limit: Number(c.req.query('limit')) || 50,
+    });
+    return c.json(rows);
+});
+
+app.get('/api/admin/log-viewer/archives', requireAuth(), requireAnyAdminRole(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const query = (c.req.query('q') ?? '').trim();
+    const limit = Math.min(Number(c.req.query('limit')) || 50, 200);
+
+    const conditions: SQL[] = [];
+    if (query) conditions.push(or(like(households.streetAddress, `%${query}%`), like(householdArchive.snapshot, `%${query}%`))!);
+
+    const rows = await db.select({
+        id: householdArchive.id,
+        streetAddress: households.streetAddress,
+        archivedAt: householdArchive.archivedAt,
+        snapshot: householdArchive.snapshot,
+    }).from(householdArchive)
+        .leftJoin(households, eq(households.id, householdArchive.addressId))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(householdArchive.archivedAt))
         .limit(limit).all();
 
-    return c.json(rows);
+    const results = rows.map((row) => {
+        let residents: Array<{ firstName: string; lastName: string; email: string | null; phoneMobile: string | null; phoneHome: string | null }> = [];
+        try {
+            const parsed = JSON.parse(row.snapshot) as { residents?: typeof residents };
+            residents = parsed.residents ?? [];
+        } catch {
+            residents = [];
+        }
+        return {
+            id: row.id,
+            streetAddress: row.streetAddress,
+            archivedAt: row.archivedAt,
+            residents: residents.map((resident) => ({
+                name: `${resident.firstName} ${resident.lastName}`,
+                email: resident.email ?? null,
+                phone: resident.phoneMobile ?? resident.phoneHome ?? null,
+            })),
+        };
+    });
+
+    return c.json(results);
+});
+
+app.get('/api/admin/log-viewer/archives/:archiveId', requireAuth(), requireAnyAdminRole(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const archiveId = Number(c.req.param('archiveId'));
+    if (!Number.isInteger(archiveId)) return c.json({ error: 'Invalid archive ID.' }, 400);
+
+    const row = await db.select({
+        id: householdArchive.id,
+        streetAddress: households.streetAddress,
+        archivedAt: householdArchive.archivedAt,
+        archivedByAdminId: householdArchive.archivedByAdminId,
+        snapshot: householdArchive.snapshot,
+    }).from(householdArchive)
+        .leftJoin(households, eq(households.id, householdArchive.addressId))
+        .where(eq(householdArchive.id, archiveId)).get();
+    if (!row) return c.json({ error: 'Archive record not found.' }, 404);
+
+    let snapshot: unknown = null;
+    try {
+        snapshot = JSON.parse(row.snapshot);
+    } catch {
+        snapshot = null;
+    }
+
+    return c.json({ id: row.id, streetAddress: row.streetAddress, archivedAt: row.archivedAt, archivedByAdminId: row.archivedByAdminId, snapshot });
 });
 
 app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin(), async (c) => {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Baby, CheckCircle2, Home, Inbox, MailPlus, Users } from 'lucide-vue-next';
+import { Activity, Baby, CheckCircle2, Home, Inbox, MailPlus, Users } from 'lucide-vue-next';
 
 interface AdminStatus {
   households: number;
@@ -10,11 +10,21 @@ interface AdminStatus {
   loginAccounts: number;
   aliasLogins: number;
   openAccessRequests: number;
+  dau: number;
+  wau: number;
+  mau: number;
+  qau: number;
 }
 
 const status = ref<AdminStatus | null>(null);
 const isLoading = ref(true);
 const error = ref('');
+
+const activeUsersSummary = computed(() => {
+  const s = status.value;
+  if (!s) return '';
+  return `24h: ${s.dau.toLocaleString()} | 7d: ${s.wau.toLocaleString()} | 30d: ${s.mau.toLocaleString()} | 90d: ${s.qau.toLocaleString()}`;
+});
 
 const rows = computed(() => [
   { label: 'Open Access Requests', value: status.value?.openAccessRequests ?? 0, icon: Inbox },
@@ -65,6 +75,15 @@ onMounted(loadStatus);
     <p v-if="isLoading" class="py-10 text-center text-content-muted">Loading status...</p>
 
     <div v-else class="overflow-hidden rounded-3xl border border-theme-border bg-surface shadow-sm">
+      <div class="flex items-center justify-between gap-4 border-b border-theme-border px-5 py-4 sm:px-6">
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+            <Activity class="h-5 w-5" />
+          </span>
+          <span class="min-w-0 text-sm font-medium text-content sm:text-base">Active users</span>
+        </div>
+        <strong class="text-sm font-semibold tabular-nums text-content sm:text-base">{{ activeUsersSummary }}</strong>
+      </div>
       <div
         v-for="row in rows"
         :key="row.label"

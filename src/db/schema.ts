@@ -190,6 +190,7 @@ export const sessions = sqliteTable(
     },
     (table) => [
         index('idx_sessions_user').on(table.userId),
+        index('idx_sessions_last_seen').on(table.lastSeenAt, table.userId),
     ]
 );
 

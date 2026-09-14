@@ -8,8 +8,8 @@ Details:
 Admin:
 - x Users - reset login tokens to force re-authentication
 - x User Admins - Manage Admin users and their permissions
-- Archive households instead of deleting them
-- Archive addresses instead of deleting them
+- x Archive households instead of deleting them
+- x Archive addresses instead of deleting them
 - Add History button next directory address to see previous households
 - x User Blocks - Manage user block lists and restrictions: Suspend
 - x Info Msg - Show message at top of home page
@@ -20,8 +20,8 @@ Admin:
 Directory:
 - Directory - Additional fields: interest, hobbies, and skills, Address History
 - Directory - Homeowner and Renters information
-- Unarchive Address - Restore previously archived addresses
-- Unarchive Household - Restore prev archived households
+- xx Unarchive Address - Restore previously archived addresses - no
+- xx Unarchive Household - Restore prev archived households - no
 - x Clickable email and phone links to email, call or sms
 - x clickable address to open in google maps
 

@@ -398,7 +398,12 @@ app.get('/api/admin/access-requests/count', requireAuth(), requireAnyAdminRole()
 app.get('/api/admin/status', requireAuth(), requireAnyAdminRole(), async (c) => {
     const db = drizzle(c.env.DB);
     const sixMonthsAgoSec = Math.floor((Date.now() - 180 * 24 * 60 * 60_000) / 1000);
-    const [householdCount, residentCount, childCount, userCount, aliasLoginCount, openAccessRequestCount, verifiedHouseholdCount] = await Promise.all([
+    const nowSec = Math.floor(Date.now() / 1000);
+    const dayAgoSec = nowSec - 24 * 60 * 60;
+    const weekAgoSec = nowSec - 7 * 24 * 60 * 60;
+    const monthAgoSec = nowSec - 30 * 24 * 60 * 60;
+    const quarterAgoSec = nowSec - 90 * 24 * 60 * 60;
+    const [householdCount, residentCount, childCount, userCount, aliasLoginCount, openAccessRequestCount, verifiedHouseholdCount, activeUserCounts] = await Promise.all([
         db.select({ count: sql<number>`count(*)` }).from(households).get(),
         db.select({ count: sql<number>`count(*)` }).from(residents).get(),
         db.select({ count: sql<number>`count(*)` }).from(children).get(),
@@ -408,6 +413,12 @@ app.get('/api/admin/status', requireAuth(), requireAnyAdminRole(), async (c) => 
         db.select({ count: sql<number>`count(*)` }).from(households).where(
             sql`max(coalesce(${households.updatedAt}, 0), coalesce(${households.directoryConfirmedAt}, 0)) >= ${sixMonthsAgoSec}`
         ).get(),
+        db.select({
+            dau: sql<number>`count(distinct case when ${sessions.lastSeenAt} >= ${dayAgoSec} then ${sessions.userId} end)`,
+            wau: sql<number>`count(distinct case when ${sessions.lastSeenAt} >= ${weekAgoSec} then ${sessions.userId} end)`,
+            mau: sql<number>`count(distinct case when ${sessions.lastSeenAt} >= ${monthAgoSec} then ${sessions.userId} end)`,
+            qau: sql<number>`count(distinct case when ${sessions.lastSeenAt} >= ${quarterAgoSec} then ${sessions.userId} end)`,
+        }).from(sessions).where(sql`${sessions.lastSeenAt} >= ${quarterAgoSec}`).get(),
     ]);
 
     return c.json({
@@ -418,6 +429,10 @@ app.get('/api/admin/status', requireAuth(), requireAnyAdminRole(), async (c) => 
         loginAccounts: userCount?.count ?? 0,
         aliasLogins: aliasLoginCount?.count ?? 0,
         openAccessRequests: openAccessRequestCount?.count ?? 0,
+        dau: activeUserCounts?.dau ?? 0,
+        wau: activeUserCounts?.wau ?? 0,
+        mau: activeUserCounts?.mau ?? 0,
+        qau: activeUserCounts?.qau ?? 0,
     });
 });
 

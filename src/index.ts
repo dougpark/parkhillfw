@@ -1408,34 +1408,33 @@ app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
     const favoriteHouseholdIds = new Set((await db.select({ householdId: householdFavorites.householdId })
         .from(householdFavorites).where(eq(householdFavorites.userId, userId)).all()).map((row) => row.householdId));
 
-    // Default ordering: favorited households first; if the user has none favorited, their own household leads instead.
-    const requestingUser = c.get('user') as { residentId?: number | null };
-    let ownHouseholdId: number | null = null;
-    if (requestingUser.residentId) {
-        const ownResident = await db.select({ householdId: residents.householdId })
-            .from(residents)
-            .where(eq(residents.id, requestingUser.residentId))
-            .get();
-        ownHouseholdId = ownResident?.householdId ?? null;
-    }
-    const priorityHouseholdIds = favoriteHouseholdIds.size > 0
-        ? favoriteHouseholdIds
-        : new Set(ownHouseholdId !== null ? [ownHouseholdId] : []);
-
-    const householdRows = (await db.select().from(households).where(or(eq(households.status, 'active'), eq(households.status, 'vacant'))).all()).sort((left, right) =>
-        compareStreetAddresses(left.streetAddress, right.streetAddress)
-    );
-    const filteredHouseholds = matchedHouseholdIds
-        ? householdRows.filter((h) => matchedHouseholdIds.has(h.id))
-        : householdRows;
-    const visibleHouseholds = filteredHouseholds
-        .filter((household) => !favoritesOnly || favoriteHouseholdIds.has(household.id))
-        .sort((left, right) => Number(priorityHouseholdIds.has(right.id)) - Number(priorityHouseholdIds.has(left.id)));
-
     const [allResidents, allChildren] = await Promise.all([
         db.select().from(residents).all(),
         db.select().from(children).all(),
     ]);
+
+    // Sort key is the primary contact's last name, falling back to the first resident on record.
+    const primaryLastNameByHousehold = new Map<number, string>();
+    for (const resident of allResidents) {
+        if (resident.isPrimaryContact) primaryLastNameByHousehold.set(resident.householdId, resident.lastName);
+    }
+    for (const resident of allResidents) {
+        if (!primaryLastNameByHousehold.has(resident.householdId)) primaryLastNameByHousehold.set(resident.householdId, resident.lastName);
+    }
+
+    const householdRows = (await db.select().from(households).where(or(eq(households.status, 'active'), eq(households.status, 'vacant'))).all()).sort((left, right) => {
+        const leftName = primaryLastNameByHousehold.get(left.id);
+        const rightName = primaryLastNameByHousehold.get(right.id);
+        if (leftName && rightName) return leftName.localeCompare(rightName);
+        if (leftName) return -1;
+        if (rightName) return 1;
+        return compareStreetAddresses(left.streetAddress, right.streetAddress);
+    });
+    const filteredHouseholds = matchedHouseholdIds
+        ? householdRows.filter((h) => matchedHouseholdIds.has(h.id))
+        : householdRows;
+    const visibleHouseholds = filteredHouseholds
+        .filter((household) => !favoritesOnly || favoriteHouseholdIds.has(household.id));
 
     const data = visibleHouseholds.map((household) => ({
         ...household,

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Mail, MapPin, MessageCircle, Phone, Shield, Home, Star, X } from 'lucide-vue-next';
+import { ref, computed } from 'vue';
+import { Mail, MapPin, Phone, Shield, Home, Star, ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { emailHref, mapsHref } from '@/lib/contact';
+import PhoneActionSheet from './PhoneActionSheet.vue';
 
 interface Resident {
   id: number;
@@ -45,51 +47,115 @@ const emit = defineEmits<{
   'toggle-favorite': [householdId: number];
 }>();
 
+const expanded = ref(false);
 const selectedPhone = ref<string | null>(null);
 
-function normalizedPhone(value: string): { digits: string; hasPlus: boolean; extension?: string } {
-  const extensionMatch = value.match(/\b(?:x|ext\.?|extension)\s*(\d{1,6})$/i);
-  const extension = extensionMatch?.[1];
-  const mainNumber = extensionMatch ? value.slice(0, extensionMatch.index).trim() : value.trim();
-  return {
-    digits: mainNumber.replace(/\D/g, ''),
-    hasPlus: mainNumber.startsWith('+'),
-    extension,
-  };
-}
-
-function phoneHref(value: string): string {
-  const { digits, hasPlus, extension } = normalizedPhone(value);
-  return `tel:${hasPlus ? '+' : ''}${digits}${extension ? `;ext=${extension}` : ''}`;
-}
-
-function smsHref(value: string): string {
-  const { digits, hasPlus } = normalizedPhone(value);
-  return `sms:${hasPlus ? '+' : ''}${digits}`;
-}
+const sortedResidents = computed(() =>
+  [...props.household.residents].sort((left, right) => Number(right.isPrimaryContact) - Number(left.isPrimaryContact))
+);
 
 function choosePhoneAction(event: Event, value: string): void {
   event.preventDefault();
   selectedPhone.value = value;
 }
-
-function closePhoneActions(): void {
-  selectedPhone.value = null;
-}
-
-function emailHref(value: string): string {
-  return `mailto:${value.trim()}`;
-}
-
-function mapsHref(streetAddress: string): string {
-  const query = encodeURIComponent(`${streetAddress}, Fort Worth, TX`);
-  return `https://www.google.com/maps/search/?api=1&query=${query}`;
-}
 </script>
 
 <template>
-  <article class="bg-surface border border-theme-border rounded-3xl p-6 shadow-sm">
-    <header class="flex flex-wrap items-start justify-between gap-3">
+  <article class="bg-surface border border-theme-border rounded-3xl shadow-sm overflow-hidden">
+    <Transition name="card-face" mode="out-in">
+      <!-- Preview card -->
+      <div v-if="!expanded" key="preview" class="p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0 flex-1 space-y-2">
+            <!-- Desktop compact rows -->
+            <div class="hidden sm:block space-y-1.5">
+              <div
+                v-for="resident in sortedResidents"
+                :key="resident.id"
+                class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm"
+              >
+                <span class="font-medium text-content">
+                  {{ resident.firstName }} {{ resident.lastName }}
+                </span>
+                <a
+                  v-if="resident.email"
+                  :href="emailHref(resident.email)"
+                  class="inline-flex items-center gap-1 text-accent hover:underline"
+                >
+                  <Mail class="h-3.5 w-3.5" aria-hidden="true" />{{ resident.email }}
+                </a>
+                <button
+                  v-if="resident.phoneMobile"
+                  type="button"
+                  class="inline-flex items-center gap-1 text-accent hover:underline"
+                  @click="choosePhoneAction($event, resident.phoneMobile)"
+                >
+                  <Phone class="h-3.5 w-3.5" aria-hidden="true" />{{ resident.phoneMobile }}
+                </button>
+              </div>
+            </div>
+            <!-- Mobile stacked rows -->
+            <ul class="sm:hidden space-y-2">
+              <li v-for="resident in sortedResidents" :key="resident.id" class="text-sm">
+                <p class="font-medium text-content">
+                  {{ resident.firstName }} {{ resident.lastName }}
+                </p>
+                <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-content-muted">
+                  <a
+                    v-if="resident.email"
+                    :href="emailHref(resident.email)"
+                    class="inline-flex items-center gap-1 text-accent hover:underline"
+                  >
+                    <Mail class="h-3.5 w-3.5" aria-hidden="true" />{{ resident.email }}
+                  </a>
+                  <button
+                    v-if="resident.phoneMobile"
+                    type="button"
+                    class="inline-flex items-center gap-1 text-accent hover:underline"
+                    @click="choosePhoneAction($event, resident.phoneMobile)"
+                  >
+                    <Phone class="h-3.5 w-3.5" aria-hidden="true" />{{ resident.phoneMobile }}
+                  </button>
+                </div>
+              </li>
+            </ul>
+            <p class="text-xs text-content-muted">{{ household.streetAddress }}</p>
+          </div>
+          <div class="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              class="rounded-full p-1 text-[#f4b400] hover:bg-warning-subtle transition-colors"
+              :aria-label="props.household.isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+              :title="props.household.isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+              @click.stop="emit('toggle-favorite', props.household.id)"
+            >
+              <Star class="w-4 h-4" :fill="props.household.isFavorite ? 'currentColor' : 'none'" />
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-full border border-theme-border px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
+              @click="expanded = true"
+            >
+              Show more
+              <ChevronDown class="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Full card -->
+      <div v-else key="full" class="p-6">
+    <div class="flex justify-end">
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-full border border-theme-border px-3 py-1.5 text-sm font-medium text-content-muted transition-colors hover:bg-surface-hover hover:text-content"
+        @click="expanded = false"
+      >
+        Show less
+        <ChevronUp class="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
+    <header class="mt-2 flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 class="flex items-center gap-2 text-lg font-semibold text-content">
           <Home class="w-4 h-4 text-accent" />
@@ -119,7 +185,7 @@ function mapsHref(streetAddress: string): string {
         </p>
         <p v-if="household.notes" class="mt-1 text-sm text-content-muted">Notes: {{ household.notes }}</p>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap justify-end gap-2">
         <span
           v-if="household.parkHillMember"
           class="rounded-full bg-accent/10 text-accent px-3 py-1 text-xs font-medium"
@@ -203,52 +269,6 @@ function mapsHref(streetAddress: string): string {
       </ul>
     </section>
 
-    <Teleport to="body">
-      <div
-        v-if="selectedPhone"
-        class="fixed inset-0 z-50 flex items-end justify-center bg-[#1f1f1f]/35 p-3 sm:items-center sm:p-6"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Choose phone action"
-        @click="closePhoneActions"
-      >
-        <div class="w-full max-w-sm rounded-3xl border border-theme-border bg-surface p-4 shadow-2xl" @click.stop>
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <p class="text-sm font-semibold text-content">What would you like to do?</p>
-              <p class="mt-1 text-sm text-content-muted">{{ selectedPhone }}</p>
-            </div>
-            <button
-              type="button"
-              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-content-muted hover:bg-surface-hover"
-              aria-label="Close phone actions"
-              @click="closePhoneActions"
-            >
-              <X class="h-5 w-5" />
-            </button>
-          </div>
-          <div class="mt-4 grid grid-cols-2 gap-3">
-            <a
-              :href="phoneHref(selectedPhone)"
-              class="flex min-h-14 items-center justify-center gap-2 rounded-full bg-accent px-4 text-sm font-medium text-on-accent"
-              @click="closePhoneActions"
-            >
-              <Phone class="h-5 w-5" aria-hidden="true" />
-              Call
-            </a>
-            <a
-              :href="smsHref(selectedPhone)"
-              class="flex min-h-14 items-center justify-center gap-2 rounded-full border border-theme-border bg-surface px-4 text-sm font-medium text-content hover:bg-surface-hover"
-              @click="closePhoneActions"
-            >
-              <MessageCircle class="h-5 w-5 text-accent" aria-hidden="true" />
-              Text
-            </a>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
     <section v-if="household.children.length" class="mt-5">
       <h3 class="text-sm font-semibold text-content-muted uppercase tracking-wide mb-2">Children</h3>
       <!-- Desktop table -->
@@ -287,5 +307,22 @@ function mapsHref(streetAddress: string): string {
         </li>
       </ul>
     </section>
+      </div>
+    </Transition>
+
+    <PhoneActionSheet v-if="selectedPhone" :phone="selectedPhone" @close="selectedPhone = null" />
   </article>
 </template>
+
+<style scoped>
+.card-face-enter-active,
+.card-face-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.card-face-enter-from,
+.card-face-leave-to {
+  opacity: 0;
+  transform: translateY(4px) scale(0.99);
+}
+</style>
+

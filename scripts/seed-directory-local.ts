@@ -1,7 +1,8 @@
 import { parse } from 'csv-parse/sync';
 import { readFileSync } from 'fs';
 import { drizzle } from 'drizzle-orm/d1';
-import { households, residents, children } from '../src/db/schema';
+import { eq, isNull, sql } from 'drizzle-orm';
+import { households, residents, children, users } from '../src/db/schema';
 
 function parseBool(val: string | undefined): boolean {
     if (!val) return false;
@@ -135,8 +136,26 @@ export async function seedDirectory(db: ReturnType<typeof drizzle>, csvFilePath:
         }
     }
 
+    // Deleting residents cascades resident_id to NULL on every users row (ON DELETE SET NULL);
+    // restore the link by email, same match rule used at login (src/lib/auth.ts completeLogin).
+    const unlinkedUsers = await db.select().from(users).where(isNull(users.residentId));
+    let relinkedCount = 0;
+    for (const unlinkedUser of unlinkedUsers) {
+        if (!unlinkedUser.email) continue;
+        const match = await db.select().from(residents)
+            .where(sql`lower(${residents.email}) = lower(${unlinkedUser.email})`)
+            .get();
+        if (match) {
+            await db.update(users)
+                .set({ residentId: match.id, linkStatus: 'auto_matched', updatedAt: new Date() })
+                .where(eq(users.id, unlinkedUser.id));
+            relinkedCount++;
+        }
+    }
+
     console.log(`\nImport completed successfully!`);
     console.log(`- Households: ${householdCount}`);
     console.log(`- Residents: ${residentCount}`);
     console.log(`- Children: ${childCount}`);
+    console.log(`- Users re-linked to residents: ${relinkedCount}`);
 }

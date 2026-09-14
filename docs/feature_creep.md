@@ -5,6 +5,15 @@ Details:
 - x directory default sort by resident last name or street name?
 - x directory blank until first search? No
 
+Photo Pages:
+- new main photo page that lists all photo pages and makes selecting an event page easy
+- admin interface for managing event photo pages
+- list all event photo pages, button to edit or delete each photo page
+- button to add a new event photo page by asking for folder name (browse r2 folders /photos/{event}) and event name
+- creates new r2 /photos/{event} folder for the event
+- drag and drop or upload multiple photos to new photo folder (/photos/{event})
+
+
 Admin:
 - x Users - reset login tokens to force re-authentication
 - x User Admins - Manage Admin users and their permissions
@@ -41,7 +50,7 @@ Directory:
 
 - Blog - Manage and publish blog posts
 - Reports - Generate and view various reports
-- Settings - Configure application preferences and options
+- x Settings - Configure application preferences and options
 - Help - Provide user assistance and documentation
 - Analytics - Provide insights and data analysis tools
 - Stats - Track usage and client device in

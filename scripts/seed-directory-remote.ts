@@ -33,6 +33,8 @@ export async function generateSeedSql(csvFilePath: string, outputPath: string) {
 
     const sqlStatements: string[] = [];
     sqlStatements.push('-- Auto-generated Seed SQL');
+    // D1's remote bulk import doesn't guarantee statement order, so FK checks must be deferred
+    sqlStatements.push('PRAGMA defer_foreign_keys = true;');
     sqlStatements.push('DELETE FROM children;');
     sqlStatements.push('DELETE FROM residents;');
     sqlStatements.push('DELETE FROM households;');
@@ -64,8 +66,11 @@ export async function generateSeedSql(csvFilePath: string, outputPath: string) {
         const h1First = escapeSql(rowData['h1-Homeowner Firstname']);
         const h1Last = escapeSql(rowData['h1-Homeowner Last Name']);
         if (h1First !== 'NULL' || h1Last !== 'NULL') {
+            // first_name/last_name are NOT NULL; fall back to empty string like the local seed script
+            const firstName = h1First === 'NULL' ? "''" : h1First;
+            const lastName = h1Last === 'NULL' ? "''" : h1Last;
             sqlStatements.push(
-                `INSERT INTO residents (household_id, first_name, last_name, is_primary_contact, email, phone_home, phone_mobile, phone_work, occupation) VALUES (${householdId}, ${h1First}, ${h1Last}, 1, ${escapeSql(rowData['h1-Homeowner Email Address'])}, ${escapeSql(rowData['h1-Home Phone'])}, ${escapeSql(rowData['h1-Cell Phone'])}, ${escapeSql(rowData['h1-Work Phone'])}, ${escapeSql(rowData['h1-Occupation'])});`
+                `INSERT INTO residents (household_id, first_name, last_name, is_primary_contact, email, phone_home, phone_mobile, phone_work, occupation) VALUES (${householdId}, ${firstName}, ${lastName}, 1, ${escapeSql(rowData['h1-Homeowner Email Address'])}, ${escapeSql(rowData['h1-Home Phone'])}, ${escapeSql(rowData['h1-Cell Phone'])}, ${escapeSql(rowData['h1-Work Phone'])}, ${escapeSql(rowData['h1-Occupation'])});`
             );
         }
 
@@ -73,8 +78,11 @@ export async function generateSeedSql(csvFilePath: string, outputPath: string) {
         const h2First = escapeSql(rowData['h2-Homeowner Firstname']);
         const h2Last = escapeSql(rowData['h2-Homeowner Last Name']);
         if (h2First !== 'NULL' || h2Last !== 'NULL') {
+            const firstName = h2First === 'NULL' ? "''" : h2First;
+            // default secondary's last name to the primary's when blank
+            const lastName = h2Last === 'NULL' ? (h1Last === 'NULL' ? "''" : h1Last) : h2Last;
             sqlStatements.push(
-                `INSERT INTO residents (household_id, first_name, last_name, is_primary_contact, email, phone_home, phone_mobile, phone_work, occupation) VALUES (${householdId}, ${h2First}, ${h2Last}, 0, ${escapeSql(rowData['h2-Homeowner Email Address'])}, ${escapeSql(rowData['h2-Home Phone'])}, ${escapeSql(rowData['h2-Cell Phone'])}, ${escapeSql(rowData['h2-Work Phone'])}, ${escapeSql(rowData['h2-Occupation'])});`
+                `INSERT INTO residents (household_id, first_name, last_name, is_primary_contact, email, phone_home, phone_mobile, phone_work, occupation) VALUES (${householdId}, ${firstName}, ${lastName}, 0, ${escapeSql(rowData['h2-Homeowner Email Address'])}, ${escapeSql(rowData['h2-Home Phone'])}, ${escapeSql(rowData['h2-Cell Phone'])}, ${escapeSql(rowData['h2-Work Phone'])}, ${escapeSql(rowData['h2-Occupation'])});`
             );
         }
 
@@ -92,6 +100,13 @@ export async function generateSeedSql(csvFilePath: string, outputPath: string) {
 
         householdId++;
     }
+
+    // Deleting residents cascades resident_id to NULL on every users row (ON DELETE SET NULL);
+    // restore the link by email, same match rule used at login (lib/auth.ts completeLogin).
+    sqlStatements.push(
+        "\n-- Re-link existing users to their re-seeded resident rows by email",
+        `UPDATE users SET resident_id = (SELECT id FROM residents WHERE lower(residents.email) = lower(users.email)), link_status = 'auto_matched' WHERE resident_id IS NULL AND EXISTS (SELECT 1 FROM residents WHERE lower(residents.email) = lower(users.email));`
+    );
 
     writeFileSync(outputPath, sqlStatements.join('\n'), 'utf-8');
     console.log(`Generated SQL file at: ${outputPath}`);

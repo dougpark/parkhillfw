@@ -8,9 +8,11 @@ async function main() {
 
     console.log(`Connecting to ${isRemote ? 'REMOTE Cloudflare' : 'LOCAL'} D1 database...`);
 
-    // Explicitly tell getPlatformProxy whether to use remote bindings
+    // Explicitly tell getPlatformProxy whether to use remote bindings.
+    // Without this, the "remote: true" send_email binding in wrangler.json
+    // forces a remote proxy connection even when only seeding local D1.
     const { env, dispose } = await getPlatformProxy<{ DB: D1Database }>({
-        remote: isRemote,
+        remoteBindings: isRemote,
     });
     const db = drizzle(env.DB);
 

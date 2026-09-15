@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import BreadcrumbNav from '@/components/common/BreadcrumbNav.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FilterChip from '@/components/ui/FilterChip.vue';
@@ -47,6 +47,44 @@ const favoritesOnly = ref(false);
 const households = ref<Household[]>([]);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
+
+type SortBy = 'name' | 'address';
+const SORT_STORAGE_KEY = 'directory_sort_by';
+
+function loadStoredSortBy(): SortBy {
+  try {
+    return localStorage.getItem(SORT_STORAGE_KEY) === 'address' ? 'address' : 'name';
+  } catch {
+    return 'name';
+  }
+}
+
+const sortBy = ref<SortBy>(loadStoredSortBy());
+
+watch(sortBy, (value) => {
+  try {
+    localStorage.setItem(SORT_STORAGE_KEY, value);
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+});
+
+function householdSortName(household: Household): string {
+  const primary = household.residents.find((resident) => resident.isPrimaryContact) ?? household.residents[0];
+  return primary ? `${primary.lastName} ${primary.firstName}` : 'Vacant';
+}
+
+const sortedHouseholds = computed(() => {
+  const list = [...households.value];
+  if (sortBy.value === 'address') {
+    list.sort((a, b) => a.streetAddress.localeCompare(b.streetAddress, undefined, { numeric: true, sensitivity: 'base' }));
+  } else {
+    list.sort((a, b) => householdSortName(a).localeCompare(householdSortName(b), undefined, { sensitivity: 'base' }));
+  }
+  return list;
+});
+
+const totalResidents = computed(() => households.value.reduce((sum, household) => sum + household.residents.length, 0));
 
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 
@@ -128,13 +166,41 @@ onMounted(loadDirectory);
     <p v-else-if="error" class="text-center text-danger py-10">{{ error }}</p>
     <p v-else-if="!households.length" class="text-center text-content-muted py-10">No households found.</p>
 
-    <div v-else class="space-y-6">
-      <HouseholdCard
-        v-for="household in households"
-        :key="household.id"
-        :household="household"
-        @toggle-favorite="toggleFavorite"
-      />
-    </div>
+    <template v-else>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <p class="text-sm text-content-muted">
+          Showing {{ totalResidents }} {{ totalResidents === 1 ? 'Resident' : 'Residents' }}
+        </p>
+        <div class="inline-flex items-center rounded-full border border-theme-border bg-surface p-1" role="group" aria-label="Sort directory results">
+          <button
+            type="button"
+            class="rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+            :class="sortBy === 'name' ? 'bg-accent text-on-accent' : 'text-content-muted hover:text-content'"
+            :aria-pressed="sortBy === 'name'"
+            @click="sortBy = 'name'"
+          >
+            Name
+          </button>
+          <button
+            type="button"
+            class="rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+            :class="sortBy === 'address' ? 'bg-accent text-on-accent' : 'text-content-muted hover:text-content'"
+            :aria-pressed="sortBy === 'address'"
+            @click="sortBy = 'address'"
+          >
+            Address
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+        <HouseholdCard
+          v-for="household in sortedHouseholds"
+          :key="household.id"
+          :household="household"
+          @toggle-favorite="toggleFavorite"
+        />
+      </div>
+    </template>
   </div>
 </template>

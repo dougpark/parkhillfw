@@ -68,7 +68,10 @@ function choosePhoneAction(event: Event, value: string): void {
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1 space-y-2">
             <!-- Desktop compact rows -->
-            <div class="hidden sm:block space-y-1.5">
+            <div v-if="!sortedResidents.length" class="hidden sm:block">
+              <span class="text-sm font-medium italic text-content-muted">Vacant</span>
+            </div>
+            <div v-else class="hidden sm:block space-y-1.5">
               <div
                 v-for="resident in sortedResidents"
                 :key="resident.id"
@@ -95,7 +98,8 @@ function choosePhoneAction(event: Event, value: string): void {
               </div>
             </div>
             <!-- Mobile stacked rows -->
-            <ul class="sm:hidden space-y-2">
+            <p v-if="!sortedResidents.length" class="sm:hidden text-sm font-medium italic text-content-muted">Vacant</p>
+            <ul v-else class="sm:hidden space-y-2">
               <li v-for="resident in sortedResidents" :key="resident.id" class="text-sm">
                 <p class="font-medium text-content">
                   {{ resident.firstName }} {{ resident.lastName }}
@@ -200,6 +204,11 @@ function choosePhoneAction(event: Event, value: string): void {
         </span>
       </div>
     </header>
+
+    <section v-if="!household.residents.length" class="mt-5">
+      <h3 class="text-sm font-semibold text-content-muted uppercase tracking-wide mb-2">Adults</h3>
+      <p class="text-sm italic text-content-muted">Vacant</p>
+    </section>
 
     <section v-if="household.residents.length" class="mt-5">
       <h3 class="text-sm font-semibold text-content-muted uppercase tracking-wide mb-2">Adults</h3>

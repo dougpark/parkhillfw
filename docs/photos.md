@@ -1,41 +1,115 @@
-# Photos
-- mobile and desktop friendly
-- Admin -> Site Content -> Photos - for managing photo folders and events
-- Photos are stored in R2 under the `/photos/{folder}/{event}` folder structure.
+# Photo Gallery Technical Specification & Architecture Recommendations
 
-# Terminology
-- Photo Gallery: A page that shows all the folders and events with photo previews and links to the individual event pages. 
-- Photo Folder: A container for organizing related photo events.
-- Photo Event: A specific event within a photo folder that contains photos.
-- Photo: An individual image within a photo event.
-   
-# Pages Navigation
-- on the Admin -> Site Content -> Navigation page add a button to add a Photo Event page (list and search), then be able to place it anywhere in the site's navigation structure
+## System Overview
+A mobile- and desktop-friendly Photo Gallery feature integrated into the administration dashboard and public portal. Photos are organized logically into **Folders** $\rightarrow$ **Events** $\rightarrow$ **Photos**, managed via Cloudflare Workers, Cloudflare D1 (metadata), and Cloudflare R2 (object storage).
 
-# Photo Gallery
-- a page that shows all the folders and events with photo previews and links to the individual event pages
+---
 
-# Photo Event Page
-- shows the name, description, date, and photos for a specific event
-- photos should show large-square-thumbnails in tight rows and columns
-- click on a thumbnail for full size view with left right navigation
+## 1. Database Schema Design (Cloudflare D1)
 
-# Admin Photos
-- UI List of all photo folders and event pages with options to edit or delete each page or add a new event page
-- UI to add a folder with name (creates new R2 /photos/{folder} folder)
-- No nested folders within a photo folder are allowed.
-- UI to delete a folder (removes R2 /photos/{folder} folder and all its contents)
-- UI to rename a folder (updates R2 /photos/{folder} folder name)
-- UI to add an event to a folder (creates new R2 /photos/{folder}/{event} folder)
-- UI to delete an event from a folder (removes R2 /photos/{folder}/{event} folder and all its contents)
-- UI to rename an event in a folder (updates R2 /photos/{folder}/{event} folder name)
-- UI to move an event from one folder to another (updates R2 /photos/{folder}/{event} folder location)
-- UI to move a photo from one event to another (updates R2 /photos/{folder}/{event}/{photo} location)
-- UI Event-Edit page for each event with options to upload or remove photos
-- event name
-- event slug (slug is the URL-friendly version of the event name)
-- event date
-- event description
-- Supports drag and drop or multiple photo uploads for each event page
-- select photo for the event cover image to use for the event preview in the photo gallery
+Rather than performing expensive file system operations (moving/copying objects) inside R2 when renaming or re-organizing content, all hierarchy, ordering, and metadata are maintained in D1. R2 object keys remain immutable using UUIDs.
 
+Examples: 
+
+```sql
+-- Photo Folders
+CREATE TABLE photo_folders (
+  id TEXT PRIMARY KEY,               -- e.g., 'fld_uuid'
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  display_order INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Photo Events
+CREATE TABLE photo_events (
+  id TEXT PRIMARY KEY,               -- e.g., 'evt_uuid'
+  folder_id TEXT NOT NULL REFERENCES photo_folders(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT,
+  event_date DATE,
+  status TEXT CHECK(status IN ('draft', 'published')) DEFAULT 'draft',
+  cover_photo_id TEXT,               -- Foreign key to photos(id) set upon photo selection
+  display_order INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Individual Photos
+CREATE TABLE photos (
+  id TEXT PRIMARY KEY,               -- e.g., 'pho_uuid'
+  event_id TEXT NOT NULL REFERENCES photo_events(id) ON DELETE CASCADE,
+  r2_key TEXT NOT NULL,              -- e.g., 'photos/pho_uuid/original.jpg'
+  r2_thumb_key TEXT NOT NULL,        -- e.g., 'photos/pho_uuid/thumb.webp'
+  r2_display_key TEXT NOT NULL,      -- e.g., 'photos/pho_uuid/display.webp'
+  caption TEXT,
+  width INTEGER,
+  height INTEGER,
+  display_order INTEGER DEFAULT 0,
+  uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_photo_events_folder ON photo_events(folder_id);
+CREATE INDEX idx_photo_events_slug ON photo_events(slug);
+CREATE INDEX idx_photos_event ON photos(event_id);
+```
+
+## 2. R2 Storage & Immutable Key Architecture
+
+To prevent execution timeouts in Cloudflare Workers during bulk folder renames or moves, physical paths in R2 do not reflect folder/event names.
+• Object Key Pattern: photos/{photo_id}/{variant}.webp
+• Variants: • thumb – 400 \times 400\text{px} cropped/scaled WebP for square thumbnail grids. • display – 1920\text{px} max-width WebP for lightbox viewing. • original – Uncompressed source upload (optional, for archival).
+
+# Mutability Operations Comparison
+Database-Backed Strategy (Recommended)
+
+## Move Event to New Folder		
+- Single D1 SQL statement: UPDATE photo_events SET folder_id = ? WHERE id = ?.
+
+## Rename Event / Folder		
+- Update name and slug column in D1.
+
+## Delete Event	
+- Worker background process purges R2 keys; D1 handles cascade.
+
+
+## 3. Public & Admin Navigation Hierarchy
+
+### Public Routing
+• /gallery – Renders all public Photo Folders alongside published Photo Events.
+• /gallery/:event_slug – Public Photo Event page with grid and lightbox interactive viewer.
+
+### Navigation Management Integration (Admin -> Site Content -> Navigation)
+• Photo Gallery Root: Place the main /gallery endpoint into primary or secondary navigation structure.
+• Direct Event Placement: Allow pinning individual published events (e.g., /gallery/100th-celebration) into navigation trees alongside custom links.
+
+### Visibility & Guardrails
+- Admin -> Site Content -> Photos requires "Page Editor" or "Admin" or "Owner"
+• Unauthenticated visitors requesting a draft event route directly return a 404 Not Found.
+• Authenticated admins viewing a draft event see a sticky preview badge ("Draft - Not visible to public").
+
+## 4. Administrative Workflow (Admin -> Site Content -> Photos)
+
+## Folder & Event Operations
+• Folder Management: Create, rename, or delete folders. Deleting a folder prompts an explicit confirmation modal listing child events and photo counts.
+• Event Actions: • Create/Edit metadata (Name, Slug, Date, Description, Status). • Re-assign event to another folder via simple select dropdown. • Set Cover Image directly by clicking any photo within the event grid edit screen.
+
+## Bulk Drag-and-Drop Uploads
+
+• Client-side direct or multi-part uploads to Worker endpoints.
+• Automatic image resizing pipeline via Cloudflare Image Resizing  to generate thumb and display variants.
+• Re-order grid using drag-and-drop handles, updating display_order attributes across photo rows.
+
+## 5. UI/UX Specifications
+
+### Grid Layout (Event Page)
+• Responsive CSS Grid utilizing grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) on mobile, scaling to 200px on desktop.
+• Fixed 1:1 aspect ratio cards (aspect-square) with object-fit: cover for crisp alignment.
+
+### Lightbox Viewer
+• Modal container opening on thumbnail selection.
+• Touch swipe navigation enabled (touchstart/touchend gesture tracking) for mobile users.
+• Keyboard navigation bindings (ArrowLeft, ArrowRight, Escape).
+• Dynamic preloading of adjacent images (\pm 1) for instantaneous transitions.

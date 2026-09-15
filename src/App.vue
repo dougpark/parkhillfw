@@ -266,7 +266,7 @@ watch(siteName, (value) => { document.title = value; }, { immediate: true });
                 @click="openAccountPanel"
               >
                 <Pencil class="h-4 w-4 text-success" />
-                Edit Login Emails
+                Sign-in Alias Emails
               </button>
 
               <RouterLink
@@ -402,8 +402,8 @@ watch(siteName, (value) => { document.title = value; }, { immediate: true });
       >
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h2 class="font-semibold">Login Emails</h2>
-            <p class="mt-1 text-xs text-content-muted">Private addresses used only to sign in.</p>
+            <h2 class="font-semibold">Sign-in Alias Emails</h2>
+            <p class="mt-1 text-xs text-content-muted">Enter an alternative email address (like your work email) to use for signing in. This address remains private and will not be visible to other members in the directory.</p>
           </div>
           <button type="button" class="rounded-full p-1 text-content-muted hover:bg-surface-hover" aria-label="Close account settings" @click="isAccountPanelOpen = false"><X class="h-4 w-4" /></button>
         </div>
@@ -416,7 +416,7 @@ watch(siteName, (value) => { document.title = value; }, { immediate: true });
           <button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-accent" @click="addLoginEmail"><Plus class="h-4 w-4" /> Add email</button>
           <p v-if="emailPanelError" class="rounded-xl bg-danger-subtle p-2 text-xs text-danger">{{ emailPanelError }}</p>
           <p v-if="emailPanelSaved" class="rounded-xl bg-success-subtle p-2 text-xs text-success">Login Emails saved.</p>
-          <button type="button" :disabled="isSavingEmails" class="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60" @click="saveLoginEmails"><Save class="h-4 w-4" /> {{ isSavingEmails ? 'Saving...' : 'Save Login Emails' }}</button>
+          <button type="button" :disabled="isSavingEmails" class="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60" @click="saveLoginEmails"><Save class="h-4 w-4" /> {{ isSavingEmails ? 'Saving...' : 'Save Alias Emails' }}</button>
         </div>
       </section>
     </div>

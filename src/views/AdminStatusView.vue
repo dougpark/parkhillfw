@@ -33,7 +33,7 @@ const rows = computed(() => [
   { label: 'Adult residents', value: status.value?.adultResidents ?? 0, icon: Users },
   { label: 'Children', value: status.value?.children ?? 0, icon: Baby },
   { label: 'Login accounts', value: status.value?.loginAccounts ?? 0, icon: Users },
-  { label: 'Alias alternate logins', value: status.value?.aliasLogins ?? 0, icon: MailPlus },
+  { label: 'Sign-in Alias Emails', value: status.value?.aliasLogins ?? 0, icon: MailPlus },
 ]);
 
 async function loadStatus() {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { Check, CheckCircle2, ChevronDown, Clock, Edit3, Info, LogIn, LogOut, Palette, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-vue-next';
+import { Check, CheckCircle2, ChevronDown, Clock, Edit3, Info, LogIn, LogOut, Mail, Palette, Pencil, Plus, Save, ShieldCheck, Trash2, X } from 'lucide-vue-next';
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
 import { useSiteSettings } from './composables/useSiteSettings';
@@ -265,7 +265,7 @@ watch(siteName, (value) => { document.title = value; }, { immediate: true });
               role="menuitem"
                 @click="openAccountPanel"
               >
-                <Pencil class="h-4 w-4 text-success" />
+                <Mail class="h-4 w-4 text-success" />
                 Sign-in Alias Emails
               </button>
 

@@ -136,6 +136,7 @@ async function togglePermission(user: AccessUser, field: PermissionField) {
 }
 
 async function clearPermissions(user: AccessUser) {
+  if (!confirm(`Revoke all access for ${user.displayName}? This removes Admin, Page Editor, Directory Editor, and Owner permissions.`)) return;
   error.value = '';
   const response = await fetch(`/api/admin/users/${user.id}/permissions/clear`, { method: 'POST' });
   const data = await response.json() as { error?: string };

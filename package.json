@@ -36,7 +36,7 @@
   "scripts": {
     "dev:worker": "wrangler dev",
     "dev:vue": "vite",
-    "dev": "bun run dev:worker & bun run dev:vue",
+    "dev": "trap 'kill 0' EXIT INT TERM; bun run dev:worker & bun run dev:vue & wait",
     "build": "vite build",
     "deploy": "bun run build && wrangler deploy",
     "db:generate": "drizzle-kit generate",

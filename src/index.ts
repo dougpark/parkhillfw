@@ -1286,6 +1286,63 @@ app.get('/api/admin/log-viewer/archives/:archiveId', requireAuth(), requireAnyAd
     return c.json({ id: row.id, streetAddress: row.streetAddress, archivedAt: row.archivedAt, archivedByAdminId: row.archivedByAdminId, snapshot });
 });
 
+app.get('/api/admin/log-viewer/last-seen', requireAuth(), requireAnyAdminRole(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const query = (c.req.query('q') ?? '').trim();
+
+    let matchedUserIds: number[] | null = null;
+    if (query) {
+        const term = `%${query}%`;
+        const [residentRows, userRows, aliasRows] = await Promise.all([
+            db.select({ userId: users.id }).from(residents)
+                .innerJoin(users, eq(users.residentId, residents.id))
+                .where(or(
+                    like(residents.firstName, term),
+                    like(residents.lastName, term),
+                    like(residents.email, term),
+                    like(sql`${residents.firstName} || ' ' || ${residents.lastName}`, term),
+                ))
+                .all(),
+            db.select({ userId: users.id }).from(users).where(like(users.email, term)).all(),
+            db.select({ userId: userLoginEmails.userId }).from(userLoginEmails).where(like(userLoginEmails.email, term)).all(),
+        ]);
+        matchedUserIds = [...new Set([...residentRows, ...userRows, ...aliasRows].map((row) => row.userId))];
+        if (!matchedUserIds.length) return c.json([]);
+    }
+
+    const sessionRows = await db.select({
+        userId: sessions.userId,
+        lastSeenAt: sql<number | null>`max(${sessions.lastSeenAt})`,
+    }).from(sessions)
+        .where(matchedUserIds ? inArray(sessions.userId, matchedUserIds) : undefined)
+        .groupBy(sessions.userId)
+        .having(sql`max(${sessions.lastSeenAt}) is not null`)
+        .orderBy(desc(sql`max(${sessions.lastSeenAt})`))
+        .limit(100).all();
+    if (!sessionRows.length) return c.json([]);
+
+    const userIds = sessionRows.map((row) => row.userId);
+    const userRows = await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: residents.firstName,
+        lastName: residents.lastName,
+    }).from(users)
+        .leftJoin(residents, eq(residents.id, users.residentId))
+        .where(inArray(users.id, userIds)).all();
+    const userById = new Map(userRows.map((row) => [row.id, row]));
+
+    return c.json(sessionRows.map((row) => {
+        const user = userById.get(row.userId);
+        return {
+            userId: row.userId,
+            email: user?.email ?? null,
+            residentName: user?.firstName ? `${user.firstName} ${user.lastName}` : null,
+            lastSeenAt: row.lastSeenAt,
+        };
+    }));
+});
+
 app.patch('/api/admin/access-requests/:requestId', requireAuth(), requireAdmin(), async (c) => {
     const db = drizzle(c.env.DB);
     const requestId = Number(c.req.param('requestId'));

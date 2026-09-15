@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Archive, ChevronDown, ClipboardList, FileText, FolderTree, Gauge, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
+import { Archive, ChevronDown, ClipboardList, Clock, FileText, FolderTree, Gauge, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 import AdminArchiveBrowserView from './AdminArchiveBrowserView.vue';
+import AdminLastSeenView from './AdminLastSeenView.vue';
 import AdminLogsView from './AdminLogsView.vue';
 import AdminStatusView from './AdminStatusView.vue';
 
@@ -88,6 +89,7 @@ const adminMenuSections: AdminMenuSection[] = [
     children: [
       { label: 'Logs', description: 'Search and filter the activity log.', icon: ScrollText, role: 'any' },
       { label: 'Archives', description: 'Browse archived household records.', icon: Archive, role: 'any' },
+      { label: 'Last Seen', description: 'Most recently active users.', icon: Clock, role: 'any' },
     ],
   },
   {    label: 'Settings',
@@ -323,6 +325,8 @@ function handleCrumbClick(index: number) {
         <AdminLogsView />
       </div>      <div v-else-if="selectedFeature === 'Archives'" class="min-w-0 p-6 sm:p-8">
         <AdminArchiveBrowserView />
+      </div>      <div v-else-if="selectedFeature === 'Last Seen'" class="min-w-0 p-6 sm:p-8">
+        <AdminLastSeenView />
       </div>      <div v-else-if="selectedFeature === 'Settings'" class="min-w-0 p-6 sm:p-8">
         <AdminSettingsView />
       </div>      <div v-else class="min-w-0 p-6 sm:p-8">

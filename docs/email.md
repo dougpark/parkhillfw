@@ -3,7 +3,7 @@
 Park Hill uses Cloudflare Email Sending through the `EMAIL` binding in `wrangler.json`.
 
 - From: `auth@parkhillfw.org`
-- Reply-To: `parkdn@gmail.com`
+- Reply-To: `admin@parkhillfw.org`
 - Magic-link lifetime: 15 minutes
 - Session lifetime: 400 days
 - Local and test sends use the configured remote binding
@@ -16,7 +16,7 @@ await env.EMAIL.send({
   html,
   text,
   headers: {
-    'Reply-To': 'parkdn@gmail.com',
+    'Reply-To': 'admin@parkhillfw.org',
   },
 });
 ```

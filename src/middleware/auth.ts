@@ -54,7 +54,7 @@ export function devBypassUser(role: string | undefined): AppUser {
         pageEditor: { isPageEditor: true },
         user: {},
     }[role ?? 'admin'] ?? { isAdmin: true };
-    return { id: 1, email: 'parkdn@gmail.com', householdId: 1, residentId: 1, ...flags };
+    return { id: 1, email: 'admin@parkhillfw.com', householdId: 1, residentId: 1, ...flags };
 }
 
 export const requireAuth = (): MiddlewareHandler<AppEnv> => async (c, next) => {

@@ -26,13 +26,13 @@
 ### Adult Residents
 | Name | Primary | Email | Mobile Phone | Home Phone | Occupation |
 | --- | --- | --- | --- | --- | --- |
-| Doug Park | Yes | parkdn@gmail.com | (817) 917-3771 | N/A | Retired |
-| Beth Park | No | bethgpark@mac.com | (817) 917-3772 | N/A | Retired |
+| nnnn Park | Yes | xx@gmail.com | (817) xxx-xxxx | N/A | Retired |
+| nnnn Park | No | xx@mac.com | (817) xxx-xxxx | N/A | Retired |
 
 ### Children & Dependents
 | Name | Birth Year | School | Location | Pet Sitting | Babysitting | Special Skills |
 | --- | --- | --- | --- | --- | --- | --- |
-| Thomas Park | N/A | SMU '2020 | N/A | No | No | N/A |
-| Stephen Park | N/A | TCU '2026 | N/A | No | No | N/A |
+| nnnn Park | N/A | nnn '2020 | N/A | No | No | N/A |
+| nnnn Park | N/A | nnn '2026 | N/A | No | No | N/A |
 
 ---

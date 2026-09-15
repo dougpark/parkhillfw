@@ -9,4 +9,4 @@ CREATE TABLE `settings` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX `idx_settings_key_unique` ON `settings` (`key`);
 --> statement-breakpoint
-INSERT INTO `settings` (`key`, `value`, `updated_at`) VALUES ('admin_email', '"parkdn@gmail.com"', unixepoch());
+INSERT INTO `settings` (`key`, `value`, `updated_at`) VALUES ('admin_email', '"admin@parkhillfw.com"', unixepoch());

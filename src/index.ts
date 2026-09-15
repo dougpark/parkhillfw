@@ -23,7 +23,7 @@ import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expir
 import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
 import { getSetting, setSetting } from './lib/settings';
 
-const DEFAULT_ADMIN_EMAIL = 'parkdn@gmail.com';
+const DEFAULT_ADMIN_EMAIL = 'admin@parkhillfw.com';
 const DEFAULT_SITE_NAME = 'Park Hill Directory';
 import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor, type AppBindings, type AppEnv } from './middleware/auth';
 

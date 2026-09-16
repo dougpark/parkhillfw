@@ -60,9 +60,10 @@ function revealActions(): void {
 async function sharePhoto(): Promise<void> {
     if (!currentPhoto.value) return;
     try {
-        const res = await fetch(displayUrl(currentPhoto.value));
+        const res = await fetch(originalUrl(currentPhoto.value));
         const blob = await res.blob();
-        const file = new File([blob], `photo-${currentPhoto.value.id}.jpg`, { type: blob.type });
+        const ext = blob.type.split('/')[1] ?? 'jpg';
+        const file = new File([blob], `photo-${currentPhoto.value.id}.${ext}`, { type: blob.type });
         if (navigator.canShare?.({ files: [file] })) {
             await navigator.share({ files: [file] });
         } else {
@@ -79,6 +80,10 @@ function thumbUrl(photo: EventPhoto): string {
 
 function displayUrl(photo: EventPhoto): string {
     return `/api/photos/${photo.id}/display`;
+}
+
+function originalUrl(photo: EventPhoto): string {
+    return `/api/photos/${photo.id}/original`;
 }
 
 function formatDate(value: string | null): string {

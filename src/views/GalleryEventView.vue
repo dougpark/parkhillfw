@@ -141,7 +141,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
           v-for="(photo, index) in photos"
           :key="photo.id"
           type="button"
-          class="aspect-square overflow-hidden rounded-xl border border-theme-border bg-app-bg"
+          class="aspect-square overflow-hidden rounded-xl border border-theme-border bg-app-bg transition-all hover:scale-[1.02] hover:brightness-110"
           @click="openLightbox(index)"
         >
           <img :src="thumbUrl(photo)" :alt="photo.caption ?? ''" class="h-full w-full object-cover" loading="lazy" />

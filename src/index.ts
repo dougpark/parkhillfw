@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, asc, desc, eq, inArray, like, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import {
     accessRequests,
     activityLogs,
     children,
+    documentFolders,
     documents,
     householdFavorites,
     householdArchive,
@@ -1719,6 +1720,253 @@ app.get('/api/admin/attachments/images', requireAuth(), requirePageEditor(), asy
     const db = drizzle(c.env.DB);
     const rows = await db.select().from(documents).where(like(documents.mimeType, 'image/%')).orderBy(desc(documents.createdAt)).all();
     return c.json(rows);
+});
+
+// ==========================================
+// Document Library (single-level Folders -> Documents) — Google-Drive-style
+// archive, distinct from the per-page Attachments above (folderId vs pageId).
+// ==========================================
+
+const DOCUMENT_LIBRARY_MAX_BYTES = 20 * 1024 * 1024;
+const DOCUMENT_LIBRARY_SIZE_DESCRIPTION = '20 MB';
+const DOCUMENT_LIBRARY_MIME_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+const OFFICE_MIME_TYPES = new Set([
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+]);
+
+function documentDisplayName(document: { name: string | null; filename: string }): string {
+    return document.name?.trim() || document.filename;
+}
+
+app.get('/api/admin/document-folders', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folders = await db.select().from(documentFolders).orderBy(asc(documentFolders.name)).all();
+    const docCounts = await db.select({ folderId: documents.folderId, count: sql<number>`count(*)` })
+        .from(documents).where(isNull(documents.pageId)).groupBy(documents.folderId).all();
+    const countByFolder = new Map(docCounts.map((row) => [row.folderId, row.count]));
+    return c.json(folders.map((folder) => ({ ...folder, documentCount: countByFolder.get(folder.id) ?? 0 })));
+});
+
+app.post('/api/admin/document-folders', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ name?: string; description?: string }>().catch(() => ({} as Record<string, never>));
+    const name = body.name?.trim();
+    if (!name) return c.json({ error: 'Folder name is required.' }, 400);
+    const created = await db.insert(documentFolders).values({
+        name,
+        description: body.description?.trim() || null,
+    }).returning().then((rows) => rows[0]);
+    return c.json({ folder: created }, 201);
+});
+
+app.put('/api/admin/document-folders/:folderId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Invalid folder ID.' }, 400);
+    const existing = await db.select({ id: documentFolders.id }).from(documentFolders).where(eq(documentFolders.id, folderId)).get();
+    if (!existing) return c.json({ error: 'Folder not found.' }, 404);
+
+    const body = await c.req.json<{ name?: string; description?: string }>();
+    const name = body.name?.trim();
+    if (!name) return c.json({ error: 'Folder name is required.' }, 400);
+    const updated = await db.update(documentFolders).set({
+        name,
+        description: body.description?.trim() || null,
+        updatedAt: new Date(),
+    }).where(eq(documentFolders.id, folderId)).returning().then((rows) => rows[0]);
+    return c.json({ folder: updated });
+});
+
+app.delete('/api/admin/document-folders/:folderId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Invalid folder ID.' }, 400);
+    const existing = await db.select({ id: documentFolders.id }).from(documentFolders).where(eq(documentFolders.id, folderId)).get();
+    if (!existing) return c.json({ error: 'Folder not found.' }, 404);
+
+    const docRows = await db.select({ r2Key: documents.r2Key }).from(documents).where(eq(documents.folderId, folderId)).all();
+    await Promise.all(docRows.map((document) => c.env.BUCKET.delete(document.r2Key)));
+    await db.delete(documents).where(eq(documents.folderId, folderId));
+    await db.delete(documentFolders).where(eq(documentFolders.id, folderId));
+    return c.json({ deleted: true });
+});
+
+app.get('/api/admin/document-folders/:folderId/documents', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Invalid folder ID.' }, 400);
+    const rows = await db.select().from(documents).where(eq(documents.folderId, folderId)).orderBy(desc(documents.createdAt)).all();
+    return c.json(rows);
+});
+
+// Cross-folder search for the admin Document Library and the Page Editor attachment picker.
+app.get('/api/admin/documents/search', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const q = c.req.query('q')?.trim() ?? '';
+    const type = c.req.query('type')?.trim() ?? '';
+    const conditions = [sql`${documents.folderId} is not null`];
+    if (q) conditions.push(or(like(documents.name, `%${q}%`), like(documents.filename, `%${q}%`))!);
+    if (type === 'pdf') conditions.push(eq(documents.mimeType, 'application/pdf'));
+    else if (type === 'image') conditions.push(like(documents.mimeType, 'image/%'));
+    const rows = await db.select().from(documents).where(and(...conditions)).orderBy(desc(documents.createdAt)).all();
+    return c.json(rows);
+});
+
+app.post('/api/admin/document-folders/:folderId/documents', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { id: number };
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Invalid folder ID.' }, 400);
+    const folder = await db.select({ id: documentFolders.id }).from(documentFolders).where(eq(documentFolders.id, folderId)).get();
+    if (!folder) return c.json({ error: 'Folder not found.' }, 404);
+
+    const formData = await c.req.parseBody();
+    const file = formData['file'];
+    if (!(file instanceof File)) return c.json({ error: 'A file is required.' }, 400);
+    if (OFFICE_MIME_TYPES.has(file.type)) {
+        return c.json({ error: 'MS Office files are not supported. Please convert to PDF before uploading.' }, 415);
+    }
+    if (!DOCUMENT_LIBRARY_MIME_TYPES.has(file.type)) {
+        return c.json({ error: `"${file.name}" is not a supported file type. Allowed: PDF or images (PNG, JPEG, GIF, WebP).` }, 415);
+    }
+    if (file.size > DOCUMENT_LIBRARY_MAX_BYTES) {
+        return c.json({ error: `"${file.name}" is too large. Maximum size is ${DOCUMENT_LIBRARY_SIZE_DESCRIPTION}.` }, 413);
+    }
+
+    const conflict = await db.select({ id: documents.id, filename: documents.filename })
+        .from(documents).where(and(eq(documents.folderId, folderId), eq(documents.filename, file.name))).get();
+    if (conflict && c.req.query('replace') !== 'true') {
+        return c.json({ error: `A document named "${file.name}" already exists in this folder.`, existingDocumentId: conflict.id }, 409);
+    }
+
+    if (conflict) {
+        const existing = await db.select().from(documents).where(eq(documents.id, conflict.id)).get();
+        await c.env.BUCKET.delete(existing!.r2Key);
+        await c.env.BUCKET.put(existing!.r2Key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } });
+        const updated = await db.update(documents).set({
+            mimeType: file.type,
+            sizeBytes: file.size,
+            isDraft: true,
+            updatedAt: new Date(),
+        }).where(eq(documents.id, conflict.id)).returning().then((rows) => rows[0]);
+        return c.json({ document: updated }, 200);
+    }
+
+    const safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, '_') || 'file';
+    const r2Key = `library/${folderId}/${crypto.randomUUID()}-${safeName}`;
+    await c.env.BUCKET.put(r2Key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } });
+
+    const created = await db.insert(documents).values({
+        folderId,
+        r2Key,
+        filename: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        isDraft: true,
+        uploadedByUserId: user.id,
+    }).returning().then((rows) => rows[0]);
+    return c.json({ document: created }, 201);
+});
+
+app.put('/api/admin/documents/:documentId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const documentId = Number(c.req.param('documentId'));
+    if (!Number.isInteger(documentId)) return c.json({ error: 'Invalid document ID.' }, 400);
+    const existing = await db.select({ id: documents.id, folderId: documents.folderId }).from(documents).where(eq(documents.id, documentId)).get();
+    if (!existing || existing.folderId === null) return c.json({ error: 'Document not found.' }, 404);
+
+    const body = await c.req.json<{ name?: string; description?: string; isDraft?: boolean }>();
+    const updated = await db.update(documents).set({
+        name: body.name?.trim() || null,
+        description: body.description?.trim() || null,
+        isDraft: Boolean(body.isDraft),
+        updatedAt: new Date(),
+    }).where(eq(documents.id, documentId)).returning().then((rows) => rows[0]);
+    return c.json({ document: updated });
+});
+
+app.put('/api/admin/documents/:documentId/replace', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const documentId = Number(c.req.param('documentId'));
+    if (!Number.isInteger(documentId)) return c.json({ error: 'Invalid document ID.' }, 400);
+    const existing = await db.select().from(documents).where(eq(documents.id, documentId)).get();
+    if (!existing || existing.folderId === null) return c.json({ error: 'Document not found.' }, 404);
+
+    const formData = await c.req.parseBody();
+    const file = formData['file'];
+    if (!(file instanceof File)) return c.json({ error: 'A file is required.' }, 400);
+    if (OFFICE_MIME_TYPES.has(file.type)) {
+        return c.json({ error: 'MS Office files are not supported. Please convert to PDF before uploading.' }, 415);
+    }
+    if (!DOCUMENT_LIBRARY_MIME_TYPES.has(file.type)) {
+        return c.json({ error: `"${file.name}" is not a supported file type. Allowed: PDF or images (PNG, JPEG, GIF, WebP).` }, 415);
+    }
+    if (file.size > DOCUMENT_LIBRARY_MAX_BYTES) {
+        return c.json({ error: `"${file.name}" is too large. Maximum size is ${DOCUMENT_LIBRARY_SIZE_DESCRIPTION}.` }, 413);
+    }
+
+    await c.env.BUCKET.delete(existing.r2Key);
+    await c.env.BUCKET.put(existing.r2Key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } });
+    const updated = await db.update(documents).set({
+        filename: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        updatedAt: new Date(),
+    }).where(eq(documents.id, documentId)).returning().then((rows) => rows[0]);
+    return c.json({ document: updated });
+});
+
+// Reader routes below require only sign-in (any authenticated user), matching
+// the "any authenticated user can read documents linked from a Page" rule.
+// Drafts stay hidden from non-editors even if a link leaks into a public page.
+app.get('/api/documents/:documentId', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const documentId = Number(c.req.param('documentId'));
+    if (!Number.isInteger(documentId)) return c.json({ error: 'Document not found.' }, 404);
+    const document = await db.select().from(documents).where(eq(documents.id, documentId)).get();
+    if (!document || document.folderId === null) return c.json({ error: 'Document not found.' }, 404);
+
+    const user = c.get('user') as { isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const isEditor = Boolean(user.isPageEditor || user.isAdmin || user.isOwner);
+    if (document.isDraft && !isEditor) return c.json({ error: 'Document not found.' }, 404);
+
+    return c.json({
+        id: document.id,
+        name: documentDisplayName(document),
+        description: document.description,
+        mimeType: document.mimeType,
+        sizeBytes: document.sizeBytes,
+        url: `/api/files/${document.r2Key}`,
+    });
+});
+
+app.get('/api/documents/folder/:folderId', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Folder not found.' }, 404);
+    const folder = await db.select().from(documentFolders).where(eq(documentFolders.id, folderId)).get();
+    if (!folder) return c.json({ error: 'Folder not found.' }, 404);
+
+    const user = c.get('user') as { isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const isEditor = Boolean(user.isPageEditor || user.isAdmin || user.isOwner);
+    const rows = await db.select().from(documents)
+        .where(isEditor ? eq(documents.folderId, folderId) : and(eq(documents.folderId, folderId), eq(documents.isDraft, false)))
+        .orderBy(asc(documents.filename)).all();
+
+    return c.json({
+        folder: { id: folder.id, name: folder.name, description: folder.description },
+        documents: rows.map((document) => ({
+            id: document.id,
+            name: documentDisplayName(document),
+            mimeType: document.mimeType,
+            sizeBytes: document.sizeBytes,
+        })),
+    });
 });
 
 // ==========================================

@@ -3,7 +3,6 @@ import { onMounted, ref } from 'vue';
 import { BookOpen, DollarSign, Pencil, ShieldCheck } from 'lucide-vue-next';
 import NavCardGrid from '../components/menus/NavCardGrid.vue';
 import type { NavNode } from '../components/menus/menuTree';
-import heroLogo from '/modern-ph-logo-clear.svg?raw';
 
 interface AuthUser {
   isOwner?: boolean;
@@ -14,6 +13,9 @@ interface AuthUser {
 
 const user = ref<AuthUser | null>(null);
 const pendingRequests = ref(0);
+// Fetched at runtime instead of a static `?raw` import — that pattern is unreliable
+// for public/ assets when this view is loaded via the router's lazy import().
+const heroLogo = ref('');
 const navItems = ref<NavNode[]>([]);
 
 const baseCards = [
@@ -45,6 +47,13 @@ const canAdmin = (authUser: AuthUser) => Boolean(
 );
 
 onMounted(async () => {
+  try {
+    const logoResponse = await fetch('/modern-ph-logo-clear.svg');
+    if (logoResponse.ok) heroLogo.value = await logoResponse.text();
+  } catch {
+    heroLogo.value = '';
+  }
+
   try {
     const navResponse = await fetch('/api/nav');
     if (navResponse.ok) navItems.value = ((await navResponse.json()) as { items: NavNode[] }).items;

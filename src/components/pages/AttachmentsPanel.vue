@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Check, Copy, FileText, Images, Trash2, Upload, X } from 'lucide-vue-next';
+import { Check, Copy, FileText, Folder, FolderSearch, Images, Trash2, Upload, X } from 'lucide-vue-next';
+import { formatFileSize } from '../../composables/useDocumentLibrary';
 
 interface Attachment {
     id: number;
@@ -9,6 +10,21 @@ interface Attachment {
     mimeType: string;
     sizeBytes: number;
     createdAt: string;
+}
+
+interface LibraryDocumentRow {
+    id: number;
+    folderId: number;
+    filename: string;
+    name: string | null;
+    mimeType: string;
+    sizeBytes: number;
+}
+
+interface LibraryFolderRow {
+    id: number;
+    name: string;
+    documentCount: number;
 }
 
 const props = defineProps<{ pageId: number }>();
@@ -105,6 +121,45 @@ function pickLibraryImage(image: Attachment): void {
     showLibrary.value = false;
 }
 
+const showDocLibrary = ref(false);
+const docLibraryLoading = ref(false);
+const docSearch = ref('');
+const docTypeFilter = ref<'' | 'pdf' | 'image'>('');
+const libraryDocuments = ref<LibraryDocumentRow[]>([]);
+const libraryFolders = ref<LibraryFolderRow[]>([]);
+
+function libraryDocName(document: LibraryDocumentRow): string {
+    return document.name?.trim() || document.filename;
+}
+
+async function searchLibraryDocuments(): Promise<void> {
+    docLibraryLoading.value = true;
+    const params = new URLSearchParams();
+    if (docSearch.value.trim()) params.set('q', docSearch.value.trim());
+    if (docTypeFilter.value) params.set('type', docTypeFilter.value);
+    const res = await fetch(`/api/admin/documents/search?${params.toString()}`);
+    if (res.ok) libraryDocuments.value = (await res.json()) as LibraryDocumentRow[];
+    docLibraryLoading.value = false;
+}
+
+async function openDocLibrary(): Promise<void> {
+    showDocLibrary.value = true;
+    docLibraryLoading.value = true;
+    const foldersRes = await fetch('/api/admin/document-folders');
+    if (foldersRes.ok) libraryFolders.value = (await foldersRes.json()) as LibraryFolderRow[];
+    await searchLibraryDocuments();
+}
+
+function insertDocumentLink(document: LibraryDocumentRow): void {
+    emit('insert', `[${libraryDocName(document)}](/library/documents/${document.id})`);
+    showDocLibrary.value = false;
+}
+
+function insertFolderLink(folder: LibraryFolderRow): void {
+    emit('insert', `[${folder.name}](/library/folders/${folder.id})`);
+    showDocLibrary.value = false;
+}
+
 onMounted(load);
 defineExpose({ load });
 </script>
@@ -121,6 +176,14 @@ defineExpose({ load });
         >
           <Images class="h-4 w-4" />
           Browse images
+        </button>
+        <button
+          type="button"
+          class="flex items-center gap-2 rounded-full border border-theme-border bg-surface px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-app-bg"
+          @click="openDocLibrary"
+        >
+          <FolderSearch class="h-4 w-4" />
+          Document library
         </button>
         <button
           type="button"
@@ -223,6 +286,82 @@ defineExpose({ load });
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div v-if="showDocLibrary" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4" @click.self="showDocLibrary = false">
+      <div class="flex h-full w-full max-w-2xl flex-col bg-surface p-6 shadow-xl sm:h-auto sm:max-h-[80vh] sm:rounded-3xl">
+        <div class="flex items-center justify-between">
+          <h4 class="text-lg font-semibold">Document library</h4>
+          <button
+            type="button"
+            title="Close"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-app-bg"
+            @click="showDocLibrary = false"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        </div>
+        <p class="mt-1 text-sm text-content-muted">Insert a link to a document, or to a whole folder (visitors see a list of its documents).</p>
+
+        <div v-if="libraryFolders.length" class="mt-3 flex flex-wrap gap-2">
+          <button
+            v-for="folder in libraryFolders"
+            :key="folder.id"
+            type="button"
+            class="flex items-center gap-1.5 rounded-full border border-theme-border px-3 py-1.5 text-xs font-medium text-content-muted hover:bg-app-bg hover:text-accent"
+            :title="`Insert folder link for ${folder.name}`"
+            @click="insertFolderLink(folder)"
+          >
+            <Folder class="h-3.5 w-3.5" />
+            {{ folder.name }} ({{ folder.documentCount }})
+          </button>
+        </div>
+
+        <div class="mt-3 flex flex-wrap gap-2">
+          <input
+            v-model="docSearch"
+            type="search"
+            placeholder="Search documents by name…"
+            class="min-w-0 flex-1 rounded-xl border border-theme-border bg-surface px-4 py-2.5 text-sm text-content placeholder:text-content-muted focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+            @keyup.enter="searchLibraryDocuments"
+          />
+          <select
+            v-model="docTypeFilter"
+            class="rounded-xl border border-theme-border bg-surface px-3 py-2.5 text-sm text-content focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
+            @change="searchLibraryDocuments"
+          >
+            <option value="">All types</option>
+            <option value="pdf">PDF</option>
+            <option value="image">Images</option>
+          </select>
+          <button
+            type="button"
+            class="rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted hover:bg-app-bg"
+            @click="searchLibraryDocuments"
+          >
+            Search
+          </button>
+        </div>
+
+        <p v-if="docLibraryLoading" class="py-8 text-center text-sm text-content-muted">Loading documents…</p>
+        <p v-else-if="!libraryDocuments.length" class="py-8 text-center text-sm text-content-muted">No documents match.</p>
+        <ul v-else class="mt-3 min-h-0 flex-1 divide-y divide-theme-border overflow-y-auto">
+          <li v-for="document in libraryDocuments" :key="document.id" class="flex items-center gap-3 py-2">
+            <FileText class="h-5 w-5 shrink-0 text-content-muted" />
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-medium">{{ libraryDocName(document) }}</p>
+              <p class="text-xs text-content-muted">{{ document.mimeType }} · {{ formatFileSize(document.sizeBytes) }}</p>
+            </div>
+            <button
+              type="button"
+              class="rounded-full px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
+              @click="insertDocumentLink(document)"
+            >
+              Insert
+            </button>
+          </li>
+        </ul>
       </div>
     </div>
   </section>

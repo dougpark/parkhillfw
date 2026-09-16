@@ -349,22 +349,44 @@ export const settings = sqliteTable(
 // 4. DOCUMENTS & ATTACHMENTS (R2 Storage)
 // ==========================================
 
+// Single-level Document Library folders (no nesting). A folder can be
+// published to a page via a markdown link that lists its documents.
+export const documentFolders = sqliteTable(
+    'document_folders',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        name: text('name').notNull(),
+        description: text('description'),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+);
+
+// Rows with folderId set are Document Library items; rows with pageId set
+// (folderId null) are the existing per-page attachment/embed system.
 export const documents = sqliteTable(
     'documents',
     {
         id: integer('id').primaryKey({ autoIncrement: true }),
         pageId: integer('page_id').references(() => pages.id, { onDelete: 'cascade' }),
+        folderId: integer('folder_id').references(() => documentFolders.id, { onDelete: 'cascade' }),
         r2Key: text('r2_key').notNull(),
         filename: text('filename').notNull(),
+        // Editable display name for Document Library items; falls back to filename when null.
+        name: text('name'),
+        description: text('description'),
         mimeType: text('mime_type').notNull(),
         sizeBytes: integer('size_bytes').notNull(),
+        isDraft: integer('is_draft', { mode: 'boolean' }).default(true),
 
         uploadedByUserId: integer('uploaded_by_user_id').references(() => users.id, { onDelete: 'set null' }),
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     },
     (table) => [
         uniqueIndex('idx_documents_r2_key_unique').on(table.r2Key),
         index('idx_documents_page').on(table.pageId),
+        index('idx_documents_folder').on(table.folderId),
     ]
 );
 

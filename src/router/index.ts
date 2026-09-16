@@ -93,6 +93,18 @@ const router = createRouter({
             meta: { requiresAuth: true },
             component: () => import('../views/GalleryEventView.vue'),
         },
+        {
+            path: '/library/documents/:id',
+            name: 'library-document',
+            meta: { requiresAuth: true },
+            component: () => import('../views/LibraryDocumentView.vue'),
+        },
+        {
+            path: '/library/folders/:id',
+            name: 'library-folder',
+            meta: { requiresAuth: true },
+            component: () => import('../views/LibraryFolderView.vue'),
+        },
     ],
 });
 

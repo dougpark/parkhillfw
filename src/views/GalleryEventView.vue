@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, Share2, X } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 
 interface EventPhoto {
@@ -31,6 +31,47 @@ const error = ref('');
 const lightboxIndex = ref<number | null>(null);
 
 const currentPhoto = computed(() => (lightboxIndex.value !== null ? photos.value[lightboxIndex.value] ?? null : null));
+const slideDirection = ref<'next' | 'prev'>('next');
+const transitionName = computed(() => (slideDirection.value === 'next' ? 'slide-next' : 'slide-prev'));
+const showActions = ref(false);
+const canShare = computed(() => typeof navigator !== 'undefined' && !!navigator.share);
+let hideActionsTimer: ReturnType<typeof setTimeout> | null = null;
+
+function hideActions(): void {
+    showActions.value = false;
+    if (hideActionsTimer) {
+        clearTimeout(hideActionsTimer);
+        hideActionsTimer = null;
+    }
+}
+
+function toggleActions(): void {
+    showActions.value = !showActions.value;
+    if (hideActionsTimer) clearTimeout(hideActionsTimer);
+    if (showActions.value) hideActionsTimer = setTimeout(() => { showActions.value = false; }, 3000);
+}
+
+function revealActions(): void {
+    showActions.value = true;
+    if (hideActionsTimer) clearTimeout(hideActionsTimer);
+    hideActionsTimer = setTimeout(() => { showActions.value = false; }, 3000);
+}
+
+async function sharePhoto(): Promise<void> {
+    if (!currentPhoto.value) return;
+    try {
+        const res = await fetch(displayUrl(currentPhoto.value));
+        const blob = await res.blob();
+        const file = new File([blob], `photo-${currentPhoto.value.id}.jpg`, { type: blob.type });
+        if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file] });
+        } else {
+            await navigator.share({ url: window.location.href });
+        }
+    } catch {
+        // user cancelled the share sheet — nothing to do
+    }
+}
 
 function thumbUrl(photo: EventPhoto): string {
     return `/api/photos/${photo.id}/thumb`;
@@ -62,19 +103,25 @@ async function load(slug: string): Promise<void> {
 
 function openLightbox(index: number): void {
     lightboxIndex.value = index;
+    revealActions();
 }
 
 function closeLightbox(): void {
+    hideActions();
     lightboxIndex.value = null;
 }
 
 function showPrev(): void {
     if (lightboxIndex.value === null) return;
+    revealActions();
+    slideDirection.value = 'prev';
     lightboxIndex.value = (lightboxIndex.value - 1 + photos.value.length) % photos.value.length;
 }
 
 function showNext(): void {
     if (lightboxIndex.value === null) return;
+    revealActions();
+    slideDirection.value = 'next';
     lightboxIndex.value = (lightboxIndex.value + 1) % photos.value.length;
 }
 
@@ -95,13 +142,25 @@ watch(lightboxIndex, (index) => {
 });
 
 let touchStartX = 0;
+let isMultiTouch = false;
 function onTouchStart(e: TouchEvent): void {
+    isMultiTouch = e.touches.length > 1;
     touchStartX = e.changedTouches[0]?.clientX ?? 0;
 }
+function onTouchMove(e: TouchEvent): void {
+    if (e.touches.length > 1) isMultiTouch = true;
+}
 function onTouchEnd(e: TouchEvent): void {
+    // Let taps that land directly on a button (close/prev/next/download/share) fire their own click normally.
+    if ((e.target as HTMLElement | null)?.closest('button')) return;
+    e.preventDefault();
+    if (isMultiTouch) return;
     const endX = e.changedTouches[0]?.clientX ?? 0;
     const delta = endX - touchStartX;
-    if (Math.abs(delta) < 40) return;
+    if (Math.abs(delta) < 40) {
+        toggleActions();
+        return;
+    }
     if (delta > 0) showPrev();
     else showNext();
 }
@@ -154,36 +213,80 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
 
     <div
       v-if="currentPhoto"
-      class="fixed inset-0 z-50 flex flex-col bg-black/90"
+      class="fixed inset-0 z-50 flex flex-col bg-[#171818]"
       @touchstart="onTouchStart"
+      @touchmove="onTouchMove"
       @touchend="onTouchEnd"
+      @click="toggleActions"
+      @mousemove="revealActions"
     >
-      <button type="button" class="absolute right-4 top-4 rounded-full bg-black/40 p-2 text-white hover:bg-black/60" aria-label="Close" @click="closeLightbox">
+      <button type="button" class="absolute right-4 top-4 z-10 rounded-full bg-black/40 p-2 text-white hover:bg-black/60" aria-label="Close" @click.stop="closeLightbox">
         <X class="h-6 w-6" />
       </button>
-      <button
-        v-if="photos.length > 1"
-        type="button"
-        class="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 sm:left-4"
-        aria-label="Previous photo"
-        @click="showPrev"
-      >
-        <ChevronLeft class="h-7 w-7" />
-      </button>
-      <button
-        v-if="photos.length > 1"
-        type="button"
-        class="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 sm:right-4"
-        aria-label="Next photo"
-        @click="showNext"
-      >
-        <ChevronRight class="h-7 w-7" />
-      </button>
+      <Transition name="fade">
+        <button
+          v-if="showActions && canShare"
+          type="button"
+          class="absolute left-4 top-4 z-10 rounded-full bg-black/40 p-2 text-white hover:bg-black/60"
+          aria-label="Share photo"
+          @click.stop="sharePhoto"
+        >
+          <Share2 class="h-5 w-5" />
+        </button>
+      </Transition>
+      <Transition name="fade">
+        <button
+          v-if="photos.length > 1 && showActions"
+          type="button"
+          class="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 sm:left-4"
+          aria-label="Previous photo"
+          @click.stop="showPrev"
+        >
+          <ChevronLeft class="h-7 w-7" />
+        </button>
+      </Transition>
+      <Transition name="fade">
+        <button
+          v-if="photos.length > 1 && showActions"
+          type="button"
+          class="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/60 sm:right-4"
+          aria-label="Next photo"
+          @click.stop="showNext"
+        >
+          <ChevronRight class="h-7 w-7" />
+        </button>
+      </Transition>
 
-      <div class="flex min-h-0 flex-1 items-center justify-center p-4">
-        <img :src="displayUrl(currentPhoto)" :alt="currentPhoto.caption ?? ''" class="max-h-full max-w-full object-contain" />
+      <div class="relative min-h-0 flex-1 overflow-hidden">
+        <Transition :name="transitionName">
+          <div :key="currentPhoto.id" class="absolute inset-0 flex items-center justify-center p-4">
+            <img :src="displayUrl(currentPhoto)" :alt="currentPhoto.caption ?? ''" class="max-h-full max-w-full object-contain" />
+          </div>
+        </Transition>
       </div>
+
       <p v-if="currentPhoto.caption" class="pb-6 text-center text-sm text-white/80">{{ currentPhoto.caption }}</p>
     </div>
   </section>
 </template>
+
+<style scoped>
+.slide-next-enter-active,
+.slide-next-leave-active,
+.slide-prev-enter-active,
+.slide-prev-leave-active {
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+.slide-next-enter-from { transform: translateX(100%); opacity: 0; }
+.slide-next-leave-to { transform: translateX(-100%); opacity: 0; }
+.slide-prev-enter-from { transform: translateX(-100%); opacity: 0; }
+.slide-prev-leave-to { transform: translateX(100%); opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

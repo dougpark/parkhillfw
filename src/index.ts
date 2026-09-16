@@ -14,6 +14,9 @@ import {
     magicTokens,
     menus,
     pages,
+    photoEvents,
+    photoFolders,
+    photos,
     residents,
     sessions,
     userLoginEmails,
@@ -1716,6 +1719,410 @@ app.get('/api/admin/attachments/images', requireAuth(), requirePageEditor(), asy
     const db = drizzle(c.env.DB);
     const rows = await db.select().from(documents).where(like(documents.mimeType, 'image/%')).orderBy(desc(documents.createdAt)).all();
     return c.json(rows);
+});
+
+// ==========================================
+// Photo Gallery (Folders -> Events -> Photos) — page editor role required to manage
+// ==========================================
+
+const PHOTO_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_PHOTO_ORIGINAL_BYTES = 20 * 1024 * 1024;
+const MAX_PHOTO_VARIANT_BYTES = 5 * 1024 * 1024;
+
+async function uniquePhotoFolderSlug(db: PagesDb, name: string, excludeId?: number): Promise<string> {
+    const base = slugify(name);
+    let candidate = base;
+    for (let suffix = 2; ; suffix++) {
+        const existing = await db.select({ id: photoFolders.id }).from(photoFolders).where(eq(photoFolders.slug, candidate)).get();
+        if (!existing || existing.id === excludeId) return candidate;
+        candidate = `${base}-${suffix}`;
+    }
+}
+
+async function uniquePhotoEventSlug(db: PagesDb, name: string, excludeId?: number): Promise<string> {
+    const base = slugify(name);
+    let candidate = base;
+    for (let suffix = 2; ; suffix++) {
+        const existing = await db.select({ id: photoEvents.id }).from(photoEvents).where(eq(photoEvents.slug, candidate)).get();
+        if (!existing || existing.id === excludeId) return candidate;
+        candidate = `${base}-${suffix}`;
+    }
+}
+
+// Same visibility rule as pages: drafts are editor-only, non-public events need a matched directory record.
+function canViewEvent(
+    event: { isDraft: boolean | null; isPublic: boolean | null },
+    user: { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean }
+): boolean {
+    const isEditor = Boolean(user.isPageEditor || user.isAdmin || user.isOwner);
+    if (event.isDraft && !isEditor) return false;
+    if (!event.isDraft && !event.isPublic && !user.residentId && !isEditor) return false;
+    return true;
+}
+
+async function deletePhotosR2(bucket: R2Bucket, rows: Array<{ r2Key: string; r2ThumbKey: string; r2DisplayKey: string }>): Promise<void> {
+    const keys = rows.flatMap((row) => [row.r2Key, row.r2ThumbKey, row.r2DisplayKey]);
+    await Promise.all(keys.map((key) => bucket.delete(key)));
+}
+
+app.get('/api/admin/photo-folders', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folders = await db.select().from(photoFolders).orderBy(asc(photoFolders.displayOrder), asc(photoFolders.id)).all();
+    const eventCounts = await db.select({ folderId: photoEvents.folderId, count: sql<number>`count(*)` })
+        .from(photoEvents).groupBy(photoEvents.folderId).all();
+    const countByFolder = new Map(eventCounts.map((row) => [row.folderId, row.count]));
+    return c.json(folders.map((folder) => ({ ...folder, eventCount: countByFolder.get(folder.id) ?? 0 })));
+});
+
+app.post('/api/admin/photo-folders', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ name?: string }>().catch(() => ({ name: undefined }));
+    const name = body.name?.trim();
+    if (!name) return c.json({ error: 'Folder name is required.' }, 400);
+    const slug = await uniquePhotoFolderSlug(db, name);
+    const maxOrder = await db.select({ max: sql<number | null>`max(display_order)` }).from(photoFolders).get();
+    const created = await db.insert(photoFolders).values({
+        name,
+        slug,
+        displayOrder: (maxOrder?.max ?? -1) + 1,
+    }).returning().then((rows) => rows[0]);
+    return c.json({ folder: created }, 201);
+});
+
+app.put('/api/admin/photo-folders/:folderId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Invalid folder ID.' }, 400);
+    const existing = await db.select({ id: photoFolders.id }).from(photoFolders).where(eq(photoFolders.id, folderId)).get();
+    if (!existing) return c.json({ error: 'Folder not found.' }, 404);
+
+    const body = await c.req.json<{ name?: string }>();
+    const name = body.name?.trim();
+    if (!name) return c.json({ error: 'Folder name is required.' }, 400);
+    const slug = await uniquePhotoFolderSlug(db, name, folderId);
+    const updated = await db.update(photoFolders).set({ name, slug, updatedAt: new Date() })
+        .where(eq(photoFolders.id, folderId)).returning().then((rows) => rows[0]);
+    return c.json({ folder: updated });
+});
+
+app.post('/api/admin/photo-folders/reorder', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ folderIds?: number[] }>().catch(() => ({ folderIds: undefined }));
+    const folderIds = body.folderIds;
+    if (!Array.isArray(folderIds) || folderIds.some((id) => !Number.isInteger(id))) {
+        return c.json({ error: 'folderIds must be an array of folder IDs.' }, 400);
+    }
+    await Promise.all(folderIds.map((id, index) =>
+        db.update(photoFolders).set({ displayOrder: index }).where(eq(photoFolders.id, id))));
+    return c.json({ reordered: true });
+});
+
+app.delete('/api/admin/photo-folders/:folderId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Invalid folder ID.' }, 400);
+    const existing = await db.select({ id: photoFolders.id }).from(photoFolders).where(eq(photoFolders.id, folderId)).get();
+    if (!existing) return c.json({ error: 'Folder not found.' }, 404);
+
+    const eventRows = await db.select({ id: photoEvents.id }).from(photoEvents).where(eq(photoEvents.folderId, folderId)).all();
+    const eventIds = eventRows.map((row) => row.id);
+    if (eventIds.length) {
+        const photoRows = await db.select({ r2Key: photos.r2Key, r2ThumbKey: photos.r2ThumbKey, r2DisplayKey: photos.r2DisplayKey })
+            .from(photos).where(inArray(photos.eventId, eventIds)).all();
+        await deletePhotosR2(c.env.BUCKET, photoRows);
+        await db.delete(photos).where(inArray(photos.eventId, eventIds));
+        await db.delete(photoEvents).where(eq(photoEvents.folderId, folderId));
+    }
+    await db.delete(photoFolders).where(eq(photoFolders.id, folderId));
+    return c.json({ deleted: true });
+});
+
+app.get('/api/admin/photo-folders/:folderId/events', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const folderId = Number(c.req.param('folderId'));
+    if (!Number.isInteger(folderId)) return c.json({ error: 'Invalid folder ID.' }, 400);
+    const events = await db.select().from(photoEvents).where(eq(photoEvents.folderId, folderId))
+        .orderBy(asc(photoEvents.displayOrder), asc(photoEvents.id)).all();
+    const photoCounts = await db.select({ eventId: photos.eventId, count: sql<number>`count(*)` })
+        .from(photos).groupBy(photos.eventId).all();
+    const countByEvent = new Map(photoCounts.map((row) => [row.eventId, row.count]));
+    return c.json(events.map((event) => ({ ...event, photoCount: countByEvent.get(event.id) ?? 0 })));
+});
+
+app.get('/api/admin/photo-events/:eventId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const eventId = Number(c.req.param('eventId'));
+    if (!Number.isInteger(eventId)) return c.json({ error: 'Invalid event ID.' }, 400);
+    const event = await db.select().from(photoEvents).where(eq(photoEvents.id, eventId)).get();
+    if (!event) return c.json({ error: 'Event not found.' }, 404);
+    return c.json({ event });
+});
+
+app.post('/api/admin/photo-events', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const body = await c.req.json<{ folderId?: number; name?: string; description?: string; eventDate?: string }>()
+        .catch(() => ({} as Record<string, never>));
+    const folderId = Number(body.folderId);
+    const name = body.name?.trim();
+    if (!Number.isInteger(folderId)) return c.json({ error: 'A folder is required.' }, 400);
+    if (!name) return c.json({ error: 'Event name is required.' }, 400);
+    const folder = await db.select({ id: photoFolders.id }).from(photoFolders).where(eq(photoFolders.id, folderId)).get();
+    if (!folder) return c.json({ error: 'Folder not found.' }, 404);
+
+    const slug = await uniquePhotoEventSlug(db, name);
+    const maxOrder = await db.select({ max: sql<number | null>`max(display_order)` }).from(photoEvents).where(eq(photoEvents.folderId, folderId)).get();
+    const created = await db.insert(photoEvents).values({
+        folderId,
+        name,
+        slug,
+        description: body.description?.trim() || null,
+        eventDate: body.eventDate ? new Date(body.eventDate) : null,
+        isDraft: true,
+        isPublic: true,
+        displayOrder: (maxOrder?.max ?? -1) + 1,
+    }).returning().then((rows) => rows[0]);
+    return c.json({ event: created }, 201);
+});
+
+app.put('/api/admin/photo-events/:eventId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const eventId = Number(c.req.param('eventId'));
+    if (!Number.isInteger(eventId)) return c.json({ error: 'Invalid event ID.' }, 400);
+    const existing = await db.select().from(photoEvents).where(eq(photoEvents.id, eventId)).get();
+    if (!existing) return c.json({ error: 'Event not found.' }, 404);
+
+    const body = await c.req.json<{
+        folderId?: number; name?: string; description?: string; eventDate?: string | null;
+        isPublic?: boolean; isDraft?: boolean;
+    }>();
+    const name = body.name?.trim();
+    if (!name) return c.json({ error: 'Event name is required.' }, 400);
+    const folderId = Number(body.folderId ?? existing.folderId);
+    if (folderId !== existing.folderId) {
+        const folder = await db.select({ id: photoFolders.id }).from(photoFolders).where(eq(photoFolders.id, folderId)).get();
+        if (!folder) return c.json({ error: 'Folder not found.' }, 404);
+    }
+    const slug = await uniquePhotoEventSlug(db, name, eventId);
+
+    const updated = await db.update(photoEvents).set({
+        folderId,
+        name,
+        slug,
+        description: body.description?.trim() || null,
+        eventDate: body.eventDate ? new Date(body.eventDate) : null,
+        isPublic: Boolean(body.isPublic),
+        isDraft: Boolean(body.isDraft),
+        updatedAt: new Date(),
+    }).where(eq(photoEvents.id, eventId)).returning().then((rows) => rows[0]);
+    return c.json({ event: updated });
+});
+
+app.delete('/api/admin/photo-events/:eventId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const eventId = Number(c.req.param('eventId'));
+    if (!Number.isInteger(eventId)) return c.json({ error: 'Invalid event ID.' }, 400);
+    const existing = await db.select({ id: photoEvents.id }).from(photoEvents).where(eq(photoEvents.id, eventId)).get();
+    if (!existing) return c.json({ error: 'Event not found.' }, 404);
+
+    const photoRows = await db.select({ r2Key: photos.r2Key, r2ThumbKey: photos.r2ThumbKey, r2DisplayKey: photos.r2DisplayKey })
+        .from(photos).where(eq(photos.eventId, eventId)).all();
+    await deletePhotosR2(c.env.BUCKET, photoRows);
+    await db.delete(photos).where(eq(photos.eventId, eventId));
+    await db.delete(photoEvents).where(eq(photoEvents.id, eventId));
+    return c.json({ deleted: true });
+});
+
+app.get('/api/admin/photo-events/:eventId/photos', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const eventId = Number(c.req.param('eventId'));
+    if (!Number.isInteger(eventId)) return c.json({ error: 'Invalid event ID.' }, 400);
+    const rows = await db.select().from(photos).where(eq(photos.eventId, eventId))
+        .orderBy(asc(photos.displayOrder), asc(photos.id)).all();
+    return c.json(rows);
+});
+
+app.post('/api/admin/photo-events/:eventId/photos', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { id: number };
+    const eventId = Number(c.req.param('eventId'));
+    if (!Number.isInteger(eventId)) return c.json({ error: 'Invalid event ID.' }, 400);
+    const event = await db.select({ id: photoEvents.id, coverPhotoId: photoEvents.coverPhotoId }).from(photoEvents).where(eq(photoEvents.id, eventId)).get();
+    if (!event) return c.json({ error: 'Event not found.' }, 404);
+
+    const formData = await c.req.parseBody();
+    const original = formData['original'];
+    const thumb = formData['thumb'];
+    const display = formData['display'];
+    const width = Number(formData['width']);
+    const height = Number(formData['height']);
+    const caption = typeof formData['caption'] === 'string' ? formData['caption'].trim() || null : null;
+
+    if (!(original instanceof File) || !(thumb instanceof File) || !(display instanceof File)) {
+        return c.json({ error: 'original, thumb, and display images are all required.' }, 400);
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        return c.json({ error: 'Valid image width and height are required.' }, 400);
+    }
+    for (const [file, maxBytes] of [[original, MAX_PHOTO_ORIGINAL_BYTES], [thumb, MAX_PHOTO_VARIANT_BYTES], [display, MAX_PHOTO_VARIANT_BYTES]] as const) {
+        if (!PHOTO_MIME_TYPES.has(file.type)) return c.json({ error: `"${file.name}" is not a supported image type.` }, 415);
+        if (file.size > maxBytes) return c.json({ error: `"${file.name}" is too large.` }, 413);
+    }
+
+    const photoId = crypto.randomUUID();
+    const r2Key = `photos/${photoId}/original.${original.type.split('/')[1]}`;
+    const r2ThumbKey = `photos/${photoId}/thumb.webp`;
+    const r2DisplayKey = `photos/${photoId}/display.webp`;
+    await Promise.all([
+        c.env.BUCKET.put(r2Key, await original.arrayBuffer(), { httpMetadata: { contentType: original.type } }),
+        c.env.BUCKET.put(r2ThumbKey, await thumb.arrayBuffer(), { httpMetadata: { contentType: 'image/webp' } }),
+        c.env.BUCKET.put(r2DisplayKey, await display.arrayBuffer(), { httpMetadata: { contentType: 'image/webp' } }),
+    ]);
+
+    const maxOrder = await db.select({ max: sql<number | null>`max(display_order)` }).from(photos).where(eq(photos.eventId, eventId)).get();
+    const created = await db.insert(photos).values({
+        eventId,
+        r2Key,
+        r2ThumbKey,
+        r2DisplayKey,
+        caption,
+        width: Math.round(width),
+        height: Math.round(height),
+        displayOrder: (maxOrder?.max ?? -1) + 1,
+        uploadedByUserId: user.id,
+    }).returning().then((rows) => rows[0]);
+
+    if (!event.coverPhotoId) {
+        await db.update(photoEvents).set({ coverPhotoId: created!.id }).where(eq(photoEvents.id, eventId));
+    }
+    return c.json({ photo: created }, 201);
+});
+
+app.put('/api/admin/photos/:photoId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const photoId = Number(c.req.param('photoId'));
+    if (!Number.isInteger(photoId)) return c.json({ error: 'Invalid photo ID.' }, 400);
+    const existing = await db.select({ id: photos.id }).from(photos).where(eq(photos.id, photoId)).get();
+    if (!existing) return c.json({ error: 'Photo not found.' }, 404);
+
+    const body = await c.req.json<{ caption?: string }>();
+    const updated = await db.update(photos).set({ caption: body.caption?.trim() || null })
+        .where(eq(photos.id, photoId)).returning().then((rows) => rows[0]);
+    return c.json({ photo: updated });
+});
+
+app.delete('/api/admin/photos/:photoId', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const photoId = Number(c.req.param('photoId'));
+    if (!Number.isInteger(photoId)) return c.json({ error: 'Invalid photo ID.' }, 400);
+    const existing = await db.select().from(photos).where(eq(photos.id, photoId)).get();
+    if (!existing) return c.json({ error: 'Photo not found.' }, 404);
+
+    await deletePhotosR2(c.env.BUCKET, [existing]);
+    await db.delete(photos).where(eq(photos.id, photoId));
+    await db.update(photoEvents).set({ coverPhotoId: null })
+        .where(and(eq(photoEvents.id, existing.eventId), eq(photoEvents.coverPhotoId, photoId)));
+    return c.json({ deleted: true });
+});
+
+app.post('/api/admin/photo-events/:eventId/photos/reorder', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const eventId = Number(c.req.param('eventId'));
+    if (!Number.isInteger(eventId)) return c.json({ error: 'Invalid event ID.' }, 400);
+    const body = await c.req.json<{ photoIds?: number[] }>().catch(() => ({ photoIds: undefined }));
+    const photoIds = body.photoIds;
+    if (!Array.isArray(photoIds) || photoIds.some((id) => !Number.isInteger(id))) {
+        return c.json({ error: 'photoIds must be an array of photo IDs.' }, 400);
+    }
+    await Promise.all(photoIds.map((id, index) =>
+        db.update(photos).set({ displayOrder: index }).where(and(eq(photos.id, id), eq(photos.eventId, eventId)))));
+    return c.json({ reordered: true });
+});
+
+app.post('/api/admin/photo-events/:eventId/cover', requireAuth(), requirePageEditor(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const eventId = Number(c.req.param('eventId'));
+    if (!Number.isInteger(eventId)) return c.json({ error: 'Invalid event ID.' }, 400);
+    const body = await c.req.json<{ photoId?: number }>().catch(() => ({ photoId: undefined }));
+    const photoId = Number(body.photoId);
+    if (!Number.isInteger(photoId)) return c.json({ error: 'A photo ID is required.' }, 400);
+    const photo = await db.select({ id: photos.id }).from(photos).where(and(eq(photos.id, photoId), eq(photos.eventId, eventId))).get();
+    if (!photo) return c.json({ error: 'Photo not found in this event.' }, 404);
+    await db.update(photoEvents).set({ coverPhotoId: photoId }).where(eq(photoEvents.id, eventId));
+    return c.json({ coverPhotoId: photoId });
+});
+
+// Public gallery listing — same visibility rule as pages (see canViewEvent).
+app.get('/api/gallery', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const folders = await db.select().from(photoFolders).orderBy(asc(photoFolders.displayOrder), asc(photoFolders.id)).all();
+    const events = await db.select().from(photoEvents).orderBy(asc(photoEvents.displayOrder), asc(photoEvents.id)).all();
+    const visibleEvents = events.filter((event) => canViewEvent(event, user));
+    const eventsByFolder = new Map<number, typeof visibleEvents>();
+    for (const event of visibleEvents) {
+        const bucket = eventsByFolder.get(event.folderId) ?? [];
+        bucket.push(event);
+        eventsByFolder.set(event.folderId, bucket);
+    }
+    const result = folders
+        .map((folder) => ({
+            id: folder.id,
+            name: folder.name,
+            slug: folder.slug,
+            events: (eventsByFolder.get(folder.id) ?? []).map((event) => ({
+                id: event.id,
+                name: event.name,
+                slug: event.slug,
+                eventDate: event.eventDate,
+                isDraft: event.isDraft,
+                coverPhotoId: event.coverPhotoId,
+            })),
+        }))
+        .filter((folder) => folder.events.length > 0);
+    return c.json(result);
+});
+
+app.get('/api/gallery/:eventSlug', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const event = await db.select().from(photoEvents).where(eq(photoEvents.slug, c.req.param('eventSlug'))).get();
+    if (!event) return c.json({ error: 'Event not found.' }, 404);
+    if (!canViewEvent(event, user)) return c.json({ error: 'Event not found.' }, 404);
+
+    const photoRows = await db.select({
+        id: photos.id,
+        caption: photos.caption,
+        width: photos.width,
+        height: photos.height,
+        displayOrder: photos.displayOrder,
+    }).from(photos).where(eq(photos.eventId, event.id)).orderBy(asc(photos.displayOrder), asc(photos.id)).all();
+
+    return c.json({ event, photos: photoRows });
+});
+
+// Authenticated photo variant proxy — same directory/draft visibility rule as the gallery API.
+app.get('/api/photos/:photoId/:variant', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const photoId = Number(c.req.param('photoId'));
+    const variant = c.req.param('variant');
+    if (!Number.isInteger(photoId)) return c.json({ error: 'Photo not found.' }, 404);
+    if (!['thumb', 'display', 'original'].includes(variant)) return c.json({ error: 'Invalid image variant.' }, 400);
+
+    const photo = await db.select().from(photos).where(eq(photos.id, photoId)).get();
+    if (!photo) return c.json({ error: 'Photo not found.' }, 404);
+    const event = await db.select().from(photoEvents).where(eq(photoEvents.id, photo.eventId)).get();
+    if (!event || !canViewEvent(event, user)) return c.json({ error: 'Photo not found.' }, 404);
+
+    const key = variant === 'thumb' ? photo.r2ThumbKey : variant === 'display' ? photo.r2DisplayKey : photo.r2Key;
+    const object = await c.env.BUCKET.get(key);
+    if (!object) return c.json({ error: 'File not found.' }, 404);
+    const headers = new Headers();
+    headers.set('Content-Type', object.httpMetadata?.contentType ?? 'application/octet-stream');
+    // R2 keys are immutable UUIDs — safe to cache for a year, per photos.md.
+    headers.set('Cache-Control', 'private, max-age=31536000, immutable');
+    headers.set('ETag', object.httpEtag);
+    return new Response(object.body, { headers });
 });
 
 // ==========================================

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Archive, ChevronDown, ClipboardList, Clock, FileText, FolderTree, Gauge, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
+import { Archive, ChevronDown, ClipboardList, Clock, FileText, FolderTree, Gauge, Images, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
@@ -16,6 +16,8 @@ import AdminLoginUsersView from './AdminLoginUsersView.vue';
 import AdminMenusView from './AdminMenusView.vue';
 
 import AdminPagesView from './AdminPagesView.vue';
+
+import AdminPhotosView from './AdminPhotosView.vue';
 
 import AdminSettingsView from './AdminSettingsView.vue';
 
@@ -68,6 +70,7 @@ const adminMenuSections: AdminMenuSection[] = [
     children: [
       { label: 'Pages', description: 'Manage neighborhood pages.', icon: FileText, role: 'pageEditor' },
       { label: 'Navigation', description: 'Organize navigation and folders.', icon: FolderTree, role: 'pageEditor' },
+      { label: 'Photos', description: 'Manage gallery folders, events, and photos.', icon: Images, role: 'pageEditor' },
     ],
   },
   {
@@ -147,7 +150,7 @@ const breadcrumbTrail = computed(() => {
   return trail;
 });
 
-const fullWidthAdminFeature = computed(() => selectedFeature.value === 'Pages' || selectedFeature.value === 'Navigation');
+const fullWidthAdminFeature = computed(() => selectedFeature.value === 'Pages' || selectedFeature.value === 'Navigation' || selectedFeature.value === 'Photos');
 
 onMounted(async () => {
   const savedExpandedSection = localStorage.getItem(ACCORDION_STORAGE_KEY);
@@ -304,6 +307,9 @@ function handleCrumbClick(index: number) {
       </div>
       <div v-else-if="selectedFeature === 'Navigation'" class="min-w-0 p-6 sm:p-8">
         <AdminMenusView @exit="selectedFeature = 'Status'" />
+      </div>
+      <div v-else-if="selectedFeature === 'Photos'" class="min-w-0 p-6 sm:p-8">
+        <AdminPhotosView @exit="selectedFeature = 'Status'" />
       </div>
       <div v-else-if="selectedFeature === 'Access Requests'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessRequestsView />

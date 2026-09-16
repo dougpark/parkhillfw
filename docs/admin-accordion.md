@@ -8,6 +8,7 @@
 - Site Content
 -> Pages
 -> Navigation
+-> Photos
 - User Management
 -> Access Requests
 -> Login Accounts

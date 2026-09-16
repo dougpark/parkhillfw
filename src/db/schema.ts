@@ -366,3 +366,65 @@ export const documents = sqliteTable(
         index('idx_documents_page').on(table.pageId),
     ]
 );
+
+// ==========================================
+// 5. PHOTO GALLERY (Folders -> Events -> Photos)
+// ==========================================
+
+export const photoFolders = sqliteTable(
+    'photo_folders',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        name: text('name').notNull(),
+        slug: text('slug').notNull(),
+        displayOrder: integer('display_order').default(0),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        uniqueIndex('idx_photo_folders_slug_unique').on(table.slug),
+    ]
+);
+
+export const photoEvents = sqliteTable(
+    'photo_events',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        folderId: integer('folder_id').notNull().references(() => photoFolders.id, { onDelete: 'cascade' }),
+        name: text('name').notNull(),
+        slug: text('slug').notNull(),
+        description: text('description'),
+        eventDate: integer('event_date', { mode: 'timestamp' }),
+        isPublic: integer('is_public', { mode: 'boolean' }).default(true),
+        isDraft: integer('is_draft', { mode: 'boolean' }).default(true),
+        // Nullable FK to photos(id); the referenced row lives in the table declared below.
+        coverPhotoId: integer('cover_photo_id'),
+        displayOrder: integer('display_order').default(0),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        uniqueIndex('idx_photo_events_slug_unique').on(table.slug),
+        index('idx_photo_events_folder').on(table.folderId, table.displayOrder),
+    ]
+);
+
+export const photos = sqliteTable(
+    'photos',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        eventId: integer('event_id').notNull().references(() => photoEvents.id, { onDelete: 'cascade' }),
+        r2Key: text('r2_key').notNull(),
+        r2ThumbKey: text('r2_thumb_key').notNull(),
+        r2DisplayKey: text('r2_display_key').notNull(),
+        caption: text('caption'),
+        width: integer('width'),
+        height: integer('height'),
+        displayOrder: integer('display_order').default(0),
+        uploadedByUserId: integer('uploaded_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+        uploadedAt: integer('uploaded_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        index('idx_photos_event').on(table.eventId, table.displayOrder),
+    ]
+);

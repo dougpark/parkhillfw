@@ -6,20 +6,19 @@ Details:
 - x directory blank until first search? No
 
 Photo Pages:
-- new main photo page that lists all photo pages and makes selecting an event page easy
-- admin interface for managing event photo pages
-- list all event photo pages, button to edit or delete each photo page
-- button to add a new event photo page by asking for folder name (browse r2 folders /photos/{event}) and event name
-- creates new r2 /photos/{event} folder for the event
-- drag and drop or upload multiple photos to new photo folder (/photos/{event})
+- Gallery page
+- Event pages
+- Admin Photo Section
 
+Surveys:
+- Create and manage surveys for users
 
 Admin:
 - x Users - reset login tokens to force re-authentication
 - x User Admins - Manage Admin users and their permissions
 - x Archive households instead of deleting them
 - x Archive addresses instead of deleting them
-- Add History button next directory address to see previous households
+- Add History button next directory address to see previous households - MD editor with links and images and documents 
 - x User Blocks - Manage user block lists and restrictions: Suspend
 - x Info Msg - Show message at top of home page
 - Documents - Manage and store files in the cloud

@@ -3,7 +3,10 @@
 ## System Overview
 A mobile- and desktop-friendly Photo Gallery feature integrated into the administration dashboard and public portal. Photos are organized logically into **Folders** $\rightarrow$ **Events** $\rightarrow$ **Photos**, managed via Cloudflare Workers, Cloudflare D1 (metadata), and Cloudflare R2 (object storage).
 
----
+## R2 
+- photos are static with long cache lifetimes, typically set to one year, to optimize performance and reduce redundant network requests.
+- R2 objects are private and only accessible through the app
+
 
 ## 1. Database Schema Design (Cloudflare D1)
 

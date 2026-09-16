@@ -180,7 +180,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
         <ChevronRight class="h-7 w-7" />
       </button>
 
-      <div class="flex flex-1 items-center justify-center p-4">
+      <div class="flex min-h-0 flex-1 items-center justify-center p-4">
         <img :src="displayUrl(currentPhoto)" :alt="currentPhoto.caption ?? ''" class="max-h-full max-w-full object-contain" />
       </div>
       <p v-if="currentPhoto.caption" class="pb-6 text-center text-sm text-white/80">{{ currentPhoto.caption }}</p>

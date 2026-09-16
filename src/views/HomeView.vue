@@ -116,7 +116,7 @@ onMounted(async () => {
               <h3 class="text-xl font-semibold text-content transition-colors group-hover:text-accent">Admin</h3>
               <span v-if="pendingRequests" class="rounded-full bg-warning-subtle px-2 py-0.5 text-xs font-semibold text-warning">{{ pendingRequests }} review{{ pendingRequests === 1 ? '' : 's' }}</span>
             </div>
-            <p class="mt-1 text-content-muted">Manage neighborhood content and access</p>
+            <p class="mt-1 text-content-muted">Manage neighborhood content</p>
           </div>
         </div>
       </RouterLink>

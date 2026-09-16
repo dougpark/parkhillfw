@@ -12,6 +12,7 @@ const slug = ref(props.row.slug ?? '');
 const description = ref(props.row.description ?? '');
 const iconName = ref(props.row.iconName ?? '');
 const targetUrl = ref(props.row.targetUrl ?? '');
+const openInNewTab = ref(props.row.openInNewTab ?? true);
 const isPublic = ref(props.row.isPublic);
 const isDraft = ref(props.row.isDraft);
 const error = ref('');
@@ -22,6 +23,7 @@ watch(() => props.row, (row) => {
   description.value = row.description ?? '';
   iconName.value = row.iconName ?? '';
   targetUrl.value = row.targetUrl ?? '';
+  openInNewTab.value = row.openInNewTab ?? true;
   isPublic.value = row.isPublic;
   isDraft.value = row.isDraft;
 });
@@ -42,6 +44,7 @@ function submit(): void {
     description: description.value.trim() || null,
     iconName: iconName.value || null,
     targetUrl: targetUrl.value.trim() || null,
+    openInNewTab: openInNewTab.value,
     isPublic: isPublic.value,
     isDraft: isDraft.value,
   });
@@ -76,6 +79,11 @@ function submit(): void {
         <label v-if="props.row.kind === 'link'" class="block">
           <span class="text-sm font-medium text-content">Link URL</span>
           <input v-model="targetUrl" type="text" placeholder="https://example.com" class="mt-1 w-full rounded-xl border border-theme-border px-4 py-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40" />
+        </label>
+
+        <label v-if="props.row.kind === 'link'" class="flex items-center gap-3 text-sm text-content">
+          <input v-model="openInNewTab" type="checkbox" class="h-4 w-4 rounded" />
+          Open in a new tab
         </label>
 
         <p v-if="props.row.kind === 'page'" class="rounded-xl bg-app-bg px-4 py-3 text-sm text-content-muted">

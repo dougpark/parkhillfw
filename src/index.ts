@@ -1970,12 +1970,13 @@ app.post('/api/admin/photo-events/:eventId/photos', requireAuth(), requirePageEd
 
     const photoId = crypto.randomUUID();
     const r2Key = `photos/${photoId}/original.${original.type.split('/')[1]}`;
-    const r2ThumbKey = `photos/${photoId}/thumb.webp`;
-    const r2DisplayKey = `photos/${photoId}/display.webp`;
+    // thumb/display arrive as webp, or jpeg if the browser's canvas couldn't encode webp.
+    const r2ThumbKey = `photos/${photoId}/thumb.${thumb.type.split('/')[1]}`;
+    const r2DisplayKey = `photos/${photoId}/display.${display.type.split('/')[1]}`;
     await Promise.all([
         c.env.BUCKET.put(r2Key, await original.arrayBuffer(), { httpMetadata: { contentType: original.type } }),
-        c.env.BUCKET.put(r2ThumbKey, await thumb.arrayBuffer(), { httpMetadata: { contentType: 'image/webp' } }),
-        c.env.BUCKET.put(r2DisplayKey, await display.arrayBuffer(), { httpMetadata: { contentType: 'image/webp' } }),
+        c.env.BUCKET.put(r2ThumbKey, await thumb.arrayBuffer(), { httpMetadata: { contentType: thumb.type } }),
+        c.env.BUCKET.put(r2DisplayKey, await display.arrayBuffer(), { httpMetadata: { contentType: display.type } }),
     ]);
 
     const maxOrder = await db.select({ max: sql<number | null>`max(display_order)` }).from(photos).where(eq(photos.eventId, eventId)).get();
@@ -2080,6 +2081,25 @@ app.get('/api/gallery', requireAuth(), async (c) => {
         }))
         .filter((folder) => folder.events.length > 0);
     return c.json(result);
+});
+
+app.get('/api/gallery/folder/:folderSlug', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { residentId?: number | null; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const folder = await db.select().from(photoFolders).where(eq(photoFolders.slug, c.req.param('folderSlug'))).get();
+    if (!folder) return c.json({ error: 'Folder not found.' }, 404);
+
+    const events = await db.select().from(photoEvents).where(eq(photoEvents.folderId, folder.id))
+        .orderBy(asc(photoEvents.displayOrder), asc(photoEvents.id)).all();
+    const visibleEvents = events.filter((event) => canViewEvent(event, user)).map((event) => ({
+        id: event.id,
+        name: event.name,
+        slug: event.slug,
+        eventDate: event.eventDate,
+        isDraft: event.isDraft,
+        coverPhotoId: event.coverPhotoId,
+    }));
+    return c.json({ folder: { id: folder.id, name: folder.name, slug: folder.slug }, events: visibleEvents });
 });
 
 app.get('/api/gallery/:eventSlug', requireAuth(), async (c) => {
@@ -2206,6 +2226,7 @@ app.get('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
         iconName: menus.iconName,
         pageId: menus.pageId,
         targetUrl: menus.targetUrl,
+        openInNewTab: menus.openInNewTab,
         displayOrder: menus.displayOrder,
         isPublic: menus.isPublic,
         isDraft: menus.isDraft,
@@ -2227,6 +2248,7 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
         parentId?: number | null;
         pageId?: number | null;
         targetUrl?: string | null;
+        openInNewTab?: boolean;
         description?: string | null;
         iconName?: string | null;
     }>().catch(() => ({}) as {
@@ -2235,6 +2257,7 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
         parentId?: number | null;
         pageId?: number | null;
         targetUrl?: string | null;
+        openInNewTab?: boolean;
         description?: string | null;
         iconName?: string | null;
     });
@@ -2279,6 +2302,7 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
         iconName: body.iconName?.trim() || null,
         pageId: target.pageId,
         targetUrl: target.targetUrl,
+        openInNewTab: kind === 'link' ? (body.openInNewTab ?? true) : true,
         displayOrder,
         isPublic: false,
         isDraft: true,
@@ -2351,6 +2375,7 @@ app.put('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async (c
         iconName?: string | null;
         pageId?: number | null;
         targetUrl?: string | null;
+        openInNewTab?: boolean;
         isPublic?: boolean;
         isDraft?: boolean;
     }>();
@@ -2386,6 +2411,7 @@ app.put('/api/admin/menus/:menuId', requireAuth(), requirePageEditor(), async (c
         iconName: body.iconName?.trim() || null,
         pageId: target.pageId,
         targetUrl: target.targetUrl,
+        openInNewTab: existing.kind === 'link' ? (body.openInNewTab ?? Boolean(existing.openInNewTab)) : true,
         isPublic: body.isPublic ?? Boolean(existing.isPublic),
         isDraft: body.isDraft ?? Boolean(existing.isDraft),
         updatedAt: new Date(),
@@ -2446,6 +2472,7 @@ type NavNode = {
     iconName: string | null;
     pageSlug: string | null;
     targetUrl: string | null;
+    openInNewTab: boolean;
     isPublic: boolean;
     isDraft: boolean;
     children: NavNode[];
@@ -2489,6 +2516,7 @@ function buildNavTree(
             iconName: row.iconName,
             pageSlug: row.pageSlug,
             targetUrl: row.targetUrl,
+            openInNewTab: Boolean(row.openInNewTab),
             isPublic: Boolean(row.isPublic),
             isDraft: Boolean(row.isDraft),
             children: build(row.id),
@@ -2510,6 +2538,7 @@ function navRows(db: PagesDb) {
         iconName: menus.iconName,
         pageId: menus.pageId,
         targetUrl: menus.targetUrl,
+        openInNewTab: menus.openInNewTab,
         displayOrder: menus.displayOrder,
         isPublic: menus.isPublic,
         isDraft: menus.isDraft,

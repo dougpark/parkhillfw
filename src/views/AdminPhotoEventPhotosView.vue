@@ -64,8 +64,8 @@ async function upload(files: FileList | File[]): Promise<void> {
             const variants = await buildPhotoVariants(file);
             const formData = new FormData();
             formData.append('original', file);
-            formData.append('thumb', variants.thumb, 'thumb.webp');
-            formData.append('display', variants.display, 'display.webp');
+            formData.append('thumb', variants.thumb, `thumb.${variants.thumbType.split('/')[1]}`);
+            formData.append('display', variants.display, `display.${variants.displayType.split('/')[1]}`);
             formData.append('width', String(variants.width));
             formData.append('height', String(variants.height));
             const res = await fetch(`/api/admin/photo-events/${props.event.id}/photos`, { method: 'POST', body: formData });

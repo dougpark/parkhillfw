@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { defineAsyncComponent } from 'vue';
-import { FolderPlus, Images, Pencil, Trash2 } from 'lucide-vue-next';
+import { Check, Copy, FolderPlus, Images, Pencil, Trash2 } from 'lucide-vue-next';
 
 const AdminPhotoEventsView = defineAsyncComponent(() => import('./AdminPhotoEventsView.vue'));
 
@@ -25,6 +25,16 @@ const deleteTarget = ref<FolderRow | null>(null);
 const deleting = ref(false);
 const creating = ref(false);
 const newFolderName = ref('');
+const copiedId = ref<number | null>(null);
+
+async function copyFolderUrl(folder: FolderRow): Promise<void> {
+    const url = `${window.location.origin}/gallery/folder/${folder.slug}`;
+    await navigator.clipboard.writeText(`[${folder.name}](${url})`);
+    copiedId.value = folder.id;
+    setTimeout(() => {
+        if (copiedId.value === folder.id) copiedId.value = null;
+    }, 1500);
+}
 
 async function load(): Promise<void> {
     loading.value = true;
@@ -162,6 +172,15 @@ onMounted(load);
             @click="openFolder(folder)"
           >
             <Images class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            :title="copiedId === folder.id ? 'Copied!' : 'Copy folder link'"
+            class="flex h-9 w-9 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-accent/10 hover:text-accent"
+            @click="copyFolderUrl(folder)"
+          >
+            <Check v-if="copiedId === folder.id" class="h-4 w-4 text-green-600" />
+            <Copy v-else class="h-4 w-4" />
           </button>
           <button
             type="button"

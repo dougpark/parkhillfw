@@ -298,6 +298,7 @@ export const menus = sqliteTable(
 
         pageId: integer('page_id').references(() => pages.id, { onDelete: 'set null' }),
         targetUrl: text('target_url'),
+        openInNewTab: integer('open_in_new_tab', { mode: 'boolean' }).default(true),
 
         displayOrder: integer('display_order').default(0),
         isPublic: integer('is_public', { mode: 'boolean' }).default(false),

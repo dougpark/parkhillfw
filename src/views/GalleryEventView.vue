@@ -41,7 +41,8 @@ function displayUrl(photo: EventPhoto): string {
 }
 
 function formatDate(value: string | null): string {
-    return value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+    // eventDate is stored as UTC midnight for a plain calendar date — format in UTC so it doesn't shift a day in local timezones.
+    return value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }) : '';
 }
 
 async function load(slug: string): Promise<void> {

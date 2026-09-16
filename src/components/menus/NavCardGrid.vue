@@ -19,7 +19,7 @@ const cardClass = 'group rounded-3xl border border-theme-border bg-surface p-5 s
       :key="node.id"
       :is="node.kind === 'link' ? 'a' : 'RouterLink'"
       v-bind="node.kind === 'link'
-        ? { href: node.targetUrl, target: '_blank', rel: 'noopener noreferrer' }
+        ? (node.openInNewTab ? { href: node.targetUrl, target: '_blank', rel: 'noopener noreferrer' } : { href: node.targetUrl })
         : { to: routeFor(node) }"
       :class="cardClass"
     >

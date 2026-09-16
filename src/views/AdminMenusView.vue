@@ -59,7 +59,7 @@ function addFolder(): void {
 }
 
 function addLink(): void {
-  void createItem({ kind: 'link', title: 'New link', targetUrl: 'https://' });
+  void createItem({ kind: 'link', title: 'New link', targetUrl: 'https://', openInNewTab: true });
 }
 
 function openPagePicker(parentId: number | null): void {

@@ -30,7 +30,8 @@ function coverThumbUrl(event: GalleryEvent): string | null {
 }
 
 function formatDate(value: string | null): string {
-    return value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+    // eventDate is stored as UTC midnight for a plain calendar date — format in UTC so it doesn't shift a day in local timezones.
+    return value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) : '';
 }
 
 function openEvent(event: GalleryEvent): void {
@@ -63,7 +64,9 @@ onMounted(load);
 
     <div v-else-if="folders.length" class="space-y-8">
       <div v-for="folder in folders" :key="folder.id">
-        <h3 class="text-lg font-semibold text-content">{{ folder.name }}</h3>
+        <RouterLink :to="`/gallery/folder/${folder.slug}`" class="text-lg font-semibold text-content hover:text-accent hover:underline">
+          {{ folder.name }}
+        </RouterLink>
         <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           <button
             v-for="event in folder.events"

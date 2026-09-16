@@ -10,6 +10,7 @@ export interface MenuRow {
     iconName: string | null;
     pageId: number | null;
     targetUrl: string | null;
+    openInNewTab: boolean;
     displayOrder: number;
     isPublic: boolean;
     isDraft: boolean;
@@ -43,6 +44,7 @@ export interface NavNode {
     iconName: string | null;
     pageSlug: string | null;
     targetUrl: string | null;
+    openInNewTab: boolean;
     isPublic: boolean;
     isDraft: boolean;
     children: NavNode[];

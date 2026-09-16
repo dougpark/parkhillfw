@@ -82,6 +82,12 @@ const router = createRouter({
             component: () => import('../views/GalleryView.vue'),
         },
         {
+            path: '/gallery/folder/:slug',
+            name: 'gallery-folder',
+            meta: { requiresAuth: true },
+            component: () => import('../views/GalleryFolderView.vue'),
+        },
+        {
             path: '/gallery/:slug',
             name: 'gallery-event',
             meta: { requiresAuth: true },

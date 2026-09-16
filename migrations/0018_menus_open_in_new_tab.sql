@@ -1,0 +1,1 @@
+ALTER TABLE `menus` ADD `open_in_new_tab` integer DEFAULT true;

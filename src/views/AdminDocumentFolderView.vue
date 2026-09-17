@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
 import { Check, Copy, Eye, FileText, Image as ImageIcon, Pencil, RefreshCw, Trash2, Upload } from 'lucide-vue-next';
 import { formatFileSize } from '../composables/useDocumentLibrary';
-import DocumentLinkModal from '../components/documents/DocumentLinkModal.vue';
+// Lazy-loaded so the pdf.js viewer it bundles is only fetched when a document is previewed.
+const DocumentLinkModal = defineAsyncComponent(() => import('../components/documents/DocumentLinkModal.vue'));
 
 interface DocumentRow {
     id: number;

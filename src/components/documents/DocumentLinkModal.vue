@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Download, Eye, File, X } from 'lucide-vue-next';
+import VuePdfEmbed, { GlobalWorkerOptions } from 'vue-pdf-embed/dist/index.essential.mjs';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import {
     fetchLibraryDocument,
     fetchLibraryFolder,
@@ -14,6 +16,10 @@ import {
 // Renders the "click a folder link -> list of documents" and "click a document
 // link -> view or download" behavior from docs/documents.md. Reused by
 // MarkdownPreview's click-interceptor and by the /library/... fallback routes.
+// The default blob-URL worker relies on nested dynamic import() inside a module
+// worker, which Safari doesn't support reliably — load a real hosted worker instead.
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
 const props = defineProps<{ kind: 'document' | 'folder'; id: number }>();
 const emit = defineEmits<{ close: [] }>();
 
@@ -22,6 +28,11 @@ const error = ref('');
 const folder = ref<LibraryFolder | null>(null);
 const document = ref<LibraryDocumentDetail | null>(null);
 const viewing = ref<LibraryDocumentDetail | null>(null);
+const pdfEmbedRef = ref<InstanceType<typeof VuePdfEmbed> | null>(null);
+const pdfLoading = ref(true);
+const pdfError = ref('');
+
+const isPdf = computed(() => viewing.value?.mimeType === 'application/pdf');
 
 async function loadDocument(id: number): Promise<LibraryDocumentDetail | null> {
     const detail = await fetchLibraryDocument(id);
@@ -49,25 +60,59 @@ async function load(): Promise<void> {
 
 async function openDocument(row: LibraryDocument): Promise<void> {
     error.value = '';
+    pdfLoading.value = true;
+    pdfError.value = '';
     viewing.value = await loadDocument(row.id);
 }
 
+function downloadPdf(): void {
+    if (!viewing.value) return;
+    const filename = viewing.value.name.toLowerCase().endsWith('.pdf') ? viewing.value.name : `${viewing.value.name}.pdf`;
+    pdfEmbedRef.value?.download(filename);
+}
+
+// Surfaces the real pdf.js error instead of a generic message, since the
+// underlying cause (worker/CORS/format issues) varies a lot by browser.
+function onPdfFailed(message: string, err: unknown): void {
+    console.error('[pdf-viewer]', err);
+    const detail = err instanceof Error ? err.message : String(err ?? '');
+    pdfError.value = detail ? `${message} (${detail})` : message;
+}
+
 watch(() => [props.kind, props.id], load, { immediate: true });
+watch(viewing, () => {
+    pdfLoading.value = true;
+    pdfError.value = '';
+});
 </script>
 
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4" @click.self="emit('close')">
-    <div class="flex h-full w-full max-w-2xl flex-col bg-surface p-6 shadow-xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
+    <div
+      class="flex h-full w-full flex-col bg-surface p-6 shadow-xl sm:h-auto sm:rounded-3xl"
+      :class="isPdf ? 'max-w-5xl sm:max-h-[92vh]' : 'max-w-2xl sm:max-h-[85vh]'"
+    >
       <div class="flex items-center justify-between">
-        <h4 class="text-lg font-semibold">{{ folder?.folder.name ?? viewing?.name ?? 'Document' }}</h4>
-        <button
-          type="button"
-          title="Close"
-          class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-app-bg"
-          @click="emit('close')"
-        >
-          <X class="h-4 w-4" />
-        </button>
+        <h4 class="min-w-0 truncate text-lg font-semibold">{{ folder?.folder.name ?? viewing?.name ?? 'Document' }}</h4>
+        <div class="flex shrink-0 items-center gap-1">
+          <button
+            v-if="isPdf && !pdfLoading && !pdfError"
+            type="button"
+            title="Download"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-app-bg"
+            @click="downloadPdf"
+          >
+            <Download class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            title="Close"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-app-bg"
+            @click="emit('close')"
+          >
+            <X class="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <p v-if="loading" class="py-8 text-center text-sm text-content-muted">Loading…</p>
@@ -94,7 +139,31 @@ watch(() => [props.kind, props.id], load, { immediate: true });
         </ul>
       </template>
 
-      <!-- Document: view (inline) or download prompt -->
+      <!-- PDF: straight to a full-panel viewer, no interim view/download choice -->
+      <template v-else-if="viewing && isPdf">
+        <button
+          v-if="folder"
+          type="button"
+          class="mt-2 self-start text-sm font-medium text-accent hover:opacity-80"
+          @click="viewing = null"
+        >
+          ← Back to {{ folder.folder.name }}
+        </button>
+        <p v-if="pdfError" class="py-8 text-center text-sm text-danger">{{ pdfError }}</p>
+        <div v-show="!pdfError" class="mt-4 min-h-0 flex-1 overflow-auto rounded-xl border border-theme-border bg-app-bg p-2">
+          <p v-if="pdfLoading" class="py-8 text-center text-sm text-content-muted">Loading document…</p>
+          <VuePdfEmbed
+            ref="pdfEmbedRef"
+            :source="viewing.url"
+            class="mx-auto"
+            @loaded="pdfLoading = false"
+            @loading-failed="(err: unknown) => onPdfFailed('This document could not be loaded.', err)"
+            @rendering-failed="(err: unknown) => onPdfFailed('This document could not be rendered.', err)"
+          />
+        </div>
+      </template>
+
+      <!-- Image: inline preview with explicit view/download actions -->
       <template v-else-if="viewing">
         <button
           v-if="folder"
@@ -126,8 +195,7 @@ watch(() => [props.kind, props.id], load, { immediate: true });
         </div>
 
         <div v-if="isInlineViewable(viewing.mimeType)" class="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-theme-border">
-          <img v-if="viewing.mimeType.startsWith('image/')" :src="viewing.url" :alt="viewing.name" class="max-h-[60vh] w-full object-contain" />
-          <iframe v-else :src="viewing.url" :title="viewing.name" class="h-[60vh] w-full" />
+          <img :src="viewing.url" :alt="viewing.name" class="max-h-[60vh] w-full object-contain" />
         </div>
       </template>
     </div>

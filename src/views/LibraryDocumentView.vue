@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, defineAsyncComponent } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import DocumentLinkModal from '../components/documents/DocumentLinkModal.vue';
+// Lazy-loaded so the pdf.js viewer it bundles is only fetched when a document is previewed.
+const DocumentLinkModal = defineAsyncComponent(() => import('../components/documents/DocumentLinkModal.vue'));
 
 // Fallback full-page route for /library/documents/:id — used when a document
 // link is opened directly (new tab, shared link) instead of clicked inline.

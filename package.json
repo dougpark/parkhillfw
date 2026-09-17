@@ -30,7 +30,9 @@
     "markdown-it-attrs": "^5.0.1",
     "markdown-it-container": "^4.0.0",
     "markdown-it-task-lists": "^2.1.1",
+    "pdfjs-dist": "6.3.289",
     "vue": "^3.5.42",
+    "vue-pdf-embed": "^2.1.6",
     "vue-router": "^5.3.1"
   },
   "scripts": {

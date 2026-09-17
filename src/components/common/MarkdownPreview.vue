@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, defineAsyncComponent, ref } from 'vue';
 import { createMarkdownRenderer } from '../../lib/markdown';
 import { parseLibraryLink } from '../../composables/useDocumentLibrary';
-import DocumentLinkModal from '../documents/DocumentLinkModal.vue';
 import 'github-markdown-css/github-markdown.css';
+
+// Lazy-loaded so the pdf.js viewer it bundles is only fetched when a document link is opened.
+const DocumentLinkModal = defineAsyncComponent(() => import('../documents/DocumentLinkModal.vue'));
 
 // Shared renderer for the editor preview overlay AND the public page view,
 // so what editors see is exactly what visitors get.

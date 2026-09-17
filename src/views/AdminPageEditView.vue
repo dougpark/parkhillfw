@@ -29,7 +29,6 @@ const saveError = ref('');
 const saving = ref(false);
 const dirty = ref(false);
 const showPreview = ref(false);
-const lastSavedAt = ref<Date | null>(null);
 let autosaveTimer: ReturnType<typeof setInterval> | null = null;
 
 const title = ref('');
@@ -202,7 +201,6 @@ async function save(markAsDraft?: boolean): Promise<void> {
     if (markAsDraft !== undefined) isDraft.value = data.page.isDraft;
     isPublic.value = data.page.isPublic;
     updatedAt.value = data.page.updatedAt;
-    lastSavedAt.value = new Date();
     dirty.value = false;
     emit('dirty', false);
 }
@@ -352,9 +350,6 @@ onBeforeUnmount(() => {
       </button>
 
       <div class="ml-auto flex flex-wrap items-center gap-2">
-        <span v-if="lastSavedAt && !dirty" class="text-xs text-content-muted">
-          Saved {{ lastSavedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }}
-        </span>
         <button
           type="button"
           class="rounded-full px-4 py-2 text-sm font-medium transition-all"

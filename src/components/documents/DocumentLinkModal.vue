@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { Download, Eye, File, X } from 'lucide-vue-next';
+import { Download, File, X } from 'lucide-vue-next';
 import VuePdfEmbed, { GlobalWorkerOptions } from 'vue-pdf-embed/dist/index.essential.mjs';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import {
     fetchLibraryDocument,
     fetchLibraryFolder,
     formatFileSize,
-    isInlineViewable,
     type LibraryDocument,
     type LibraryDocumentDetail,
     type LibraryFolder,
@@ -33,6 +32,8 @@ const pdfLoading = ref(true);
 const pdfError = ref('');
 
 const isPdf = computed(() => viewing.value?.mimeType === 'application/pdf');
+const isImage = computed(() => viewing.value?.mimeType.startsWith('image/') ?? false);
+const isFullPanel = computed(() => isPdf.value || isImage.value);
 
 async function loadDocument(id: number): Promise<LibraryDocumentDetail | null> {
     const detail = await fetchLibraryDocument(id);
@@ -90,7 +91,7 @@ watch(viewing, () => {
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4" @click.self="emit('close')">
     <div
       class="flex h-full w-full flex-col bg-surface p-6 shadow-xl sm:h-auto sm:rounded-3xl"
-      :class="isPdf ? 'max-w-5xl sm:max-h-[92vh]' : 'max-w-2xl sm:max-h-[85vh]'"
+      :class="isFullPanel ? 'max-w-5xl sm:max-h-[92vh]' : 'max-w-2xl sm:max-h-[85vh]'"
     >
       <div class="flex items-center justify-between">
         <h4 class="min-w-0 truncate text-lg font-semibold">{{ folder?.folder.name ?? viewing?.name ?? 'Document' }}</h4>
@@ -104,6 +105,15 @@ watch(viewing, () => {
           >
             <Download class="h-4 w-4" />
           </button>
+          <a
+            v-else-if="isImage"
+            :href="viewing!.url"
+            download
+            title="Download"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-content-muted transition-colors hover:bg-app-bg"
+          >
+            <Download class="h-4 w-4" />
+          </a>
           <button
             type="button"
             title="Close"
@@ -163,7 +173,22 @@ watch(viewing, () => {
         </div>
       </template>
 
-      <!-- Image: inline preview with explicit view/download actions -->
+      <!-- Image: straight to a full-panel preview, no interim view/download choice -->
+      <template v-else-if="viewing && isImage">
+        <button
+          v-if="folder"
+          type="button"
+          class="mt-2 self-start text-sm font-medium text-accent hover:opacity-80"
+          @click="viewing = null"
+        >
+          ← Back to {{ folder.folder.name }}
+        </button>
+        <div class="mt-4 min-h-0 flex-1 overflow-auto rounded-xl border border-theme-border bg-app-bg p-2">
+          <img :src="viewing.url" :alt="viewing.name" class="mx-auto h-full max-h-full w-auto object-contain" />
+        </div>
+      </template>
+
+      <!-- Other file types: no inline preview available, just a download prompt -->
       <template v-else-if="viewing">
         <button
           v-if="folder"
@@ -174,28 +199,14 @@ watch(viewing, () => {
           ← Back to {{ folder.folder.name }}
         </button>
         <p class="mt-2 text-xs text-content-muted">{{ formatFileSize(viewing.sizeBytes) }}</p>
-
         <div class="mt-4 flex flex-wrap gap-2">
-          <a
-            v-if="isInlineViewable(viewing.mimeType)"
-            :href="viewing.url"
-            target="_blank"
-            rel="noopener"
-            class="flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
-          >
-            <Eye class="h-4 w-4" /> View
-          </a>
           <a
             :href="viewing.url"
             download
-            class="flex items-center gap-2 rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted hover:bg-app-bg"
+            class="flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
           >
             <Download class="h-4 w-4" /> Download
           </a>
-        </div>
-
-        <div v-if="isInlineViewable(viewing.mimeType)" class="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-theme-border">
-          <img :src="viewing.url" :alt="viewing.name" class="max-h-[60vh] w-full object-contain" />
         </div>
       </template>
     </div>

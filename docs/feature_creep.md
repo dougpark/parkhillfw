@@ -6,9 +6,9 @@ Details:
 - x directory blank until first search? No
 
 Photo Pages:
-- Gallery page
-- Event pages
-- Admin Photo Section
+- x Gallery page
+- x Event pages
+- x Admin Photo Section
 
 Surveys:
 - Create and manage surveys for users
@@ -18,10 +18,11 @@ Admin:
 - x User Admins - Manage Admin users and their permissions
 - x Archive households instead of deleting them
 - x Archive addresses instead of deleting them
-- Add History button next directory address to see previous households - MD editor with links and images and documents 
+- Add History button next directory address to see previous households 
+- x MD editor with links and images and documents 
 - x User Blocks - Manage user block lists and restrictions: Suspend
 - x Info Msg - Show message at top of home page
-- Documents - Manage and store files in the cloud
+- x Documents - Manage and store files in the cloud
 - x Admin Stats Page - Show counts and usages stats
 - Login Request email - Send admin email for login request
 
@@ -40,11 +41,11 @@ Directory:
 - add email to list for starting a group email
 - add phone number to list for starting a group message
 
-- Mail Blast to send emails to the group
-- Mail Group to allow Google Groups peers to all emails
-- Mail Forwarding - Users setup domain email forwarding
-- SMS - Send and manage SMS messages to users
-- Notifications - Send alerts and updates to users
+- Mail Blast to send emails to the group, not supported
+- Mail Group to allow Google Groups peers to all emails, not supported
+- Mail Forwarding - Users setup domain email forwarding, not supported
+- SMS - Send and manage SMS messages to users, not supported
+- Notifications - Send alerts and updates to users, not supported
 - Announcements - Post and manage community announcements
 
 - Blog - Manage and publish blog posts
@@ -72,3 +73,6 @@ Directory:
 
 Alumni:
 - Alumni Directory - Manage and view alumni information
+
+System:
+- Automated daily backups of D1 and R2

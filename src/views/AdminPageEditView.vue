@@ -48,13 +48,48 @@ function formatDate(value: string | null): string {
     return value ? new Date(value).toLocaleString() : '—';
 }
 
+// Keep slugs readable in URLs and admin lists — long titles get clamped back
+// to a whole-word boundary rather than cutting off mid-word.
+const SLUG_MAX_LENGTH = 80;
+
+function clampSlugLength(value: string): string {
+    if (value.length <= SLUG_MAX_LENGTH) return value;
+    const clamped = value.slice(0, SLUG_MAX_LENGTH);
+    const lastHyphen = clamped.lastIndexOf('-');
+    return lastHyphen > 0 ? clamped.slice(0, lastHyphen) : clamped;
+}
+
+// Mirrors the backend's slugify() in src/index.ts so the auto-generated slug
+// matches what the server would produce for the same title.
+function slugify(value: string): string {
+    const base = value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return clampSlugLength(base) || 'page';
+}
+
+// Once the user edits the slug directly, stop overwriting it from the title —
+// they've chosen a specific URL and typing more of the title shouldn't clobber it.
+const slugTouched = ref(false);
+
+function onTitleInput(): void {
+    markDirty();
+    if (!slugTouched.value) slug.value = slugify(title.value);
+}
+
 function cleanSlug(): void {
-    const cleaned = slug.value
-        .toLowerCase()
-        .replace(/[^a-z0-9\s_-]+/g, '')
-        .replace(/[\s_]+/g, '-')
-        .replace(/-{2,}/g, '-');
+    const cleaned = clampSlugLength(
+        slug.value
+            .toLowerCase()
+            .replace(/[^a-z0-9\s_-]+/g, '')
+            .replace(/[\s_]+/g, '-')
+            .replace(/-{2,}/g, '-'),
+    );
     if (cleaned !== slug.value) slug.value = cleaned;
+}
+
+function onSlugInput(): void {
+    slugTouched.value = true;
+    cleanSlug();
+    markDirty();
 }
 
 function markDirty(): void {
@@ -211,6 +246,9 @@ onMounted(async () => {
     const data = (await res.json()) as { page: PageDetail };
     title.value = data.page.title;
     slug.value = data.page.slug;
+    // A slug that still matches what auto-slugify would produce means nobody
+    // has customized it yet, so keep auto-syncing as the title changes.
+    slugTouched.value = slug.value !== slugify(title.value);
     bodyMd.value = data.page.bodyMd;
     isPublic.value = data.page.isPublic;
     isDraft.value = data.page.isDraft;
@@ -268,7 +306,7 @@ onBeforeUnmount(() => {
         type="text"
         placeholder="Page title"
         class="min-w-0 flex-1 rounded-xl border border-theme-border bg-surface px-4 py-2.5 text-lg font-semibold outline-none transition-shadow focus:border-accent focus:ring-2 focus:ring-accent/20"
-        @input="markDirty"
+        @input="onTitleInput"
       />
       <button
         type="button"
@@ -288,7 +326,7 @@ onBeforeUnmount(() => {
         placeholder="slug"
         spellcheck="false"
         class="w-40 rounded-xl border border-theme-border bg-surface px-3 py-1.5 font-mono text-xs outline-none transition-shadow focus:border-accent focus:ring-2 focus:ring-accent/20"
-        @input="cleanSlug(); markDirty()"
+        @input="onSlugInput"
       />
       <span class="hidden sm:inline" aria-hidden="true">·</span>
       <span class="hidden sm:inline">By {{ authorEmail ?? 'unknown' }}</span>

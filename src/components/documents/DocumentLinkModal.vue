@@ -88,11 +88,12 @@ watch(viewing, () => {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4" @click.self="emit('close')">
-    <div
-      class="flex h-full w-full flex-col bg-surface p-6 shadow-xl sm:h-auto sm:rounded-3xl"
-      :class="isFullPanel ? 'max-w-5xl sm:max-h-[92vh]' : 'max-w-2xl sm:max-h-[85vh]'"
-    >
+  <Teleport to="body">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4" @click.self="emit('close')">
+      <div
+        class="flex h-full w-full flex-col bg-surface p-6 shadow-xl sm:h-auto sm:rounded-3xl"
+        :class="isFullPanel ? 'max-w-5xl sm:max-h-[92vh]' : 'max-w-2xl sm:max-h-[85vh]'"
+      >
       <div class="flex items-center justify-between">
         <h4 class="min-w-0 truncate text-lg font-semibold">{{ folder?.folder.name ?? viewing?.name ?? 'Document' }}</h4>
         <div class="flex shrink-0 items-center gap-1">
@@ -211,4 +212,5 @@ watch(viewing, () => {
       </template>
     </div>
   </div>
+  </Teleport>
 </template>

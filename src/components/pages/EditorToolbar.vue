@@ -6,6 +6,7 @@ import {
     Bold,
     Code,
     Eye,
+    FileText,
     Heading,
     Image as ImageIcon,
     Info,
@@ -45,7 +46,7 @@ const buttons: Array<{ name: MarkdownCommand; label: string; icon: unknown }> = 
     { name: 'checklist', label: 'Checklist (cycles unchecked → checked → plain)', icon: ListTodo },
 ];
 
-function selectCallout(type: 'info' | 'warning' | 'danger') {
+function selectCallout(type: 'info' | 'warning' | 'danger' | 'document') {
     isCalloutMenuOpen.value = false;
     emit('command', `callout-${type}`);
 }
@@ -107,6 +108,14 @@ function selectCallout(type: 'info' | 'warning' | 'danger') {
         >
           <OctagonAlert class="h-3.5 w-3.5 text-danger" />
           Danger Box (Red)
+        </button>
+        <button
+          type="button"
+          class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-content hover:bg-surface-hover hover:text-accent-secondary"
+          @click="selectCallout('document')"
+        >
+          <FileText class="h-3.5 w-3.5 text-accent-secondary" />
+          Document Card (Purple)
         </button>
       </div>
     </div>

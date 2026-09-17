@@ -14,6 +14,7 @@ export type MarkdownCommand =
     | 'callout-info'
     | 'callout-warning'
     | 'callout-danger'
+    | 'callout-document'
     | 'row'
     | 'align';
 
@@ -246,10 +247,19 @@ function insertTable(view: EditorView): void {
     view.focus();
 }
 
-function insertCallout(view: EditorView, type: 'info' | 'warning' | 'danger'): void {
+const calloutPlaceholders: Record<'info' | 'warning' | 'danger' | 'document', string> = {
+    info: 'Important note text goes here...',
+    warning: 'Important note text goes here...',
+    danger: 'Important note text goes here...',
+    document: '[Document title](/library/documents/1)',
+};
+
+// Select an existing document link first (e.g. one inserted from the
+// Attachments panel) to wrap it instead of the placeholder link.
+function insertCallout(view: EditorView, type: 'info' | 'warning' | 'danger' | 'document'): void {
     const { from, to } = view.state.selection.main;
     const selected = view.state.doc.sliceString(from, to).trim();
-    const content = selected || 'Important note text goes here...';
+    const content = selected || calloutPlaceholders[type];
     const insert = `::: ${type}\n${content}\n:::`;
     view.dispatch({
         changes: { from, to, insert },
@@ -285,6 +295,7 @@ export function applyMarkdownCommand(view: EditorView, command: MarkdownCommand)
         case 'callout-info': return insertCallout(view, 'info');
         case 'callout-warning': return insertCallout(view, 'warning');
         case 'callout-danger': return insertCallout(view, 'danger');
+        case 'callout-document': return insertCallout(view, 'document');
         case 'row': return insertRow(view);
         case 'align': return cycleAlignment(view);
     }

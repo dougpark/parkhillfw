@@ -26,6 +26,13 @@ describe('Custom Markdown Tags & Callout Tests', () => {
         expect(output).toContain('Do not share magic links');
     });
 
+    test('renders ::: document callout box as a card link', () => {
+        const input = `::: document\n[Meeting Notes](/library/documents/42)\n:::`;
+        const output = md.render(input);
+        expect(output).toContain('<div class="callout callout-document" role="group">');
+        expect(output).toContain('<a href="/library/documents/42">Meeting Notes</a>');
+    });
+
     test('renders ::: row container for image grid', () => {
         const input = `::: row\n![Photo 1](/image1.jpg)\n![Photo 2](/image2.jpg)\n:::`;
         const output = md.render(input);

@@ -101,6 +101,18 @@ export function createMarkdownRenderer(): MarkdownIt {
         },
     });
 
+    // Wraps a single document/folder library link so it renders as a clickable
+    // card instead of plain inline text — see .callout-document in style.css.
+    md.use(markdownItContainer, 'document', {
+        render(tokens: any[], idx: number) {
+            const token = tokens[idx];
+            if (token.nesting === 1) {
+                return `<div class="callout callout-document" role="group">\n`;
+            }
+            return '</div>\n';
+        },
+    });
+
     linkPhoneNumbers(md);
     return md;
 }

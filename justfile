@@ -71,3 +71,17 @@ reset-reminders-remote:
 # Reset directory confirmation & update timestamps (local)
 reset-reminders-local:
     bun run scripts/reset-directory-reminders.ts
+
+# Switch PS1 prompt between folder name (\W) and full path (\w)
+short-prompt:
+	@if grep -q "export PS1=.*\\\\W" ~/.bashrc; then \
+		echo "Prompt is already set to short folder name."; \
+	else \
+		sed -i '/export PS1=.*\\w/d' ~/.bashrc; \
+		echo 'export PS1="\[\e[32m\]\W\[\e[0m\] \$ "' >> ~/.bashrc; \
+		echo "Updated ~/.bashrc. Run 'source ~/.bashrc' or open a new terminal to apply."; \
+	fi
+
+reset-prompt:
+	@sed -i '/export PS1=.*\\W/d' ~/.bashrc
+	@echo "Removed short prompt export from ~/.bashrc."

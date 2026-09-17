@@ -110,11 +110,12 @@ onMounted(load);
 
 <template>
   <button
+    v-if="!selectedFolder"
     type="button"
     class="mb-4 rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-app-bg"
-    @click="selectedFolder ? (selectedFolder = null) : emit('exit')"
+    @click="emit('exit')"
   >
-    ← {{ selectedFolder ? 'Document Folders' : 'Admin menu' }}
+    ← Admin menu
   </button>
 
   <AdminDocumentFolderView

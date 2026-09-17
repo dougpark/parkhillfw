@@ -33,3 +33,93 @@
 # Rename the switch view button
 - rename the "Hierarchy Editor" button to "Reorder Mode" view for better clarity.
 - rename the "List View" button to "Edit Mode" view for better clarity.
+
+---
+
+## Implementation Plan
+
+### Affected files
+- [src/views/AdminMenusView.vue](../src/views/AdminMenusView.vue) — Edit Mode (list) view, action bar, row actions, modals.
+- [src/components/menus/MenuTreeEditor.vue](../src/components/menus/MenuTreeEditor.vue) — Reorder Mode (tree) view.
+- [src/components/menus/MenuItemDialog.vue](../src/components/menus/MenuItemDialog.vue) — metadata edit modal (already supports `menu`/`link`/`page` kinds, no change needed).
+- [src/components/menus/PagePickerPanel.vue](../src/components/menus/PagePickerPanel.vue) — existing "insert existing page" picker, reused as-is.
+- New: `src/components/menus/AddItemMenu.vue` — the "+ Add Item" popup used both in the action bar and per-row.
+- [src/index.ts](../src/index.ts) (`POST /api/admin/menus` ~line 2491) — add insert-position support.
+- [src/components/menus/menuTree.ts](../src/components/menus/menuTree.ts) — no structural change expected, reused for flattening.
+
+### 1. Rename mode toggle labels
+In `AdminMenusView.vue` (~line 183), the toggle button currently reads `mode === 'list' ? 'Hierarchy editor' : 'List view'`. Rename to:
+- `mode === 'list'` → button reads **"Reorder Mode"** (switches into tree/reorder mode).
+- `mode === 'tree'` → button reads **"Edit Mode"** (switches back into the list).
+No change to underlying `mode` ref values (`'list' | 'tree'`) — only the visible labels change.
+
+### 2. Reorder Mode (`MenuTreeEditor.vue`) becomes structure-only
+- Remove the **Pencil** button (~line 281) and its `emit('edit', node.row)` handler.
+- Remove the **Trash2** button (~line 285) and its `emit('remove', node.row)` handler.
+- Remove the now-unused `edit` / `remove` entries from `defineEmits` in this component.
+- Keep drag handle, expand/collapse, move up/down, indent/outdent — this view stays purely structural.
+- In `AdminMenusView.vue`, remove the `@edit="editing = $event"` and `@remove="deleteTarget = $event"` bindings on `<MenuTreeEditor>` (~lines 213–217), since the tree no longer emits them.
+
+### 3. Edit Mode (`AdminMenusView.vue`) row-level actions
+Update each row's action cluster (~lines 243–283):
+- **Remove** the existing "Add page" text button.
+- **Add** an "Add Item" icon button (only for `kind === 'menu'` rows, same condition as the old "Add page" button) that opens `AddItemMenu` scoped to that row (`parentId: node.row.id`). New items are inserted using `position: 'start'` (see backend section) so they land as the first child directly under the menu row.
+- **Keep** the Publish/Unpublish toggle unchanged.
+- **Add** a new "edit metadata" icon button on every row (all kinds) using a new icon distinct from `Pencil` — use `Settings2` from `lucide-vue-next`. This opens `MenuItemDialog` for that row (`editing = node.row`), same as today's menu/link pencil behavior, now also available for `page` rows.
+- **Keep** a `Pencil` icon button only for `kind === 'page'` rows, exclusively for editing page content (`editPage(node.row)`). It no longer doubles as the metadata editor.
+- **Keep** the `Trash2` delete button unchanged.
+
+Resulting per-row icon set:
+- `menu` rows: Add Item, Publish toggle, Settings2 (metadata), Trash2 (delete).
+- `link` rows: Publish toggle, Settings2 (metadata), Trash2 (delete).
+- `page` rows: Publish toggle, Settings2 (metadata), Pencil (content), Trash2 (delete).
+
+### 4. Action bar — "+ Add Item" popup
+Replace the three action-bar buttons ("Add page", "Add link", "New menu") with a single **"+ Add Item"** button (icon: `Plus`) that opens `AddItemMenu` with `parentId: null` (top level). Keep the Reorder/Edit mode toggle button separate, to its left.
+
+`AddItemMenu.vue` (new component):
+- Props: `parentId: number | null`.
+- Emits: `close`, and delegates actual creation back to the parent via emitted events so `AdminMenusView` keeps owning all `fetch` calls: `insert-page`, `new-link`, `new-menu`, `new-page: [title: string]`.
+- Internal states: `'menu'` (default — shows 4 options) and `'new-page'` (inline quick-add form with a single Title input + Create/Cancel, matching the quick-add feel of `AdminPagesView.vue`'s "New page" flow).
+- Menu options and labels/icons:
+  - **Insert Page** (`FilePlus2`) → emits `insert-page` → parent calls existing `openPagePicker(parentId)`.
+  - **New Link** (`Link2`) → emits `new-link` → parent calls existing `addLink()` logic, passing `parentId`.
+  - **New Menu** (`FolderPlus`) → emits `new-menu` → parent calls existing `addFolder()` logic, passing `parentId`.
+  - **New Page** (`FilePlus`) → switches internal state to `'new-page'` form; on submit emits `new-page` with the entered title.
+- Rendered as a small anchored dropdown panel (absolute positioned card, closes on outside click / `close` emit), consistent with existing modal styling (`rounded-2xl`/`rounded-3xl`, `border-theme-border`, `bg-surface`).
+
+`AdminMenusView.vue` wiring:
+- `addFolder()` / `addLink()` gain an optional `parentId` argument (default `null`) instead of always creating at top level, so the same functions serve both the action bar (`parentId: null`) and row-level "Add Item" (`parentId: node.row.id`).
+- New `createNewPage(title: string, parentId: number | null)`:
+  1. `POST /api/admin/pages` with `{ title }` → get `page.id`.
+  2. `createItem({ kind: 'page', pageId: page.id, title, parentId, position: parentId ? 'start' : 'end' })` to insert into the nav tree.
+  3. Jump straight into the page editor (`editingPageId.value = page.id`) so authors land in content editing immediately, mirroring `AdminPagesView.vue`'s `createPage()` flow.
+- Row-level "Add Item" passes `position: 'start'` so new items appear directly below the menu row; action-bar "Add Item" passes `position: 'end'` (or omits it, since `'end'` is already the default) so items land at the bottom of the top level, per the doc's note that there's no row context to anchor to.
+
+### 5. Backend: insert position support
+In `src/index.ts`, `POST /api/admin/menus` (~line 2491):
+- Accept an optional `position?: 'start' | 'end'` field in the request body (default `'end'`, preserving current behavior).
+- Where `displayOrder` is currently computed as `siblings.length ? Math.max(...siblings.map(...)) + 1 : 0`, branch:
+  - `'end'` (default): unchanged (`max + 1`).
+  - `'start'`: `siblings.length ? Math.min(...siblings.map((row) => row.displayOrder ?? 0)) - 1 : 0`.
+- This keeps ordering sparse/relative (matches how `/reorder` already tolerates non-contiguous values sorted by `displayOrder` then `id`) — no need to shift sibling rows.
+
+### 6. Suggested implementation order
+1. Backend `position` support in `POST /api/admin/menus` (small, testable in isolation via `curl`/API).
+2. Rename mode toggle labels (trivial, no behavior change).
+3. Strip edit/delete from `MenuTreeEditor.vue` + remove corresponding bindings in `AdminMenusView.vue`.
+4. Build `AddItemMenu.vue` as a standalone component (menu options + inline "new page" title form), no wiring yet.
+5. Wire `AddItemMenu` into the action bar (`parentId: null`) — replaces the 3 old buttons.
+6. Wire `AddItemMenu` into each `menu`-kind row (`parentId: node.row.id`, `position: 'start'`) — replaces "Add page".
+7. Add the `Settings2` metadata-edit icon to every row and restrict `Pencil` to page-content editing only.
+8. Manual QA pass (see Verification below).
+
+### Verification
+- `bun run build` to confirm the Vue/TS compiles cleanly.
+- Manual check in dev (`bun run dev`):
+  - Reorder Mode: drag/indent/outdent still work; no pencil/trash icons present.
+  - Edit Mode: action bar "+ Add Item" opens the popup with all 4 options; each creates the right kind at the bottom of the top level.
+  - Row "Add Item" on a menu inserts the new item directly below that menu row.
+  - "New Page" quick-add creates a page, inserts it into the nav, and opens the content editor.
+  - Metadata icon opens `MenuItemDialog` for menu/link/page rows; page rows still show a separate content-edit pencil.
+  - Publish toggle and delete confirmation still behave as before.

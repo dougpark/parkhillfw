@@ -2499,6 +2499,7 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
         openInNewTab?: boolean;
         description?: string | null;
         iconName?: string | null;
+        position?: 'start' | 'end';
     }>().catch(() => ({}) as {
         kind?: 'menu' | 'page' | 'link';
         title?: string;
@@ -2508,6 +2509,7 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
         openInNewTab?: boolean;
         description?: string | null;
         iconName?: string | null;
+        position?: 'start' | 'end';
     });
 
     const kind = body.kind ?? 'menu';
@@ -2539,7 +2541,11 @@ app.post('/api/admin/menus', requireAuth(), requirePageEditor(), async (c) => {
     if (!title) title = kind === 'link' ? 'New link' : 'New menu';
 
     const siblings = rows.filter((row) => row.parentId === parentId);
-    const displayOrder = siblings.length ? Math.max(...siblings.map((row) => row.displayOrder ?? 0)) + 1 : 0;
+    const displayOrder = siblings.length
+        ? (body.position === 'start'
+            ? Math.min(...siblings.map((row) => row.displayOrder ?? 0)) - 1
+            : Math.max(...siblings.map((row) => row.displayOrder ?? 0)) + 1)
+        : 0;
 
     const created = await db.insert(menus).values({
         parentId,

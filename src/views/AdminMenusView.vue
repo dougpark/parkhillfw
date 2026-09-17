@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
-import { FilePlus2, FolderPlus, Link2, List, Network, Pencil, Trash2 } from 'lucide-vue-next';
+import { List, Network, Pencil, Plus, Settings2, Trash2 } from 'lucide-vue-next';
 import MenuTreeEditor from '../components/menus/MenuTreeEditor.vue';
 import MenuItemDialog from '../components/menus/MenuItemDialog.vue';
 import PagePickerPanel from '../components/menus/PagePickerPanel.vue';
+import AddItemMenu from '../components/menus/AddItemMenu.vue';
 import { flattenMenus, toReorderItems, type MenuRow } from '../components/menus/menuTree';
 import { menuIcon } from '../components/menus/menuIcons';
 
@@ -19,6 +20,8 @@ const editing = ref<MenuRow | null>(null);
 const deleteTarget = ref<MenuRow | null>(null);
 const showPagePicker = ref(false);
 const pickerParentId = ref<number | null>(null);
+const showAddItem = ref(false);
+const addItemParentId = ref<number | null>(null);
 const editingPageId = ref<number | null>(null);
 const editorDirty = ref(false);
 const saveState = ref<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -54,17 +57,53 @@ async function createItem(payload: Record<string, unknown>): Promise<void> {
   await load();
 }
 
-function addFolder(): void {
-  void createItem({ kind: 'menu', title: 'New menu' });
+// Row-level adds land at the start of that menu's children (directly below the
+// row); action-bar adds have no row context, so they land at the end of the top level.
+function positionFor(parentId: number | null): 'start' | 'end' {
+  return parentId !== null ? 'start' : 'end';
 }
 
-function addLink(): void {
-  void createItem({ kind: 'link', title: 'New link', targetUrl: 'https://', openInNewTab: true });
+function openAddItem(parentId: number | null): void {
+  addItemParentId.value = parentId;
+  showAddItem.value = true;
+}
+
+function closeAddItem(): void {
+  showAddItem.value = false;
+}
+
+function addFolder(parentId: number | null): void {
+  void createItem({ kind: 'menu', title: 'New menu', parentId, position: positionFor(parentId) });
+  closeAddItem();
+}
+
+function addLink(parentId: number | null): void {
+  void createItem({ kind: 'link', title: 'New link', targetUrl: 'https://', openInNewTab: true, parentId, position: positionFor(parentId) });
+  closeAddItem();
+}
+
+async function createNewPage(title: string, parentId: number | null): Promise<void> {
+  error.value = '';
+  const response = await fetch('/api/admin/pages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) {
+    error.value = 'Could not create a new page.';
+    return;
+  }
+  const data = (await response.json()) as { page: { id: number } };
+  await createItem({ kind: 'page', pageId: data.page.id, title, parentId, position: positionFor(parentId) });
+  closeAddItem();
+  editingPageId.value = data.page.id;
+  editorDirty.value = false;
 }
 
 function openPagePicker(parentId: number | null): void {
   pickerParentId.value = parentId;
   showPagePicker.value = true;
+  closeAddItem();
 }
 
 function editPage(row: MenuRow): void {
@@ -184,19 +223,15 @@ onMounted(load);
         @click="mode = mode === 'list' ? 'tree' : 'list'"
       >
         <component :is="mode === 'list' ? Network : List" class="h-4 w-4" />
-        {{ mode === 'list' ? 'Hierarchy editor' : 'List view' }}
+        {{ mode === 'list' ? 'Reorder Mode' : 'Edit Mode' }}
       </button>
-      <button type="button" class="flex items-center gap-2 rounded-full border border-theme-border px-4 py-2.5 text-sm font-medium text-content-muted hover:bg-app-bg" @click="openPagePicker(null)">
-        <FilePlus2 class="h-4 w-4" />
-        Add page
-      </button>
-      <button type="button" class="flex items-center gap-2 rounded-full border border-theme-border px-4 py-2.5 text-sm font-medium text-content-muted hover:bg-app-bg" @click="addLink">
-        <Link2 class="h-4 w-4" />
-        Add link
-      </button>
-      <button type="button" class="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent transition-opacity hover:opacity-90" @click="addFolder">
-        <FolderPlus class="h-4 w-4" />
-        New menu
+      <button
+        type="button"
+        class="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+        @click="openAddItem(null)"
+      >
+        <Plus class="h-4 w-4" />
+        Add Item
       </button>
     </div>
   </div>
@@ -217,8 +252,6 @@ onMounted(load);
       <MenuTreeEditor
         :rows="rows"
         @reorder="onReorder"
-        @edit="editing = $event"
-        @remove="deleteTarget = $event"
       />
     </div>
 
@@ -248,10 +281,12 @@ onMounted(load);
           <button
             v-if="node.row.kind === 'menu'"
             type="button"
-            class="rounded-full border border-theme-border px-3 py-1.5 text-xs font-medium text-content-muted hover:bg-app-bg"
-            @click="openPagePicker(node.row.id)"
+            class="rounded-lg p-2 text-content-muted hover:bg-app-bg"
+            :aria-label="`Add item under ${node.row.title}`"
+            :title="`Add item under ${node.row.title}`"
+            @click="openAddItem(node.row.id)"
           >
-            Add page
+            <Plus class="h-4 w-4" />
           </button>
           <button
             type="button"
@@ -261,24 +296,25 @@ onMounted(load);
             {{ node.row.isDraft ? 'Publish' : 'Unpublish' }}
           </button>
           <button
+            type="button"
+            class="rounded-lg p-2 text-accent hover:bg-app-bg"
+            :aria-label="`Edit ${node.row.title} details`"
+            :title="`Edit ${node.row.title} details`"
+            @click="editing = node.row"
+          >
+            <Settings2 class="h-4 w-4" />
+          </button>
+          <button
             v-if="node.row.kind === 'page' && node.row.pageId !== null"
             type="button"
             class="rounded-lg p-2 text-accent hover:bg-app-bg"
-            :aria-label="`Edit ${node.row.pageTitle ?? node.row.title}`"
+            :aria-label="`Edit ${node.row.pageTitle ?? node.row.title} content`"
+            :title="`Edit ${node.row.pageTitle ?? node.row.title} content`"
             @click="editPage(node.row)"
           >
             <Pencil class="h-4 w-4" />
           </button>
-          <button
-            v-else
-            type="button"
-            class="rounded-lg p-2 text-accent hover:bg-app-bg"
-            :aria-label="`Edit ${node.row.title}`"
-            @click="editing = node.row"
-          >
-            <Pencil class="h-4 w-4" />
-          </button>
-          <button type="button" class="rounded-lg p-2 text-danger hover:bg-app-bg" :aria-label="`Delete ${node.row.title}`" @click="deleteTarget = node.row">
+          <button type="button" class="rounded-lg p-2 text-danger hover:bg-app-bg" :aria-label="`Delete ${node.row.title}`" :title="`Delete ${node.row.title}`" @click="deleteTarget = node.row">
             <Trash2 class="h-4 w-4" />
           </button>
         </div>
@@ -292,6 +328,15 @@ onMounted(load);
 
   <MenuItemDialog v-if="editing" :row="editing" @save="saveItem" @close="editing = null" />
   <PagePickerPanel v-if="showPagePicker" @select="onPageSelected" @close="showPagePicker = false; pickerParentId = null" />
+  <AddItemMenu
+    v-if="showAddItem"
+    :parent-id="addItemParentId"
+    @insert-page="openPagePicker(addItemParentId)"
+    @new-link="addLink(addItemParentId)"
+    @new-menu="addFolder(addItemParentId)"
+    @new-page="createNewPage($event, addItemParentId)"
+    @close="closeAddItem"
+  />
 
   <div v-if="deleteTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" @click.self="deleteTarget = null">
     <div class="w-full max-w-md rounded-3xl bg-surface p-6 shadow-xl">

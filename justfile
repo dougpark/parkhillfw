@@ -72,8 +72,12 @@ reset-reminders-remote:
 reset-reminders-local:
     bun run scripts/reset-directory-reminders.ts
 
+# Run wrangler local in dev mode
+wrangler-dev:
+    bunx wrangler dev
+
 # Switch PS1 prompt between folder name (\W) and full path (\w)
-short-prompt:
+prompt-short:
 	@if grep -q "export PS1=.*\\\\W" ~/.bashrc; then \
 		echo "Prompt is already set to short folder name."; \
 	else \
@@ -82,6 +86,6 @@ short-prompt:
 		echo "Updated ~/.bashrc. Run 'source ~/.bashrc' or open a new terminal to apply."; \
 	fi
 
-reset-prompt:
+prompt-reset:
 	@sed -i '/export PS1=.*\\W/d' ~/.bashrc
 	@echo "Removed short prompt export from ~/.bashrc."

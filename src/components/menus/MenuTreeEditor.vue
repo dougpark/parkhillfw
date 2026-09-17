@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical, MoveDown, MoveUp, Pencil, Trash2 } from 'lucide-vue-next';
+import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical, MoveDown, MoveUp } from 'lucide-vue-next';
 import { menuIcon } from './menuIcons';
 import { MAX_MENU_DEPTH, descendantIds, flattenMenus, moveNode, subtreeHeight, projectDrop, type FlatNode, type MenuRow } from './menuTree';
 
 const props = defineProps<{ rows: MenuRow[] }>();
 const emit = defineEmits<{
   reorder: [rows: MenuRow[]];
-  edit: [row: MenuRow];
-  remove: [row: MenuRow];
 }>();
 
 const INDENT_PX = 24;
@@ -223,6 +221,7 @@ function isBroken(row: MenuRow): boolean {
             type="button"
             class="cursor-grab rounded-lg p-1 text-content-muted hover:bg-surface active:cursor-grabbing"
             :aria-label="`Drag ${node.row.title}`"
+            title="Drag to reorder"
             @mousedown="armDrag(node.row.id)"
             @touchstart.passive="armDrag(node.row.id)"
           >
@@ -234,6 +233,7 @@ function isBroken(row: MenuRow): boolean {
             type="button"
             class="rounded-lg p-1 text-content-muted hover:bg-surface"
             :aria-label="collapsed.has(node.row.id) ? `Expand ${node.row.title}` : `Collapse ${node.row.title}`"
+            :title="collapsed.has(node.row.id) ? `Expand ${node.row.title}` : `Collapse ${node.row.title}`"
             @click="toggleCollapse(node.row.id)"
           >
             <component :is="collapsed.has(node.row.id) ? ChevronRight : ChevronDown" class="h-4 w-4" />
@@ -255,23 +255,17 @@ function isBroken(row: MenuRow): boolean {
         </div>
 
         <div class="flex flex-wrap items-center gap-1 pl-8 transition-opacity sm:flex-nowrap sm:pl-0 sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
-          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canMoveUp(node.row)" :aria-label="`Move ${node.row.title} up`" @click="moveUp(node.row)">
+          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canMoveUp(node.row)" :aria-label="`Move ${node.row.title} up`" :title="`Move ${node.row.title} up`" @click="moveUp(node.row)">
             <MoveUp class="h-4 w-4" />
           </button>
-          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canMoveDown(node.row)" :aria-label="`Move ${node.row.title} down`" @click="moveDown(node.row)">
+          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canMoveDown(node.row)" :aria-label="`Move ${node.row.title} down`" :title="`Move ${node.row.title} down`" @click="moveDown(node.row)">
             <MoveDown class="h-4 w-4" />
           </button>
-          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canOutdent(node.row)" :aria-label="`Outdent ${node.row.title}`" @click="outdent(node.row)">
+          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canOutdent(node.row)" :aria-label="`Outdent ${node.row.title}`" :title="`Outdent ${node.row.title}`" @click="outdent(node.row)">
             <ChevronsLeft class="h-4 w-4" />
           </button>
-          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canIndent(node.row)" :aria-label="`Indent ${node.row.title}`" @click="indent(node.row)">
+          <button type="button" class="rounded-lg p-1.5 text-content-muted hover:bg-surface disabled:opacity-30" :disabled="!canIndent(node.row)" :aria-label="`Indent ${node.row.title}`" :title="`Indent ${node.row.title}`" @click="indent(node.row)">
             <ChevronsRight class="h-4 w-4" />
-          </button>
-          <button type="button" class="rounded-lg p-1.5 text-accent hover:bg-surface" :aria-label="`Edit ${node.row.title}`" @click="emit('edit', node.row)">
-            <Pencil class="h-4 w-4" />
-          </button>
-          <button type="button" class="rounded-lg p-1.5 text-danger hover:bg-surface" :aria-label="`Delete ${node.row.title}`" @click="emit('remove', node.row)">
-            <Trash2 class="h-4 w-4" />
           </button>
         </div>
       </div>

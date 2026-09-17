@@ -205,6 +205,7 @@ function selectChild(section: AdminMenuSection, child: AdminFeature) {
 }
 
 function isSectionActive(section: AdminMenuSection) {
+  if (section.label === selectedFeature.value) return true;
   if (section.feature?.label === selectedFeature.value) return true;
   return section.children?.some((child) => child.label === selectedFeature.value) ?? false;
 }
@@ -217,6 +218,7 @@ function handleCrumbClick(index: number) {
 
   if (index === 1 && selectedSection.value?.children?.length) {
     saveExpandedSection(selectedSection.value.label);
+    selectedFeature.value = selectedSection.value.label;
   }
 }
 </script>

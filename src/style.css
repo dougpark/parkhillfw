@@ -24,7 +24,7 @@
 :root,
 :root[data-theme="modern-lite"] {
 	color-scheme: light;
-	--theme-app-bg: #faf9f6;
+	--theme-app-bg:#f4f1ea; /* #faf9f6; */
 	--theme-surface: #ffffff;
 	--theme-surface-subtle: #f1f4ef;
 	--theme-surface-hover: #f3ede8;

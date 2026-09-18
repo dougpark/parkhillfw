@@ -11,13 +11,13 @@ export interface ThemeOption {
 const STORAGE_KEY = 'parkhill-theme';
 const THEME_COLORS: Record<ThemeName, string> = {
     original: '#f0f4f9',
-    'modern-lite': '#faf9f6',
+    'modern-lite': '#f4f1ea', //'#faf9f6',
     'modern-dark': '#2b2d42',
 };
 
 export const themeOptions: ThemeOption[] = [
     { name: 'original', label: 'Original', colors: ['#f0f4f9', '#1a73e8', '#7c4dff'] },
-    { name: 'modern-lite', label: 'Modern Lite', colors: ['#faf9f6', '#e07a5f', '#81b29a'] },
+    { name: 'modern-lite', label: 'Modern Lite', colors: ['#f4f1ea ', '#e07a5f', '#81b29a'] },
     { name: 'modern-dark', label: 'Modern Dark', colors: ['#2b2d42', '#ab5b49', '#8d99ae'] },
 ];
 

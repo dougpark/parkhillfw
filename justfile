@@ -53,11 +53,7 @@ count-local:
     SELECT 'children' AS table_name, COUNT(*) AS count FROM children; \
     "
 
-# build and deploy to remote
-deploy:
-    bun run build
-    bun run deploy
-    date
+
 
 # migrate -- remote
 migrate-remote:
@@ -73,19 +69,26 @@ reset-reminders-local:
     bun run scripts/reset-directory-reminders.ts
 
 # Run wrangler local in dev mode
-wrangler-dev:
+dev: build
     bunx wrangler dev
 
-# Switch PS1 prompt between folder name (\W) and full path (\w)
-prompt-short:
+# build and deploy to remote
+deploy: build
+    bun run deploy
+    date
+
+# Build frontend assets into dist/
+build:
+    bun run build
+
+# Toggle PS1 prompt between short folder name (\W) and full path (\w)
+prompt:
 	@if grep -q "export PS1=.*\\\\W" ~/.bashrc; then \
-		echo "Prompt is already set to short folder name."; \
+		sed -i 's/export PS1=.*\\W.*/export PS1="\\\[\\\e\[32m\\\]\\w\\\[\\\e\[0m\\\] \\\$$ "/' ~/.bashrc; \
+		echo "Switched prompt to full path (\\w). Run 'source ~/.bashrc' to apply."; \
 	else \
 		sed -i '/export PS1=.*\\w/d' ~/.bashrc; \
+		sed -i '/export PS1=.*\\W/d' ~/.bashrc; \
 		echo 'export PS1="\[\e[32m\]\W\[\e[0m\] \$ "' >> ~/.bashrc; \
-		echo "Updated ~/.bashrc. Run 'source ~/.bashrc' or open a new terminal to apply."; \
+		echo "Switched prompt to short folder name (\\W). Run 'source ~/.bashrc' to apply."; \
 	fi
-
-prompt-reset:
-	@sed -i '/export PS1=.*\\W/d' ~/.bashrc
-	@echo "Removed short prompt export from ~/.bashrc."

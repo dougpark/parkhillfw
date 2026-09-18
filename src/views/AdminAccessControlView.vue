@@ -39,6 +39,8 @@ interface LogEntry {
 
 type PermissionField = 'isOwner' | 'isAdmin' | 'isPageEditor' | 'isDirectoryEditor' | 'isFinance';
 
+const emit = defineEmits<{ exit: [] }>();
+
 const currentUserIsOwner = ref(false);
 const searchQuery = ref('');
 const searchResults = ref<SearchResult[]>([]);
@@ -174,6 +176,14 @@ onMounted(() => {
 
 <template>
   <section class="space-y-8">
+    <button
+      type="button"
+      class="rounded-full border border-theme-border px-4 py-2 text-sm font-medium text-content-muted transition-colors hover:bg-app-bg"
+      @click="emit('exit')"
+    >
+      ← Admin menu
+    </button>
+
     <div>
       <h2 class="text-2xl font-semibold tracking-tight">Permissions</h2>
       <p class="mt-2 text-content-muted">Search for a user to grant or revoke Admin, Page Editor, Directory Editor, and Finance access.</p>

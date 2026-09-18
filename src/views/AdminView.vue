@@ -90,7 +90,7 @@ const adminMenuSections: AdminMenuSection[] = [
   },
   {
     label: 'Finance',
-    description: 'Manage payment processors, dues pricing & reports',
+    description: 'Payment processor, dues & reports',
     icon: DollarSign,
     role: 'finance',
     children: [
@@ -157,7 +157,7 @@ const breadcrumbTrail = computed(() => {
   return trail;
 });
 
-const fullWidthAdminFeature = computed(() => selectedFeature.value === 'Pages' || selectedFeature.value === 'Navigation' || selectedFeature.value === 'Photos' || selectedFeature.value === 'Documents');
+const fullWidthAdminFeature = computed(() => selectedFeature.value === 'Pages' || selectedFeature.value === 'Navigation' || selectedFeature.value === 'Photos' || selectedFeature.value === 'Documents' || selectedFeature.value === 'Permissions');
 
 onMounted(async () => {
   const savedExpandedSection = localStorage.getItem(ACCORDION_STORAGE_KEY);
@@ -339,7 +339,7 @@ function handleCrumbClick(index: number) {
         <AdminLoginUsersView />
       </div>
       <div v-else-if="selectedFeature === 'Permissions'" class="min-w-0 p-6 sm:p-8">
-        <AdminAccessControlView />
+        <AdminAccessControlView @exit="selectedFeature = 'Status'" />
       </div>      <div v-else-if="selectedFeature === 'Payment Processor'" class="min-w-0 p-6 sm:p-8">
         <AdminFinancePaymentProcessorView />
       </div>      <div v-else-if="selectedFeature === 'Logs'" class="min-w-0 p-6 sm:p-8">

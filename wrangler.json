@@ -1,37 +1,76 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "parkhillfw",
-	"account_id": "aced30206a1e4ebd1813b3746776b609",
-	"main": "src/index.ts",
-	"compatibility_date": "2026-03-01",
-    "routes": [
-    { "pattern": "parkhillfw.org", "custom_domain": true },
-    { "pattern": "www.parkhillfw.org", "custom_domain": true }
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "parkhillfw",
+  "account_id": "aced30206a1e4ebd1813b3746776b609",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true
+    }
   ],
-	"assets": {
-		"directory": "./dist",
-		"binding": "ASSETS",
-		"not_found_handling": "single-page-application",
-		"run_worker_first": ["/api/*"]
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "parkhillfw-db",
-			"database_id": "e707738a-20a7-4332-9135-d3ca5d1f489d",
-			"migrations_dir": "migrations"
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "BUCKET",
-			"bucket_name": "parkhillfw-bucket"
-		}
-	],
-	"send_email": [
-		{
-			"name": "EMAIL",
-			"remote": true
-		}
-	]
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "parkhillfw-db-dev",
+      "database_id": "5198fab4-36d4-44ad-9358-69a6bfb49159",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "parkhillfw-bucket-dev"
+    }
+  ],
+  "env": {
+    "staging": {
+      "name": "parkhillfw-staging",
+      "routes": [
+        { "pattern": "staging.parkhillfw.org", "custom_domain": true }
+        ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "parkhillfw-db-staging",
+          "database_id": "1ec85740-4640-454b-83f7-86f6e75c1947",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "parkhillfw-bucket-staging"
+        }
+      ]
+    },
+    "production": {
+      "name": "parkhillfw-prod",
+      "routes": [
+        { "pattern": "parkhillfw.org", "custom_domain": true },
+        { "pattern": "www.parkhillfw.org", "custom_domain": true }
+      ],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "parkhillfw-db",
+          "database_id": "e707738a-20a7-4332-9135-d3ca5d1f489d",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BUCKET",
+          "bucket_name": "parkhillfw-bucket"
+        }
+      ]
+    }
+  }
 }

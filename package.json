@@ -41,9 +41,13 @@
     "dev": "trap 'kill 0' EXIT INT TERM; bun run dev:worker & bun run dev:vue & wait",
     "build": "vite build",
     "deploy": "bun run build && wrangler deploy",
+    "deploy:prod": "bun run build && wrangler deploy --env production",
+    "deploy:staging": "bun run build && wrangler deploy --env staging",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:staging": "wrangler d1 migrations apply DB --remote --env staging",
+    "db:migrate:prod": "wrangler d1 migrations apply DB --remote --env production",
     "test": "bun test"
   }
 }

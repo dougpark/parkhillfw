@@ -13,6 +13,7 @@ export type PermissionFlags = {
     isAdmin?: boolean | null;
     isPageEditor?: boolean | null;
     isDirectoryEditor?: boolean | null;
+    isFinance?: boolean | null;
 };
 
 // The authenticated principal stashed on the request context by requireAuth().
@@ -42,8 +43,9 @@ export const isOwner = (user?: PermissionFlags | null) => Boolean(user?.isOwner)
 export const isAdmin = (user?: PermissionFlags | null) => Boolean(user?.isAdmin || user?.isOwner);
 export const isPageEditor = (user?: PermissionFlags | null) => Boolean(user?.isPageEditor) || isAdmin(user);
 export const isDirectoryEditor = (user?: PermissionFlags | null) => Boolean(user?.isDirectoryEditor) || isAdmin(user);
+export const isFinance = (user?: PermissionFlags | null) => Boolean(user?.isFinance) || isAdmin(user);
 export const hasAnyAdminRole = (user?: PermissionFlags | null) =>
-    isAdmin(user) || Boolean(user?.isPageEditor) || Boolean(user?.isDirectoryEditor);
+    isAdmin(user) || Boolean(user?.isPageEditor) || Boolean(user?.isDirectoryEditor) || Boolean(user?.isFinance);
 
 // Local-only role simulation so each permission level can be exercised without real logins.
 export function devBypassUser(role: string | undefined): AppUser {
@@ -104,6 +106,11 @@ export const requirePageEditor = (): MiddlewareHandler<AppEnv> => async (c, next
 
 export const requireDirectoryEditor = (): MiddlewareHandler<AppEnv> => async (c, next) => {
     if (!isDirectoryEditor(c.get('user') as PermissionFlags | undefined)) return c.json({ error: 'Forbidden' }, 403);
+    return next();
+};
+
+export const requireFinance = (): MiddlewareHandler<AppEnv> => async (c, next) => {
+    if (!isFinance(c.get('user') as PermissionFlags | undefined)) return c.json({ error: 'Forbidden' }, 403);
     return next();
 };
 

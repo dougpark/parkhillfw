@@ -29,7 +29,7 @@ import { getSetting, setSetting } from './lib/settings';
 
 const DEFAULT_ADMIN_EMAIL = 'admin@parkhillfw.com';
 const DEFAULT_SITE_NAME = 'Park Hill Directory';
-import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requirePageEditor, type AppBindings, type AppEnv } from './middleware/auth';
+import { devBypassUser, getCookie, isOwner as hasOwner, requireAdmin, requireAnyAdminRole, requireAuth, requireDirectory, requireDirectoryEditor, requireFinance, requirePageEditor, type AppBindings, type AppEnv } from './middleware/auth';
 
 const app = new Hono<AppEnv>();
 
@@ -475,6 +475,11 @@ app.put('/api/admin/settings', requireAuth(), requireAdmin(), async (c) => {
     return c.json({ adminEmail, siteName });
 });
 
+// Placeholder for the Finance subsystem; Payment Processor is not implemented yet.
+app.get('/api/admin/finance/payment-processor', requireAuth(), requireFinance(), async (c) => {
+    return c.json({ comingSoon: true });
+});
+
 app.get('/api/admin/residents', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const q = c.req.query('q')?.trim().toLowerCase();
@@ -785,7 +790,7 @@ app.put('/api/admin/users/:userId/login-emails', requireAuth(), requireAdmin(), 
     return c.json({ alternateEmails: emails });
 });
 
-const PERMISSION_FIELDS = ['isOwner', 'isAdmin', 'isPageEditor', 'isDirectoryEditor'] as const;
+const PERMISSION_FIELDS = ['isOwner', 'isAdmin', 'isPageEditor', 'isDirectoryEditor', 'isFinance'] as const;
 type PermissionField = (typeof PERMISSION_FIELDS)[number];
 
 // A non-Owner admin acting on an Owner's account could take it over (alias login email,
@@ -833,6 +838,7 @@ app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
         isAdmin: users.isAdmin,
         isPageEditor: users.isPageEditor,
         isDirectoryEditor: users.isDirectoryEditor,
+        isFinance: users.isFinance,
     };
     // Three passes cover every place an account can be found: residents who have never
     // logged in (no users row yet), the account's primary login email, and its aliases.
@@ -872,6 +878,7 @@ app.get('/api/admin/users/search', requireAuth(), requireAdmin(), async (c) => {
         isAdmin: row.isAdmin,
         isPageEditor: row.isPageEditor,
         isDirectoryEditor: row.isDirectoryEditor,
+        isFinance: row.isFinance,
     })));
 });
 
@@ -926,11 +933,12 @@ app.get('/api/admin/users/with-access', requireAuth(), requireAdmin(), async (c)
         isAdmin: users.isAdmin,
         isPageEditor: users.isPageEditor,
         isDirectoryEditor: users.isDirectoryEditor,
+        isFinance: users.isFinance,
         firstName: residents.firstName,
         lastName: residents.lastName,
     }).from(users)
         .leftJoin(residents, eq(residents.id, users.residentId))
-        .where(or(eq(users.isOwner, true), eq(users.isAdmin, true), eq(users.isPageEditor, true), eq(users.isDirectoryEditor, true)))
+        .where(or(eq(users.isOwner, true), eq(users.isAdmin, true), eq(users.isPageEditor, true), eq(users.isDirectoryEditor, true), eq(users.isFinance, true)))
         .orderBy(asc(users.email)).all();
 
     return c.json(rows.map((row) => ({
@@ -941,6 +949,7 @@ app.get('/api/admin/users/with-access', requireAuth(), requireAdmin(), async (c)
         isAdmin: row.isAdmin,
         isPageEditor: row.isPageEditor,
         isDirectoryEditor: row.isDirectoryEditor,
+        isFinance: row.isFinance,
     })));
 });
 
@@ -999,8 +1008,9 @@ app.post('/api/admin/users/:userId/permissions/clear', requireAuth(), requireAdm
         isAdmin: target.isAdmin,
         isPageEditor: target.isPageEditor,
         isDirectoryEditor: target.isDirectoryEditor,
+        isFinance: target.isFinance,
     };
-    await db.update(users).set({ isOwner: false, isAdmin: false, isPageEditor: false, isDirectoryEditor: false }).where(eq(users.id, userId));
+    await db.update(users).set({ isOwner: false, isAdmin: false, isPageEditor: false, isDirectoryEditor: false, isFinance: false }).where(eq(users.id, userId));
     await logAccessControlChange(db, actor.id, userId, 'clear_permissions', { before });
 
     return c.json({ cleared: true });

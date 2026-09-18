@@ -45,6 +45,7 @@ function setupDirectoryDb() {
             is_admin INTEGER DEFAULT 0,
             is_page_editor INTEGER DEFAULT 0,
             is_directory_editor INTEGER DEFAULT 0,
+            is_finance INTEGER DEFAULT 0,
             is_suspended INTEGER DEFAULT 0,
             last_login_at INTEGER,
             created_at INTEGER,

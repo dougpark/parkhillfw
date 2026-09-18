@@ -105,6 +105,7 @@ export const users = sqliteTable(
         isAdmin: integer('is_admin', { mode: 'boolean' }).default(false),
         isPageEditor: integer('is_page_editor', { mode: 'boolean' }).default(false),
         isDirectoryEditor: integer('is_directory_editor', { mode: 'boolean' }).default(false),
+        isFinance: integer('is_finance', { mode: 'boolean' }).default(false),
 
         // Account Security
         isSuspended: integer('is_suspended', { mode: 'boolean' }).default(false),

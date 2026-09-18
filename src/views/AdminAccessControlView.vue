@@ -12,6 +12,7 @@ interface AccessUser {
   isAdmin: boolean | null;
   isPageEditor: boolean | null;
   isDirectoryEditor: boolean | null;
+  isFinance: boolean | null;
 }
 
 interface SearchResult {
@@ -23,6 +24,7 @@ interface SearchResult {
   isAdmin: boolean | null;
   isPageEditor: boolean | null;
   isDirectoryEditor: boolean | null;
+  isFinance: boolean | null;
 }
 
 interface LogEntry {
@@ -35,7 +37,7 @@ interface LogEntry {
   targetEmail: string | null;
 }
 
-type PermissionField = 'isOwner' | 'isAdmin' | 'isPageEditor' | 'isDirectoryEditor';
+type PermissionField = 'isOwner' | 'isAdmin' | 'isPageEditor' | 'isDirectoryEditor' | 'isFinance';
 
 const currentUserIsOwner = ref(false);
 const searchQuery = ref('');
@@ -109,6 +111,7 @@ async function selectUser(result: SearchResult) {
       isAdmin: result.isAdmin ?? false,
       isPageEditor: result.isPageEditor ?? false,
       isDirectoryEditor: result.isDirectoryEditor ?? false,
+      isFinance: result.isFinance ?? false,
     });
   }
 }
@@ -136,7 +139,7 @@ async function togglePermission(user: AccessUser, field: PermissionField) {
 }
 
 async function clearPermissions(user: AccessUser) {
-  if (!confirm(`Revoke all access for ${user.displayName}? This removes Admin, Page Editor, Directory Editor, and Owner permissions.`)) return;
+  if (!confirm(`Revoke all access for ${user.displayName}? This removes Admin, Page Editor, Directory Editor, Finance, and Owner permissions.`)) return;
   error.value = '';
   const response = await fetch(`/api/admin/users/${user.id}/permissions/clear`, { method: 'POST' });
   const data = await response.json() as { error?: string };
@@ -173,7 +176,7 @@ onMounted(() => {
   <section class="space-y-8">
     <div>
       <h2 class="text-2xl font-semibold tracking-tight">Permissions</h2>
-      <p class="mt-2 text-content-muted">Search for a user to grant or revoke Admin, Page Editor, and Directory Editor access.</p>
+      <p class="mt-2 text-content-muted">Search for a user to grant or revoke Admin, Page Editor, Directory Editor, and Finance access.</p>
     </div>
 
     <p v-if="error" class="rounded-xl bg-danger-subtle p-3 text-sm text-danger">{{ error }}</p>
@@ -208,6 +211,7 @@ onMounted(() => {
         <div class="flex flex-wrap items-center gap-2">
           <FilterChip :model-value="Boolean(user.isPageEditor)" @update:model-value="togglePermission(user, 'isPageEditor')">Page Editor</FilterChip>
           <FilterChip :model-value="Boolean(user.isDirectoryEditor)" @update:model-value="togglePermission(user, 'isDirectoryEditor')">Directory Editor</FilterChip>
+          <FilterChip :model-value="Boolean(user.isFinance)" @update:model-value="togglePermission(user, 'isFinance')">Finance</FilterChip>
           <FilterChip :model-value="Boolean(user.isAdmin)" @update:model-value="togglePermission(user, 'isAdmin')">Admin</FilterChip>
           <FilterChip
             :model-value="Boolean(user.isOwner)"

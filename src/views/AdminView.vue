@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Archive, ChevronDown, ClipboardList, Clock, FileArchive, FileText, FolderTree, Gauge, Images, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
+import { Archive, ChevronDown, ClipboardList, Clock, DollarSign, FileArchive, FileText, FolderTree, Gauge, Images, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 import AdminArchiveBrowserView from './AdminArchiveBrowserView.vue';
+import AdminFinancePaymentProcessorView from './AdminFinancePaymentProcessorView.vue';
 import AdminLastSeenView from './AdminLastSeenView.vue';
 import AdminLogsView from './AdminLogsView.vue';
 import AdminStatusView from './AdminStatusView.vue';
@@ -23,7 +24,7 @@ import AdminSettingsView from './AdminSettingsView.vue';
 
 import AdminDocumentsView from './AdminDocumentsView.vue';
 
-type Role = 'any' | 'admin' | 'directoryEditor' | 'pageEditor';
+type Role = 'any' | 'admin' | 'directoryEditor' | 'pageEditor' | 'finance';
 
 interface AdminFeature {
   label: string;
@@ -47,7 +48,7 @@ const ACCORDION_STORAGE_KEY = 'parkhillfw.admin.expandedSection';
 
 const selectedFeature = ref('Status');
 const expandedSection = ref<string | null>(null);
-const permissions = ref({ isOwner: false, isAdmin: false, isPageEditor: false, isDirectoryEditor: false });
+const permissions = ref({ isOwner: false, isAdmin: false, isPageEditor: false, isDirectoryEditor: false, isFinance: false });
 
 const adminMenuSections: AdminMenuSection[] = [
   {
@@ -88,6 +89,15 @@ const adminMenuSections: AdminMenuSection[] = [
     ],
   },
   {
+    label: 'Finance',
+    description: 'Manage payment processors, dues pricing & reports',
+    icon: DollarSign,
+    role: 'finance',
+    children: [
+      { label: 'Payment Processor', description: 'Configure payment processor settings.', icon: DollarSign, role: 'finance' },
+    ],
+  },
+  {
     label: 'Log Viewer',
     description: 'Browse activity logs and archived households.',
     icon: ScrollText,
@@ -112,6 +122,7 @@ function allows(role: Role) {
   if (role === 'admin') return isAdmin.value;
   if (role === 'pageEditor') return isAdmin.value || permissions.value.isPageEditor;
   if (role === 'directoryEditor') return isAdmin.value || permissions.value.isDirectoryEditor;
+  if (role === 'finance') return isAdmin.value || permissions.value.isFinance;
   return true;
 }
 
@@ -162,6 +173,7 @@ onMounted(async () => {
     isAdmin: Boolean(data.user?.isAdmin),
     isPageEditor: Boolean(data.user?.isPageEditor),
     isDirectoryEditor: Boolean(data.user?.isDirectoryEditor),
+    isFinance: Boolean(data.user?.isFinance),
   };
 });
 
@@ -328,6 +340,8 @@ function handleCrumbClick(index: number) {
       </div>
       <div v-else-if="selectedFeature === 'Permissions'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessControlView />
+      </div>      <div v-else-if="selectedFeature === 'Payment Processor'" class="min-w-0 p-6 sm:p-8">
+        <AdminFinancePaymentProcessorView />
       </div>      <div v-else-if="selectedFeature === 'Logs'" class="min-w-0 p-6 sm:p-8">
         <AdminLogsView />
       </div>      <div v-else-if="selectedFeature === 'Archives'" class="min-w-0 p-6 sm:p-8">

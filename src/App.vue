@@ -4,7 +4,9 @@ import { Check, CheckCircle2, ChevronDown, Clock, Edit3, Info, LogIn, LogOut, Ma
 import { useRoute, useRouter } from 'vue-router';
 import { useTheme } from './composables/useTheme';
 import { useSiteSettings } from './composables/useSiteSettings';
+import { useEnvironmentBanner } from './composables/useEnvironmentBanner';
 import AboutModal from './components/common/AboutModal.vue';
+import EnvironmentBanner from './components/layout/EnvironmentBanner.vue';
 import modernLogo from '/modern-ph-logo.svg?raw';
 
 interface AuthUser {
@@ -24,6 +26,7 @@ const router = useRouter();
 const navbarLogo = modernLogo.replace('viewBox="0 0 512.000000 512.000000"', 'viewBox="145 45 220 300"');
 const { theme, themeOptions, applyTheme } = useTheme();
 const { siteName, loadSiteSettings } = useSiteSettings();
+const envInfo = useEnvironmentBanner();
 const isAccountMenuOpen = ref(false);
 const isAccountPanelOpen = ref(false);
 const isAboutModalOpen = ref(false);
@@ -206,8 +209,9 @@ watch(siteName, (value) => { document.title = value; }, { immediate: true });
 </script>
 
 <template>
-  <div class="min-h-screen bg-app-bg text-content font-sans" @click="isAccountMenuOpen = false">
-    <header class="sticky top-0 z-30 border-b border-theme-border bg-surface">
+  <div class="min-h-screen bg-app-bg text-content font-sans" :class="{ 'pt-8': envInfo }" @click="isAccountMenuOpen = false">
+    <EnvironmentBanner />
+    <header class="sticky z-30 border-b border-theme-border bg-surface" :class="envInfo ? 'top-8' : 'top-0'">
       <div class="max-w-5xl mx-auto flex items-center justify-between px-4 py-3 sm:px-8">
         <RouterLink
           to="/home"

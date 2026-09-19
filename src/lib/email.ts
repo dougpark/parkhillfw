@@ -16,7 +16,7 @@ export async function sendMagicLinkEmail(email: EmailBinding, toEmail: string, t
 
     await email.send({
         to: toEmail,
-        from: `"${siteName}" <auth@parkhillfw.org>`,
+        from: `"${siteName}" <support@parkhillfw.org>`,
         subject: `Your ${siteName} sign-in link`,
         html,
         text,
@@ -45,7 +45,7 @@ export async function sendAccessRequestOutcomeEmail(
 
     await email.send({
         to: toEmail,
-        from: `"${siteName}" <auth@parkhillfw.org>`,
+        from: `"${siteName}" <support@parkhillfw.org>`,
         subject,
         html,
         text,

@@ -36,6 +36,12 @@
       "routes": [
         { "pattern": "staging.parkhillfw.org", "custom_domain": true }
         ],
+        "send_email": [
+            {
+            "name": "EMAIL",
+            "remote": true
+            }
+        ],
       "d1_databases": [
         {
           "binding": "DB",
@@ -57,6 +63,12 @@
         { "pattern": "parkhillfw.org", "custom_domain": true },
         { "pattern": "www.parkhillfw.org", "custom_domain": true }
       ],
+      "send_email": [
+            {
+            "name": "EMAIL",
+            "remote": true
+            }
+        ],
       "d1_databases": [
         {
           "binding": "DB",

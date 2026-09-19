@@ -13,6 +13,74 @@ build:
     bun run build
 
 # ------------------------------------------------------------------------------
+# Sync Commands
+# ------------------------------------------------------------------------------
+
+## Copy remote Production D1 data to Staging D1 (households/products/subscriptions/transactions ONLY)
+sync-prod-to-staging:
+    @echo "📦 Exporting Production D1 database..."
+    bunx wrangler d1 export parkhillfw-db --env production --remote -y --output=./prod_dump.sql
+    @echo "🧼 Extracting application tables and data..."
+    grep -E "^INSERT INTO \"(households|products|subscriptions|transactions)\"" ./prod_dump.sql > ./data_only.sql || true
+    @echo "📥 Importing clean data into Staging D1..."
+    bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --file=./data_only.sql
+    @echo "🧹 Removing temporary files..."
+    rm ./prod_dump.sql ./data_only.sql
+    @echo "✅ Staging D1 data successfully synced!"
+
+## Full mirror of Production D1 into Staging D1 (residents, users, content, everything)
+## WARNING: wipes and replaces staging's directory/content data. Does not touch
+## d1_migrations, sessions, magic_tokens, or magic_link_rate_limits (transient/security state).
+sync-prod-to-staging-full:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "📦 Exporting Production D1 database (parkhillfw-db)..."
+    bunx wrangler d1 export parkhillfw-db --env production --remote -y --output=./prod_full_dump.sql
+
+    echo "🧼 Splitting into per-table data files..."
+    rm -rf ./sync_tmp && mkdir -p ./sync_tmp
+    for t in households residents children users user_login_emails household_favorites \
+             access_requests activity_logs household_archive pages document_folders \
+             documents photo_folders photo_events photos settings; do
+        grep "^INSERT INTO \"$t\"" ./prod_full_dump.sql > "./sync_tmp/$t.sql" || true
+    done
+
+    # menus is self-referencing (parent_id -> menus.id): insert with parent_id NULL
+    # first, then backfill via UPDATE so row order never violates the FK.
+    grep "^INSERT INTO \"menus\"" ./prod_full_dump.sql \
+        | sed -E 's/^(INSERT INTO "menus" \("id","parent_id"[^)]*\) VALUES\([0-9]+,)(NULL|[0-9]+)(,.*)$/\1NULL\3/' \
+        > ./sync_tmp/menus_insert.sql
+    grep "^INSERT INTO \"menus\"" ./prod_full_dump.sql \
+        | sed -E 's/^INSERT INTO "menus" \("id","parent_id"[^)]*\) VALUES\(([0-9]+),(NULL|[0-9]+),.*$/\1 \2/' \
+        | awk '$2 != "NULL" {print "UPDATE \"menus\" SET parent_id="$2" WHERE id="$1";"}' \
+        > ./sync_tmp/menus_update.sql
+
+    echo "🧹 Clearing staging tables that are about to be replaced..."
+    bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --command \
+        'DELETE FROM photos; DELETE FROM photo_events; DELETE FROM photo_folders; DELETE FROM documents; DELETE FROM document_folders; DELETE FROM menus; DELETE FROM pages; DELETE FROM household_archive; DELETE FROM activity_logs; DELETE FROM access_requests; DELETE FROM household_favorites; DELETE FROM user_login_emails; DELETE FROM users; DELETE FROM children; DELETE FROM residents; DELETE FROM households; DELETE FROM settings;'
+
+    echo "📥 Importing Production data into Staging D1 (dependency order, one table per request)..."
+    for t in households residents children users user_login_emails household_favorites \
+             access_requests activity_logs household_archive pages; do
+        if [ -s "./sync_tmp/$t.sql" ]; then
+            bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --file="./sync_tmp/$t.sql"
+        fi
+    done
+    bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --file="./sync_tmp/menus_insert.sql"
+    if [ -s "./sync_tmp/menus_update.sql" ]; then
+        bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --file="./sync_tmp/menus_update.sql"
+    fi
+    for t in document_folders documents photo_folders photo_events photos settings; do
+        if [ -s "./sync_tmp/$t.sql" ]; then
+            bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --file="./sync_tmp/$t.sql"
+        fi
+    done
+
+    echo "🧹 Removing temporary files..."
+    rm -rf ./prod_full_dump.sql ./sync_tmp
+    echo "✅ Staging D1 fully mirrors Production (residents, users, directory content, etc.)!"
+
+# ------------------------------------------------------------------------------
 # Local Development Commands
 # ------------------------------------------------------------------------------
 

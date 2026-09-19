@@ -16,18 +16,6 @@ build:
 # Sync Commands
 # ------------------------------------------------------------------------------
 
-## Copy remote Production D1 data to Staging D1 (households/products/subscriptions/transactions ONLY)
-sync-prod-to-staging:
-    @echo "📦 Exporting Production D1 database..."
-    bunx wrangler d1 export parkhillfw-db --env production --remote -y --output=./prod_dump.sql
-    @echo "🧼 Extracting application tables and data..."
-    grep -E "^INSERT INTO \"(households|products|subscriptions|transactions)\"" ./prod_dump.sql > ./data_only.sql || true
-    @echo "📥 Importing clean data into Staging D1..."
-    bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --file=./data_only.sql
-    @echo "🧹 Removing temporary files..."
-    rm ./prod_dump.sql ./data_only.sql
-    @echo "✅ Staging D1 data successfully synced!"
-
 ## Full mirror of Production D1 into Staging D1 (residents, users, content, everything)
 ## WARNING: wipes and replaces staging's directory/content data. Does not touch
 ## d1_migrations, sessions, magic_tokens, or magic_link_rate_limits (transient/security state).

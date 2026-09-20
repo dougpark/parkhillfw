@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import { alias } from 'drizzle-orm/sqlite-core';
 import {
     accessRequests,
@@ -691,7 +692,7 @@ app.post('/api/admin/households/:householdId/archive-household', requireAuth(), 
         children: householdChildren,
         archivedBy: actor ? { id: actor.id, email: actor.email } : null,
     };
-    const statements = [
+    const statements: BatchItem<'sqlite'>[] = [
         db.insert(householdArchive).values({
             addressId: household.id,
             archivedAt: now,
@@ -734,7 +735,7 @@ app.post('/api/admin/households/:householdId/archive-household', requireAuth(), 
             updatedAt: now,
         }).where(eq(households.id, householdId)),
     );
-    await db.batch(statements as [typeof statements[number], ...typeof statements]);
+    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 
     return c.json({ archived: true, streetAddress: household.streetAddress, residentsRemoved: residentIds.length, usersReset: userIds.length });
 });

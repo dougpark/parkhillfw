@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
   <div v-if="loading" class="p-6 text-sm text-content-muted">Loading page…</div>
   <div v-else-if="loadError" class="p-6 text-sm text-danger">{{ loadError }}</div>
 
-  <div v-else class="flex min-h-[32rem] flex-col space-y-4">
+  <div v-else class="flex min-h-128 flex-col space-y-4">
     <div class="flex flex-wrap items-center gap-3">
       <input
         v-model="title"
@@ -373,7 +373,7 @@ onBeforeUnmount(() => {
       @toggle-preview="showPreview = !showPreview"
     />
 
-    <div class="relative min-h-[24rem] flex-1">
+    <div class="relative min-h-96 flex-1">
       <div ref="editorHost" class="h-full overflow-hidden rounded-xl border border-theme-border bg-surface" />
       <div
         v-if="showPreview"

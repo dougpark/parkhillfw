@@ -85,7 +85,7 @@ onMounted(async () => {
     aria-hidden="true"
     class="pointer-events-none fixed inset-0 z-0 flex items-center justify-center overflow-hidden opacity-5"
   >
-    <div class="hero-watermark w-[600px] max-w-none select-none md:w-[800px] lg:w-[1000px]" v-html="heroLogo" />
+    <div class="hero-watermark w-150 max-w-none select-none md:w-200 lg:w-250" v-html="heroLogo" />
   </div>
 
   <section class="relative z-10 space-y-8 py-4 sm:py-8">

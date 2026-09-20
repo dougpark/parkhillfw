@@ -20,3 +20,13 @@ We designed the neighborhood directory to make staying connected easier, safer, 
 **Extended Login Sessions:** Stay signed in on your trusted personal devices longer, reducing the need to log in repeatedly.
 
 **Protected Resident Data:** Secure, encrypted document and data storage ensures sensitive directory details and neighborhood files remain strictly private within our community.
+
+## Private Document Library
+
+**Resident-Only Access:** Meeting notes, HOA filings, and other neighborhood documents are stored securely and are only viewable by authenticated residents—no public access.
+
+## Photo Gallery
+
+**Community Memories:** Browse photos from neighborhood events, gatherings, and celebrations, organized by folder and event for easy browsing.
+
+**Fast, Beautiful Viewing:** A responsive photo grid and lightbox viewer make it easy to swipe through pictures on your phone or click through on your desktop.

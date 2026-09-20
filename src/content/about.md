@@ -23,7 +23,7 @@ We designed the neighborhood directory to make staying connected easier, safer, 
 
 ## Private Document Library
 
-**Resident-Only Access:** Meeting notes, HOA filings, and other neighborhood documents are stored securely and are only viewable by authenticated residents—no public access.
+**Resident-Only Access:** Meeting notes, Association filings, and other neighborhood documents are stored securely and are only viewable by authenticated residents, no public access.
 
 ## Photo Gallery
 

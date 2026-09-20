@@ -24,7 +24,7 @@ import {
     users,
 } from './db/schema';
 import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE, verifyCodeAndConsume } from './lib/auth';
-import { sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
+import { sendAccessRequestAdminNotificationEmail, sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
 import { getSetting, setSetting } from './lib/settings';
 
 const DEFAULT_ADMIN_EMAIL = 'admin@parkhillfw.com';
@@ -261,6 +261,16 @@ app.post('/api/access-requests', requireAuth(), async (c) => {
         .where(and(eq(accessRequests.email, user.email), eq(accessRequests.status, 'pending'))).get();
     if (!pending) {
         await db.insert(accessRequests).values({ email: user.email, fullName, streetAddress });
+        try {
+            const [adminEmail, siteName] = await Promise.all([
+                getSetting(db, 'admin_email', DEFAULT_ADMIN_EMAIL),
+                getSetting(db, 'site_name', DEFAULT_SITE_NAME),
+            ]);
+            await sendAccessRequestAdminNotificationEmail(c.env.EMAIL, adminEmail, user.email, fullName, streetAddress, new URL(c.req.url).origin, siteName);
+        } catch (error) {
+            const emailError = error as { code?: string; message?: string };
+            console.error('Access request admin notification email failed', { code: emailError.code ?? 'UNKNOWN', message: emailError.message ?? 'Unknown email provider error' });
+        }
     }
     return c.json({ status: 'pending' });
 });

@@ -24,7 +24,7 @@ Admin:
 - x Info Msg - Show message at top of home page
 - x Documents - Manage and store files in the cloud
 - x Admin Stats Page - Show counts and usages stats
-- Login Request email - Send admin email for login request
+- x Login Request email - Send admin email for login request
 
 Directory:
 - Directory - Additional fields: interest, hobbies, and skills, Address History
@@ -33,6 +33,8 @@ Directory:
 - xx Unarchive Household - Restore prev archived households - no
 - x Clickable email and phone links to email, call or sms
 - x clickable address to open in google maps
+- Home Photos
+- Resident Photos
 
 - Mobile Actions:
 - x View address in maps
@@ -41,11 +43,11 @@ Directory:
 - add email to list for starting a group email
 - add phone number to list for starting a group message
 
-- Mail Blast to send emails to the group, not supported
-- Mail Group to allow Google Groups peers to all emails, not supported
-- Mail Forwarding - Users setup domain email forwarding, not supported
-- SMS - Send and manage SMS messages to users, not supported
-- Notifications - Send alerts and updates to users, not supported
+- xx Mail Blast to send emails to the group, not supported
+- xx Mail Group to allow Google Groups peers to all emails, not supported
+- xx Mail Forwarding - Users setup domain email forwarding, not supported
+- xx SMS - Send and manage SMS messages to users, not supported
+- xx Notifications - Send alerts and updates to users, not supported
 - Announcements - Post and manage community announcements
 
 - Blog - Manage and publish blog posts
@@ -53,7 +55,7 @@ Directory:
 - x Settings - Configure application preferences and options
 - Help - Provide user assistance and documentation
 - Analytics - Provide insights and data analysis tools
-- Stats - Track usage and client device in
+- Stats - Track usage and client device
 
 - Integrations - Connect with third-party services and APIs
 - Quickbooks Payments, Stripe
@@ -70,9 +72,14 @@ Directory:
 - Surveys - Create and manage user surveys
 - Polls - Create and manage user polls
 - Emergency Request - Submit and manage emergency requests
+- User Referrals - Allow users to initiate referrals and recommendations
+- Shared Interests - Allow users to connect based on common interests
+- Marketplace - Allow users to buy and sell items within the community
+
 
 Alumni:
 - Alumni Directory - Manage and view alumni information
+- Allow alumni to login and update their own profiles
 
 System:
 - Automated daily backups of D1 and R2

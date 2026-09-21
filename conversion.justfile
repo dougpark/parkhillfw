@@ -2,7 +2,11 @@
 
 # Default recipe listing available commands
 default:
-    @just --list
+    @just -f conversion.justfile --list
+
+# Print today's date
+today:
+    date
 
 # ------------------------------------------------------------------------------
 # Data Conversion Commands

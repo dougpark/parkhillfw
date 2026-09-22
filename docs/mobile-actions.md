@@ -9,7 +9,7 @@ Mobile contact cards balance quick utility with mis-tap prevention. Providing di
 • Copy to Clipboard: Highly valuable for numbers, physical addresses, and emails. Include a explicit visual feedback cue (e.g., changing the button icon to a checkmark or showing a toast message: "Copied to clipboard").
 
 • Add to Contacts (.vcf / vCard download): Essential for directory apps. Providing a dedicated "Save Contact" button that downloads or opens a .vcf file lets users import details directly into their phone's native address book.
-
+ 
 ## UI Strategies: Structuring Contact Cards
 
 To prevent visual clutter while keeping primary actions accessible:

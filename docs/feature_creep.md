@@ -10,8 +10,9 @@ Photo Pages:
 - x Event pages
 - x Admin Photo Section
 
-Surveys:
-- Create and manage surveys for users
+Email:
+- Register Welcome@parkhillfw.org with the Google email group
+- Send invite emails to all members
 
 Admin:
 - x Users - reset login tokens to force re-authentication
@@ -76,6 +77,8 @@ Directory:
 - Shared Interests - Allow users to connect based on common interests
 - Marketplace - Allow users to buy and sell items within the community
 
+Surveys:
+- Create and manage surveys for users
 
 Alumni:
 - Alumni Directory - Manage and view alumni information

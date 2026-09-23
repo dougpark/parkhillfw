@@ -12,7 +12,7 @@
 ## Admin -> Finance
 - requires new permission: Finance to see the section and access the sub sections
 - other permissions: Admin and Owner have full access
-- subheading text: "Manage payment processors, dues pricing & reports"
+- subheading text: "Manage payment processor, dues & reports"
 - first sub-section: "Payment Processor"
 
 ## Admin -> Finance -> Payment Processor

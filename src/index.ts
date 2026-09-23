@@ -1467,6 +1467,7 @@ app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
             like(residents.firstName, `%${q}%`),
             like(residents.lastName, `%${q}%`),
             like(residents.email, `%${q}%`),
+            like(sql`${residents.firstName} || ' ' || ${residents.lastName}`, `%${q}%`),
             like(children.name, `%${q}%`)
         );
         if (searchFilter) filters.push(searchFilter);
@@ -1537,7 +1538,12 @@ async function searchDirectoryOverlay(db: ReturnType<typeof drizzle>, q: string,
     const [addressMatches, residentMatches, childMatches] = await Promise.all([
         db.select({ id: households.id }).from(households).where(like(households.streetAddress, pattern)).all(),
         db.select({ householdId: residents.householdId }).from(residents)
-            .where(or(like(residents.firstName, pattern), like(residents.lastName, pattern), like(residents.email, pattern))).all(),
+            .where(or(
+                like(residents.firstName, pattern),
+                like(residents.lastName, pattern),
+                like(residents.email, pattern),
+                like(sql`${residents.firstName} || ' ' || ${residents.lastName}`, pattern),
+            )).all(),
         db.select({ householdId: children.householdId }).from(children).where(like(children.name, pattern)).all(),
     ]);
 

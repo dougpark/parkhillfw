@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import BreadcrumbNav from '@/components/common/BreadcrumbNav.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FilterChip from '@/components/ui/FilterChip.vue';
@@ -40,7 +41,8 @@ interface Household {
   children: Child[];
 }
 
-const query = ref('');
+const route = useRoute();
+const query = ref(typeof route.query.q === 'string' ? route.query.q : '');
 const petSitting = ref(false);
 const babysitting = ref(false);
 const favoritesOnly = ref(false);

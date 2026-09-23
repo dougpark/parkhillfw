@@ -1529,6 +1529,140 @@ app.get('/api/directory', requireAuth(), requireDirectory(), async (c) => {
 });
 
 // ==========================================
+// Universal search (navbar overlay) — directory + pages
+// ==========================================
+
+async function searchDirectoryOverlay(db: ReturnType<typeof drizzle>, q: string, limit = 6) {
+    const pattern = `%${q}%`;
+    const [addressMatches, residentMatches, childMatches] = await Promise.all([
+        db.select({ id: households.id }).from(households).where(like(households.streetAddress, pattern)).all(),
+        db.select({ householdId: residents.householdId }).from(residents)
+            .where(or(like(residents.firstName, pattern), like(residents.lastName, pattern), like(residents.email, pattern))).all(),
+        db.select({ householdId: children.householdId }).from(children).where(like(children.name, pattern)).all(),
+    ]);
+
+    const householdIds = new Set<number>([
+        ...addressMatches.map((row) => row.id),
+        ...residentMatches.map((row) => row.householdId),
+        ...childMatches.map((row) => row.householdId),
+    ]);
+    if (!householdIds.size) return [];
+
+    const matchedHouseholds = (await db.select().from(households)
+        .where(and(inArray(households.id, Array.from(householdIds)), or(eq(households.status, 'active'), eq(households.status, 'vacant'))))
+        .all())
+        .sort((left, right) => compareStreetAddresses(left.streetAddress, right.streetAddress))
+        .slice(0, limit);
+    if (!matchedHouseholds.length) return [];
+
+    const relatedResidents = await db.select().from(residents)
+        .where(inArray(residents.householdId, matchedHouseholds.map((h) => h.id))).all();
+
+    return matchedHouseholds.map((household) => {
+        const householdResidents = relatedResidents
+            .filter((r) => r.householdId === household.id)
+            .sort((left, right) => Number(right.isPrimaryContact) - Number(left.isPrimaryContact));
+        const names = householdResidents.map((r) => `${r.firstName} ${r.lastName}`);
+        const shown = names.slice(0, 3);
+        const extra = names.length > shown.length ? ` +${names.length - shown.length}` : '';
+        return {
+            id: household.id,
+            streetAddress: household.streetAddress,
+            residentSummary: names.length ? `${shown.join(', ')}${extra}` : 'Vacant',
+        };
+    });
+}
+
+function pageSearchSnippet(bodyMd: string, q: string): string {
+    // Strip whole-document constructs first (code fences span lines, so this must
+    // run before splitting into blocks below).
+    const withoutCodeAndMarkup = bodyMd
+        .replace(/<[^>]*>/g, ' ')                          // HTML tags
+        .replace(/```[\s\S]*?```/g, ' ')                   // fenced code blocks
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')              // images — drop entirely
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');           // links — keep the visible text only
+
+    // Group lines into blocks (heading / list item / paragraph) so a hand-wrapped
+    // paragraph stays joined, but headings and list items never bleed into the
+    // paragraph that follows them — otherwise collapsing all newlines to spaces
+    // can make the snippet's context window land in the line before the match.
+    const blocks: string[] = [];
+    let current: string[] = [];
+    const flushBlock = () => {
+        if (current.length) blocks.push(current.join(' '));
+        current = [];
+    };
+    for (const rawLine of withoutCodeAndMarkup.split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line) {
+            flushBlock();
+            continue;
+        }
+        if (/^#{1,6}\s+/.test(line) || /^[-+*]\s+/.test(line)) {
+            flushBlock();
+            blocks.push(line);
+            continue;
+        }
+        current.push(line);
+    }
+    flushBlock();
+
+    const cleanBlock = (text: string) => text
+        .replace(/^#{1,6}\s+/, '')
+        .replace(/^[-+*]\s+/, '')
+        .replace(/[*_~`>#[\]()!]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const lowerQuery = q.toLowerCase();
+    const cleanedBlocks = blocks.map(cleanBlock).filter(Boolean);
+    const block = cleanedBlocks.find((b) => b.toLowerCase().includes(lowerQuery)) ?? cleanedBlocks[0] ?? '';
+
+    const idx = block.toLowerCase().indexOf(lowerQuery);
+    if (idx === -1) return block.slice(0, 120);
+    const start = Math.max(0, idx - 40);
+    const end = Math.min(block.length, idx + q.length + 80);
+    return `${start > 0 ? '…' : ''}${block.slice(start, end).trim()}${end < block.length ? '…' : ''}`;
+}
+
+async function searchPagesOverlay(db: ReturnType<typeof drizzle>, q: string, isEditor: boolean, hasDirectoryAccess: boolean, limit = 6) {
+    const pattern = `%${q}%`;
+    const matches = await db.select().from(pages).where(or(like(pages.title, pattern), like(pages.bodyMd, pattern))).all();
+
+    return matches
+        .filter((page) => {
+            if (page.isDraft) return isEditor;
+            if (page.isPublic) return true;
+            return hasDirectoryAccess || isEditor;
+        })
+        .slice(0, limit)
+        .map((page) => ({
+            slug: page.slug,
+            title: page.title,
+            snippet: pageSearchSnippet(page.bodyMd, q),
+        }));
+}
+
+// Combined overlay results for the navbar search box; each source is scoped to what
+// the signed-in user is otherwise allowed to see (mirrors /api/directory and /api/pages/:slug).
+app.get('/api/search', requireAuth(), async (c) => {
+    const q = c.req.query('q')?.trim();
+    if (!q || q.length < 2) return c.json({ directory: [], pages: [] });
+
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { residentId?: number | null; householdId?: number; isPageEditor?: boolean; isAdmin?: boolean; isOwner?: boolean };
+    const isEditor = Boolean(user.isPageEditor || user.isAdmin || user.isOwner);
+    const hasDirectoryAccess = Boolean(user.residentId || user.householdId);
+
+    const [directoryResults, pageResults] = await Promise.all([
+        hasDirectoryAccess ? searchDirectoryOverlay(db, q) : Promise.resolve([]),
+        searchPagesOverlay(db, q, isEditor, Boolean(user.residentId)),
+    ]);
+
+    return c.json({ directory: directoryResults, pages: pageResults });
+});
+
+// ==========================================
 // Pages (CMS) — page editor role required
 // ==========================================
 

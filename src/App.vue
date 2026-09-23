@@ -7,6 +7,7 @@ import { useSiteSettings } from './composables/useSiteSettings';
 import { useEnvironmentBanner } from './composables/useEnvironmentBanner';
 import AboutModal from './components/common/AboutModal.vue';
 import EnvironmentBanner from './components/layout/EnvironmentBanner.vue';
+import NavSearch from './components/layout/NavSearch.vue';
 import modernLogo from '/modern-ph-logo.svg?raw';
 
 interface AuthUser {
@@ -212,16 +213,17 @@ watch(siteName, (value) => { document.title = value; }, { immediate: true });
   <div class="min-h-screen bg-app-bg text-content font-sans" :class="{ 'pt-8': envInfo }" @click="isAccountMenuOpen = false">
     <EnvironmentBanner />
     <header class="sticky z-30 border-b border-theme-border bg-surface" :class="envInfo ? 'top-8' : 'top-0'">
-      <div class="max-w-5xl mx-auto flex items-center justify-between px-4 py-3 sm:px-8">
+      <div class="relative max-w-5xl mx-auto flex items-center gap-2 px-4 py-3 sm:px-8">
         <RouterLink
           to="/home"
-          class="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight text-accent sm:text-xl"
+          class="flex min-w-0 shrink items-center gap-2 text-lg font-semibold tracking-tight text-accent sm:text-xl"
           aria-label="Go to directory"
         >
           <span class="themed-logo h-10 w-10 shrink-0" aria-hidden="true" v-html="navbarLogo" />
           <span class="truncate">{{ siteName }}</span>
         </RouterLink>
-        <div class="relative flex items-center gap-2" @click.stop>
+        <NavSearch v-if="user" class="ml-auto" />
+        <div class="relative flex shrink-0 items-center gap-2" :class="{ 'ml-auto': !user }" @click.stop>
           <template v-if="user">
             <button
               type="button"

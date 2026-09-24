@@ -2,6 +2,8 @@
 - Annual Dues and Security
 - For the logged in user
 - UI home -> Pay Dues
+- Uses Stripe Checkout customized to our look and feel
+- No credit card or sensitive payment information is stored locally; all payment processing is handled securely by Stripe.
 
 # Household-ID
 - Does Stripe need a unique id for this address, resident user combination?
@@ -49,3 +51,53 @@
 # System updates household records
 - marks Annual Dues and type as paid for the period, shows expiration date of the current payment cycle
 - marks Security as paid for the period, shows expiration date of the current payment cycle and flag if recurring payment scheduled
+
+# Prefill
+
+## Can you pre-send customer info (Name, Address, Email) and household_id to Stripe?
+Yes, fully. You can pass all of this pre-filled data server-side when you initialize the Stripe Checkout Session.
+
+## How it works in practice:
+	1.	Pre-filling Visible Fields (Name, Email, Address):
+	When initializing the Stripe Checkout Session, you can pass the resident's name, email, and address so that these fields are pre-filled on the payment screen. This improves the user experience by reducing the amount of information the resident needs to manually enter.
+
+## When creating a Checkout Session via your backend Worker, you can explicitly pass:
+•	customer_email: Pre-fills their email address so they don't have to re-type it.
+•	customer_details: Pre-populates the resident's name and physical address on the payment screen.
+
+	2.	Attaching Hidden System Data (household_id):
+Stripe provides a metadata key-value dictionary on Checkout Sessions, Customers, and Subscriptions specifically for this purpose. You can attach internal database keys without the customer ever seeing them.
+Example:
+```json
+{
+  "metadata": {
+    "household_id": "12345"
+  }
+}
+```
+
+## Key Workflow Advantage: Zero Manual Re-Entry
+- By passing customer_email and your custom metadata:
+•	The payment page opens pre-filled with the resident's email and name, reducing friction.
+•	When the payment completes, Stripe sends an asynchronous checkout.session.completed webhook event back to your server containing your exact metadata.household_id.
+•	Your backend reads that household_id from the payload and immediately updates the active paid status for the household in your database, completely hands-free.
+
+# Subscriptions
+
+How Customers See Upcoming Payments Without a Stripe Login
+Because residents do not have a standard password-based Stripe account, there are three primary ways for them to see upcoming payments:
+
+## Inside Your App's Pay Dues Dashboard (Recommended)
+Since our system stores the household_id and tracks subscription entitlements, our app should display the next payment date.
+•	Query the subscription via the Stripe API on your backend (or store the current_period_end date locally when processing webhooks).
+•	Render a simple card on the user's dashboard:
+Quarterly Security Dues: $<sample>
+Next Automatic Payment: <sample>>
+Payment Method: <sample>
+
+## Email Notifications
+Our system will send automated email reminders to residents about upcoming payments, including the next payment date and amount due.
+- 7 days in advance of the next payment due date.
+- 1 day in advance of the next payment due date.
+- Email receipt acknowledging the completed payment.
+

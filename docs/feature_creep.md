@@ -10,6 +10,9 @@ Photo Pages:
 - x Event pages
 - x Admin Photo Section
 
+Universal Search:
+- x Search across Directory and Pages
+
 Email:
 - Register Welcome@parkhillfw.org with the Google email group
 - Send invite emails to all members

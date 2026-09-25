@@ -5,6 +5,9 @@ Details:
 - x directory default sort by resident last name or street name?
 - x directory blank until first search? No
 
+Login:
+- magic link update to not login automatically on click to the email link, instead show a "Click to Confirm Login" button.
+
 Photo Pages:
 - x Gallery page
 - x Event pages

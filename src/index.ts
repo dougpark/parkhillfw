@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { alias } from 'drizzle-orm/sqlite-core';
+import type Stripe from 'stripe';
 import {
     accessRequests,
     activityLogs,
@@ -16,17 +17,20 @@ import {
     magicTokens,
     menus,
     pages,
+    payments,
     photoEvents,
     photoFolders,
     photos,
     residents,
     sessions,
+    subscriptions,
     userLoginEmails,
     users,
 } from './db/schema';
 import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE, verifyCodeAndConsume } from './lib/auth';
 import { sendAccessRequestAdminNotificationEmail, sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
 import { getSetting, setSetting } from './lib/settings';
+import { getStripe, priceIdForProduct, productTypeForPriceId, PRODUCT_CATEGORY, type ProductType } from './lib/stripe';
 
 const DEFAULT_ADMIN_EMAIL = 'admin@parkhillfw.com';
 const DEFAULT_SITE_NAME = 'Park Hill Directory';
@@ -42,6 +46,34 @@ function compareStreetAddresses(left: string, right: string): number {
 
     const streetNameOrder = leftMatch[2]!.localeCompare(rightMatch[2]!, undefined, { sensitivity: 'base' });
     return streetNameOrder || Number(leftMatch[1]) - Number(rightMatch[1]);
+}
+
+// Shared by the resident-facing dues routes — same fallback chain as GET /api/my-directory.
+async function resolveHouseholdForUser(db: ReturnType<typeof drizzle>, user: { email: string; residentId?: number | null; householdId?: number }) {
+    const resident = user.residentId
+        ? await db.select().from(residents).where(eq(residents.id, user.residentId)).get()
+        : user.householdId
+            ? await db.select().from(residents).where(eq(residents.householdId, user.householdId)).get()
+            : await db.select().from(residents).where(eq(residents.email, user.email)).get();
+    if (!resident) return null;
+    const household = await db.select().from(households).where(eq(households.id, resident.householdId)).get();
+    if (!household) return null;
+    return { resident, household };
+}
+
+// Cancels every active/past_due Stripe subscription for a household (e.g. when it's reset for a
+// new occupant) so a moved-out resident never keeps getting auto-charged.
+async function cancelActiveSubscriptionsForHousehold(db: ReturnType<typeof drizzle>, stripe: Stripe, householdId: number): Promise<void> {
+    const active = await db.select().from(subscriptions)
+        .where(and(eq(subscriptions.householdId, householdId), inArray(subscriptions.status, ['active', 'past_due', 'incomplete']))).all();
+    for (const sub of active) {
+        try {
+            await stripe.subscriptions.cancel(sub.stripeSubscriptionId);
+        } catch (error) {
+            console.error('Failed to cancel Stripe subscription during household archive', { stripeSubscriptionId: sub.stripeSubscriptionId, error });
+        }
+        await db.update(subscriptions).set({ status: 'canceled', updatedAt: new Date() }).where(eq(subscriptions.id, sub.id));
+    }
 }
 
 app.get('/api/health', (c) => c.json({ status: 'ok', runtime: 'bun-cloudflare' }));
@@ -641,6 +673,229 @@ app.put('/api/admin/households/:householdId', requireAuth(), requireDirectoryEdi
     return c.json({ saved: true });
 });
 
+app.post('/api/dues/checkout', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { email: string; residentId?: number | null; householdId?: number };
+    const body = await c.req.json<{ productType?: string }>();
+    const productType = body.productType as ProductType | undefined;
+    if (!productType || !(productType in PRODUCT_CATEGORY)) return c.json({ error: 'Invalid product.' }, 400);
+
+    const resolved = await resolveHouseholdForUser(db, user);
+    if (!resolved) return c.json({ error: 'Your account is not linked to a directory household.' }, 403);
+    const { resident, household } = resolved;
+
+    const category = PRODUCT_CATEGORY[productType];
+    const categoryProducts = (Object.keys(PRODUCT_CATEGORY) as ProductType[]).filter((type) => PRODUCT_CATEGORY[type] === category);
+    const existingActive = await db.select({ id: subscriptions.id }).from(subscriptions)
+        .where(and(eq(subscriptions.householdId, household.id), eq(subscriptions.status, 'active'), inArray(subscriptions.productType, categoryProducts)))
+        .get();
+    if (existingActive) return c.json({ error: 'This household already has an active subscription in this category. Cancel it via Manage Billing before subscribing to a different plan.' }, 409);
+
+    const stripe = getStripe(c.env);
+    let customerId = household.stripeCustomerId;
+    if (!customerId) {
+        const customer = await stripe.customers.create({
+            email: resident.email ?? user.email,
+            name: `${resident.firstName} ${resident.lastName}`,
+            metadata: { household_id: String(household.id) },
+        });
+        customerId = customer.id;
+        await db.update(households).set({ stripeCustomerId: customerId, updatedAt: new Date() }).where(eq(households.id, household.id));
+    }
+
+    const origin = new URL(c.req.url).origin;
+    const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId,
+        line_items: [{ price: priceIdForProduct(c.env, productType), quantity: 1 }],
+        metadata: { household_id: String(household.id), product_type: productType },
+        subscription_data: { metadata: { household_id: String(household.id), product_type: productType } },
+        success_url: `${origin}/dues/pay?checkout=success`,
+        cancel_url: `${origin}/dues/pay?checkout=canceled`,
+    });
+    return c.json({ url: session.url });
+});
+
+app.post('/api/dues/portal', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { email: string; residentId?: number | null; householdId?: number };
+    const resolved = await resolveHouseholdForUser(db, user);
+    if (!resolved) return c.json({ error: 'Your account is not linked to a directory household.' }, 403);
+    if (!resolved.household.stripeCustomerId) return c.json({ error: 'No billing account yet \u2014 subscribe to a product first.' }, 400);
+
+    const stripe = getStripe(c.env);
+    const origin = new URL(c.req.url).origin;
+    const portalSession = await stripe.billingPortal.sessions.create({
+        customer: resolved.household.stripeCustomerId,
+        return_url: `${origin}/dues/pay`,
+    });
+    return c.json({ url: portalSession.url });
+});
+
+app.get('/api/dues/status', requireAuth(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user') as { email: string; residentId?: number | null; householdId?: number };
+    const resolved = await resolveHouseholdForUser(db, user);
+    if (!resolved) return c.json({ error: 'Your account is not linked to a directory household.' }, 403);
+
+    const [householdSubscriptions, recentPayments] = await Promise.all([
+        db.select().from(subscriptions).where(eq(subscriptions.householdId, resolved.household.id)).all(),
+        db.select().from(payments).where(eq(payments.householdId, resolved.household.id)).orderBy(desc(payments.createdAt)).limit(20).all(),
+    ]);
+    return c.json({
+        hasBillingAccount: Boolean(resolved.household.stripeCustomerId),
+        subscriptions: householdSubscriptions,
+        payments: recentPayments,
+    });
+});
+
+app.post('/api/webhooks/stripe', async (c) => {
+    const signature = c.req.header('stripe-signature');
+    if (!signature) return c.json({ error: 'Missing signature.' }, 400);
+    const payload = await c.req.text();
+
+    const stripe = getStripe(c.env);
+    let event: Stripe.Event;
+    try {
+        event = await stripe.webhooks.constructEventAsync(payload, signature, c.env.STRIPE_WEBHOOK_SECRET);
+    } catch (error) {
+        console.error('Stripe webhook signature verification failed', error);
+        return c.json({ error: 'Invalid signature.' }, 400);
+    }
+
+    const db = drizzle(c.env.DB);
+
+    async function upsertSubscriptionFromStripe(subscription: Stripe.Subscription) {
+        const item = subscription.items.data[0];
+        const priceId = item?.price?.id;
+        const metadataProductType = subscription.metadata?.product_type as ProductType | undefined;
+        const productType = (metadataProductType && metadataProductType in PRODUCT_CATEGORY)
+            ? metadataProductType
+            : (priceId ? productTypeForPriceId(c.env, priceId) : null);
+        const householdId = Number(subscription.metadata?.household_id);
+        if (!productType || !priceId || !Number.isInteger(householdId)) return;
+
+        const status = subscription.status === 'active' || subscription.status === 'trialing' ? 'active' as const
+            : subscription.status === 'past_due' ? 'past_due' as const
+                : subscription.status === 'incomplete' || subscription.status === 'incomplete_expired' ? 'incomplete' as const
+                    : 'canceled' as const;
+        const currentPeriodEnd = item?.current_period_end ? new Date(item.current_period_end * 1000) : null;
+
+        const existing = await db.select({ id: subscriptions.id }).from(subscriptions)
+            .where(eq(subscriptions.stripeSubscriptionId, subscription.id)).get();
+        const values = {
+            householdId, productType, stripePriceId: priceId, status, currentPeriodEnd,
+            cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), updatedAt: new Date(),
+        };
+        if (existing) await db.update(subscriptions).set(values).where(eq(subscriptions.id, existing.id));
+        else await db.insert(subscriptions).values({ stripeSubscriptionId: subscription.id, ...values });
+    }
+
+    async function recordInvoicePayment(invoice: Stripe.Invoice) {
+        const subscriptionRef = invoice.parent?.subscription_details?.subscription;
+        const stripeSubscriptionId = typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef?.id;
+        if (!stripeSubscriptionId) return;
+        const existingSubscription = await db.select().from(subscriptions)
+            .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId)).get();
+        if (!existingSubscription) return;
+
+        const alreadyRecorded = await db.select({ id: payments.id }).from(payments)
+            .where(eq(payments.stripeInvoiceId, invoice.id ?? '')).get();
+        if (alreadyRecorded) return;
+
+        const line = invoice.lines.data[0];
+        await db.insert(payments).values({
+            householdId: existingSubscription.householdId,
+            productType: existingSubscription.productType,
+            amountCents: invoice.amount_paid,
+            source: 'stripe',
+            stripeInvoiceId: invoice.id ?? null,
+            stripeSubscriptionId,
+            paymentMethod: 'card',
+            periodStart: line?.period?.start ? new Date(line.period.start * 1000) : null,
+            periodEnd: line?.period?.end ? new Date(line.period.end * 1000) : null,
+        });
+    }
+
+    switch (event.type) {
+        case 'checkout.session.completed': {
+            const session = event.data.object as Stripe.Checkout.Session;
+            const subscriptionRef = session.subscription;
+            const subscriptionId = typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef?.id;
+            if (session.mode === 'subscription' && subscriptionId) {
+                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                await upsertSubscriptionFromStripe(subscription);
+            }
+            break;
+        }
+        case 'customer.subscription.updated':
+            await upsertSubscriptionFromStripe(event.data.object as Stripe.Subscription);
+            break;
+        case 'customer.subscription.deleted': {
+            const subscription = event.data.object as Stripe.Subscription;
+            await db.update(subscriptions).set({ status: 'canceled', updatedAt: new Date() })
+                .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
+            break;
+        }
+        case 'invoice.payment_succeeded':
+        case 'invoice.paid':
+            await recordInvoicePayment(event.data.object as Stripe.Invoice);
+            break;
+        default:
+            break;
+    }
+    return c.json({ received: true });
+});
+
+app.get('/api/admin/finance/dues', requireAuth(), requireFinance(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const householdRows = await db.select({ id: households.id, streetAddress: households.streetAddress, status: households.status })
+        .from(households).where(or(eq(households.status, 'active'), eq(households.status, 'vacant'))).all();
+    const [allSubscriptions, allPayments] = await Promise.all([
+        db.select().from(subscriptions).all(),
+        db.select().from(payments).orderBy(desc(payments.createdAt)).all(),
+    ]);
+    const result = householdRows
+        .map((household) => ({
+            household,
+            subscriptions: allSubscriptions.filter((sub) => sub.householdId === household.id),
+            payments: allPayments.filter((payment) => payment.householdId === household.id),
+        }))
+        .filter((row) => row.subscriptions.length || row.payments.length);
+    return c.json(result);
+});
+
+app.post('/api/admin/finance/dues/manual', requireAuth(), requireFinance(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const actor = c.get('user') as { id: number };
+    const body = await c.req.json<{
+        householdId?: number; productType?: string; amountCents?: number;
+        paymentMethod?: string; periodStart?: string; periodEnd?: string; note?: string;
+    }>();
+    const householdId = Number(body.householdId);
+    const productType = body.productType as ProductType | undefined;
+    const amountCents = Number(body.amountCents);
+    if (!Number.isInteger(householdId) || !productType || !(productType in PRODUCT_CATEGORY) || !Number.isFinite(amountCents) || amountCents <= 0) {
+        return c.json({ error: 'Household, product, and a positive amount are required.' }, 400);
+    }
+    const household = await db.select({ id: households.id }).from(households).where(eq(households.id, householdId)).get();
+    if (!household) return c.json({ error: 'Household not found.' }, 404);
+    const paymentMethod = body.paymentMethod === 'cash' || body.paymentMethod === 'check' ? body.paymentMethod : null;
+
+    await db.insert(payments).values({
+        householdId,
+        productType,
+        amountCents,
+        source: 'manual',
+        paymentMethod,
+        periodStart: body.periodStart ? new Date(body.periodStart) : null,
+        periodEnd: body.periodEnd ? new Date(body.periodEnd) : null,
+        note: body.note?.trim() || null,
+        recordedByUserId: actor.id,
+    });
+    return c.json({ recorded: true });
+});
+
 app.post('/api/admin/households/:householdId/archive-household', requireAuth(), requireDirectoryEditor(), async (c) => {
     const db = drizzle(c.env.DB);
     const householdId = Number(c.req.param('householdId'));
@@ -652,6 +907,8 @@ app.post('/api/admin/households/:householdId/archive-household', requireAuth(), 
         .where(eq(households.id, householdId)).get();
     if (!household) return c.json({ error: 'Household not found.' }, 404);
     if (body.confirmation?.trim() !== household.streetAddress) return c.json({ error: 'Type the exact street address to confirm archiving.' }, 400);
+
+    await cancelActiveSubscriptionsForHousehold(db, getStripe(c.env), householdId);
 
     const [householdResidents, householdChildren] = await Promise.all([
         db.select().from(residents).where(eq(residents.householdId, householdId)).all(),
@@ -750,6 +1007,8 @@ app.post('/api/admin/households/:householdId/archive', requireAuth(), requireDir
     if (!household) return c.json({ error: 'Household not found.' }, 404);
     if (household.status !== 'vacant') return c.json({ error: 'Household must be vacant before it can be archived.' }, 409);
     if (body.confirmation?.trim() !== household.streetAddress) return c.json({ error: 'Type the exact street address to confirm archiving.' }, 400);
+    // Defensive: archive-household already cancels subscriptions, but catch any created since then.
+    await cancelActiveSubscriptionsForHousehold(db, getStripe(c.env), householdId);
     await db.update(households).set({ status: 'archived', updatedAt: new Date(), notes: body.reason?.trim() || 'Archived address' })
         .where(eq(households.id, householdId));
     return c.json({ archived: true, streetAddress: household.streetAddress });

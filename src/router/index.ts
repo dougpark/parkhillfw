@@ -61,7 +61,7 @@ const router = createRouter({
             path: '/dues/pay',
             name: 'dues-pay',
             meta: { requiresAuth: true },
-            component: () => import('../views/ComingSoonView.vue'),
+            component: () => import('../views/DuesPayView.vue'),
         },
         {
             path: '/pages/:slug',

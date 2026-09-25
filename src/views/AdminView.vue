@@ -5,6 +5,7 @@ import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 import AdminArchiveBrowserView from './AdminArchiveBrowserView.vue';
+import AdminFinanceDuesView from './AdminFinanceDuesView.vue';
 import AdminFinancePaymentProcessorView from './AdminFinancePaymentProcessorView.vue';
 import AdminLastSeenView from './AdminLastSeenView.vue';
 import AdminLogsView from './AdminLogsView.vue';
@@ -94,6 +95,7 @@ const adminMenuSections: AdminMenuSection[] = [
     icon: DollarSign,
     role: 'finance',
     children: [
+      { label: 'Dues & Subscriptions', description: 'Review household dues/security status and record manual payments.', icon: DollarSign, role: 'finance' },
       { label: 'Payment Processor', description: 'Configure payment processor settings.', icon: DollarSign, role: 'finance' },
     ],
   },
@@ -340,6 +342,8 @@ function handleCrumbClick(index: number) {
       </div>
       <div v-else-if="selectedFeature === 'Permissions'" class="min-w-0 p-6 sm:p-8">
         <AdminAccessControlView @exit="selectedFeature = 'Status'" />
+      </div>      <div v-else-if="selectedFeature === 'Dues & Subscriptions'" class="min-w-0 p-6 sm:p-8">
+        <AdminFinanceDuesView />
       </div>      <div v-else-if="selectedFeature === 'Payment Processor'" class="min-w-0 p-6 sm:p-8">
         <AdminFinancePaymentProcessorView />
       </div>      <div v-else-if="selectedFeature === 'Logs'" class="min-w-0 p-6 sm:p-8">

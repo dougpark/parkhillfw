@@ -16,6 +16,7 @@
     "src/lib/auth.test.ts",
     "src/lib/email.ts",
     "src/lib/settings.ts",
+    "src/lib/stripe.ts",
     "src/lib/directory-reminder.test.ts",
     "src/lib/markdown-tags.test.ts",
     "scripts/**/*.ts",

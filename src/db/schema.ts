@@ -23,11 +23,14 @@ export const households = sqliteTable(
 
         directoryConfirmedAt: integer('directory_confirmed_at', { mode: 'timestamp' }),
 
+        stripeCustomerId: text('stripe_customer_id'),
+
         createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
         updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
     },
     (table) => [
         index('idx_households_address').on(table.streetAddress),
+        uniqueIndex('idx_households_stripe_customer_unique').on(table.stripeCustomerId),
     ]
 );
 
@@ -254,6 +257,64 @@ export const householdArchive = sqliteTable(
     (table) => [
         index('idx_household_archive_address').on(table.addressId),
         index('idx_household_archive_archived_at').on(table.archivedAt),
+    ]
+);
+
+// ==========================================
+// 2b. FINANCE — STRIPE DUES & SECURITY SUBSCRIPTIONS
+// ==========================================
+
+// One row per active/historical Stripe Subscription; at most one 'active' row per
+// household per category (dues: regular_annual/pacesetter_annual; security: security_annual/security_quarterly).
+export const subscriptions = sqliteTable(
+    'subscriptions',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        stripeSubscriptionId: text('stripe_subscription_id').notNull(),
+        householdId: integer('household_id')
+            .notNull()
+            .references(() => households.id, { onDelete: 'cascade' }),
+        productType: text('product_type', {
+            enum: ['regular_annual', 'pacesetter_annual', 'security_annual', 'security_quarterly'],
+        }).notNull(),
+        stripePriceId: text('stripe_price_id').notNull(),
+        status: text('status', { enum: ['active', 'past_due', 'canceled', 'incomplete'] }).notNull(),
+        currentPeriodEnd: integer('current_period_end', { mode: 'timestamp' }),
+        cancelAtPeriodEnd: integer('cancel_at_period_end', { mode: 'boolean' }).default(false),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+        updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        uniqueIndex('idx_subscriptions_stripe_id_unique').on(table.stripeSubscriptionId),
+        index('idx_subscriptions_household').on(table.householdId),
+    ]
+);
+
+// Payment history ledger — one row per successful Stripe invoice charge, or per manual
+// (cash/check) admin-recorded payment. Drives the admin/resident "paid through" display.
+export const payments = sqliteTable(
+    'payments',
+    {
+        id: integer('id').primaryKey({ autoIncrement: true }),
+        householdId: integer('household_id')
+            .notNull()
+            .references(() => households.id, { onDelete: 'cascade' }),
+        productType: text('product_type', {
+            enum: ['regular_annual', 'pacesetter_annual', 'security_annual', 'security_quarterly'],
+        }).notNull(),
+        amountCents: integer('amount_cents').notNull(),
+        source: text('source', { enum: ['stripe', 'manual'] }).notNull(),
+        stripeInvoiceId: text('stripe_invoice_id'),
+        stripeSubscriptionId: text('stripe_subscription_id'),
+        paymentMethod: text('payment_method', { enum: ['card', 'check', 'cash'] }),
+        periodStart: integer('period_start', { mode: 'timestamp' }),
+        periodEnd: integer('period_end', { mode: 'timestamp' }),
+        note: text('note'),
+        recordedByUserId: integer('recorded_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+        createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
+    },
+    (table) => [
+        index('idx_payments_household').on(table.householdId),
     ]
 );
 

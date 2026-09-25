@@ -35,6 +35,12 @@ export type AppBindings = {
     EMAIL: {
         send(message: Record<string, unknown>): Promise<unknown>;
     };
+    STRIPE_SECRET_KEY: string;
+    STRIPE_WEBHOOK_SECRET: string;
+    STRIPE_PRICE_REGULAR_ANNUAL: string;
+    STRIPE_PRICE_PACESETTER_ANNUAL: string;
+    STRIPE_PRICE_SECURITY_ANNUAL: string;
+    STRIPE_PRICE_SECURITY_QUARTERLY: string;
 };
 
 export type AppEnv = { Bindings: AppBindings; Variables: { user?: AppUser; previousLastSeenAt?: Date | null } };

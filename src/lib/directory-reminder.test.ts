@@ -18,6 +18,7 @@ function setupDirectoryDb() {
             photo_key TEXT,
             notes TEXT,
             directory_confirmed_at INTEGER,
+            stripe_customer_id TEXT,
             created_at INTEGER,
             updated_at INTEGER
         );

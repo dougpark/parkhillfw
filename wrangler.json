@@ -30,6 +30,12 @@
       "bucket_name": "parkhillfw-bucket-dev"
     }
   ],
+  "vars": {
+    "STRIPE_PRICE_REGULAR_ANNUAL": "price_1UJdlALC1nxElUbWJU7cyGLM",
+    "STRIPE_PRICE_PACESETTER_ANNUAL": "price_1UJdpkLC1nxElUbWVWdBg0GW",
+    "STRIPE_PRICE_SECURITY_ANNUAL": "price_1UJdqCLC1nxElUbWh3QMilZ3",
+    "STRIPE_PRICE_SECURITY_QUARTERLY": "price_1UJdqYLC1nxElUbWMyyVESKg"
+  },
   "env": {
     "staging": {
       "name": "parkhillfw-staging",
@@ -55,7 +61,13 @@
           "binding": "BUCKET",
           "bucket_name": "parkhillfw-bucket-staging"
         }
-      ]
+      ],
+      "vars": {
+        "STRIPE_PRICE_REGULAR_ANNUAL": "price_1UJdlALC1nxElUbWJU7cyGLM",
+        "STRIPE_PRICE_PACESETTER_ANNUAL": "price_1UJdpkLC1nxElUbWVWdBg0GW",
+        "STRIPE_PRICE_SECURITY_ANNUAL": "price_1UJdqCLC1nxElUbWh3QMilZ3",
+        "STRIPE_PRICE_SECURITY_QUARTERLY": "price_1UJdqYLC1nxElUbWMyyVESKg"
+      }
     },
     "production": {
       "name": "parkhillfw-prod",
@@ -82,7 +94,13 @@
           "binding": "BUCKET",
           "bucket_name": "parkhillfw-bucket"
         }
-      ]
+      ],
+      "vars": {
+        "STRIPE_PRICE_REGULAR_ANNUAL": "REPLACE_WITH_LIVE_MODE_PRICE_ID",
+        "STRIPE_PRICE_PACESETTER_ANNUAL": "REPLACE_WITH_LIVE_MODE_PRICE_ID",
+        "STRIPE_PRICE_SECURITY_ANNUAL": "REPLACE_WITH_LIVE_MODE_PRICE_ID",
+        "STRIPE_PRICE_SECURITY_QUARTERLY": "REPLACE_WITH_LIVE_MODE_PRICE_ID"
+      }
     }
   }
 }

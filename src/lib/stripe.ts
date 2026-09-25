@@ -1,17 +1,9 @@
 import Stripe from 'stripe';
 import type { AppBindings } from '../middleware/auth';
 
-export type ProductType = 'regular_annual' | 'pacesetter_annual' | 'security_annual' | 'security_quarterly';
-export type ProductCategory = 'dues' | 'security';
-
-// Which category each product belongs to — a household may hold at most one active
-// subscription per category (see the checkout route's mutual-exclusivity check).
-export const PRODUCT_CATEGORY: Record<ProductType, ProductCategory> = {
-    regular_annual: 'dues',
-    pacesetter_annual: 'dues',
-    security_annual: 'security',
-    security_quarterly: 'security',
-};
+export type { ProductType, ProductCategory } from './product-catalog';
+export { PRODUCT_CATEGORY, PRODUCT_LABELS } from './product-catalog';
+import type { ProductType } from './product-catalog';
 
 export function priceIdForProduct(env: AppBindings, productType: ProductType): string {
     switch (productType) {

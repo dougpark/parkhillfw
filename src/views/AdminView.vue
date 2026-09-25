@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { Archive, ChevronDown, ClipboardList, Clock, DollarSign, FileArchive, FileText, FolderTree, Gauge, Images, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
+import { Archive, ChevronDown, ClipboardList, Clock, DollarSign, FileArchive, FileText, FolderTree, Gauge, Images, Receipt, ScrollText, Settings, ShieldCheck, Users } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 import AdminAccessControlView from './AdminAccessControlView.vue';
 import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 import AdminArchiveBrowserView from './AdminArchiveBrowserView.vue';
 import AdminFinanceDuesView from './AdminFinanceDuesView.vue';
 import AdminFinancePaymentProcessorView from './AdminFinancePaymentProcessorView.vue';
+import AdminFinanceTransactionReportView from './AdminFinanceTransactionReportView.vue';
 import AdminLastSeenView from './AdminLastSeenView.vue';
 import AdminLogsView from './AdminLogsView.vue';
 import AdminStatusView from './AdminStatusView.vue';
@@ -96,6 +97,7 @@ const adminMenuSections: AdminMenuSection[] = [
     role: 'finance',
     children: [
       { label: 'Dues & Subscriptions', description: 'Review household dues/security status and record manual payments.', icon: DollarSign, role: 'finance' },
+      { label: 'Transaction Report', description: 'Search and export payment transactions by date range and category.', icon: Receipt, role: 'finance' },
       { label: 'Payment Processor', description: 'Configure payment processor settings.', icon: DollarSign, role: 'finance' },
     ],
   },
@@ -159,7 +161,7 @@ const breadcrumbTrail = computed(() => {
   return trail;
 });
 
-const fullWidthAdminFeature = computed(() => selectedFeature.value === 'Pages' || selectedFeature.value === 'Navigation' || selectedFeature.value === 'Photos' || selectedFeature.value === 'Documents' || selectedFeature.value === 'Permissions');
+const fullWidthAdminFeature = computed(() => selectedFeature.value === 'Pages' || selectedFeature.value === 'Navigation' || selectedFeature.value === 'Photos' || selectedFeature.value === 'Documents' || selectedFeature.value === 'Permissions' || selectedFeature.value === 'Transaction Report');
 
 onMounted(async () => {
   const savedExpandedSection = localStorage.getItem(ACCORDION_STORAGE_KEY);
@@ -344,6 +346,8 @@ function handleCrumbClick(index: number) {
         <AdminAccessControlView @exit="selectedFeature = 'Status'" />
       </div>      <div v-else-if="selectedFeature === 'Dues & Subscriptions'" class="min-w-0 p-6 sm:p-8">
         <AdminFinanceDuesView />
+      </div>      <div v-else-if="selectedFeature === 'Transaction Report'" class="min-w-0 p-6 sm:p-8">
+        <AdminFinanceTransactionReportView @exit="selectedFeature = 'Status'" />
       </div>      <div v-else-if="selectedFeature === 'Payment Processor'" class="min-w-0 p-6 sm:p-8">
         <AdminFinancePaymentProcessorView />
       </div>      <div v-else-if="selectedFeature === 'Logs'" class="min-w-0 p-6 sm:p-8">

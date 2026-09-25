@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, asc, desc, eq, inArray, isNull, like, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, like, lte, or, sql, type SQL } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type Stripe from 'stripe';
@@ -791,12 +791,42 @@ app.post('/api/webhooks/stripe', async (c) => {
         else await db.insert(subscriptions).values({ stripeSubscriptionId: subscription.id, ...values });
     }
 
+    // Invoices don't carry the processing fee directly — it lives on the Charge's balance
+    // transaction, reached via invoice -> payment intent -> latest charge. Two extra API
+    // calls per payment; acceptable given this app's low payment volume.
+    async function fetchStripeFeeCents(invoice: Stripe.Invoice): Promise<number | null> {
+        if (!invoice.id) return null;
+        try {
+            const withPayments = await stripe.invoices.retrieve(invoice.id, { expand: ['payments.data.payment.payment_intent'] });
+            const paymentIntentRef = withPayments.payments?.data[0]?.payment.payment_intent;
+            const paymentIntent = typeof paymentIntentRef === 'string' ? await stripe.paymentIntents.retrieve(paymentIntentRef) : paymentIntentRef;
+            const chargeRef = paymentIntent?.latest_charge;
+            if (!chargeRef) return null;
+            const charge = typeof chargeRef === 'string' ? await stripe.charges.retrieve(chargeRef, { expand: ['balance_transaction'] }) : chargeRef;
+            const balanceTransaction = charge.balance_transaction;
+            if (!balanceTransaction || typeof balanceTransaction === 'string') return null;
+            return balanceTransaction.fee;
+        } catch (error) {
+            console.error('Failed to fetch Stripe processing fee for invoice', { invoiceId: invoice.id, error });
+            return null;
+        }
+    }
+
     async function recordInvoicePayment(invoice: Stripe.Invoice) {
         const subscriptionRef = invoice.parent?.subscription_details?.subscription;
         const stripeSubscriptionId = typeof subscriptionRef === 'string' ? subscriptionRef : subscriptionRef?.id;
         if (!stripeSubscriptionId) return;
-        const existingSubscription = await db.select().from(subscriptions)
+        let existingSubscription = await db.select().from(subscriptions)
             .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId)).get();
+        if (!existingSubscription) {
+            // Stripe doesn't guarantee webhook delivery order — invoice.paid for the first invoice
+            // can arrive before checkout.session.completed finishes upserting the subscription row.
+            // Fetch and upsert it directly instead of silently dropping the payment.
+            const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+            await upsertSubscriptionFromStripe(subscription);
+            existingSubscription = await db.select().from(subscriptions)
+                .where(eq(subscriptions.stripeSubscriptionId, stripeSubscriptionId)).get();
+        }
         if (!existingSubscription) return;
 
         const alreadyRecorded = await db.select({ id: payments.id }).from(payments)
@@ -804,10 +834,12 @@ app.post('/api/webhooks/stripe', async (c) => {
         if (alreadyRecorded) return;
 
         const line = invoice.lines.data[0];
+        const feeCents = await fetchStripeFeeCents(invoice);
         await db.insert(payments).values({
             householdId: existingSubscription.householdId,
             productType: existingSubscription.productType,
             amountCents: invoice.amount_paid,
+            feeCents,
             source: 'stripe',
             stripeInvoiceId: invoice.id ?? null,
             stripeSubscriptionId,
@@ -886,6 +918,7 @@ app.post('/api/admin/finance/dues/manual', requireAuth(), requireFinance(), asyn
         householdId,
         productType,
         amountCents,
+        feeCents: 0,
         source: 'manual',
         paymentMethod,
         periodStart: body.periodStart ? new Date(body.periodStart) : null,
@@ -894,6 +927,70 @@ app.post('/api/admin/finance/dues/manual', requireAuth(), requireFinance(), asyn
         recordedByUserId: actor.id,
     });
     return c.json({ recorded: true });
+});
+
+// Historical ledger for Admin -> Finance -> Transaction Report. Includes archived
+// households (unlike /api/admin/finance/dues, which only shows current status) since
+// this is a record of past transactions, not current standing.
+app.get('/api/admin/finance/transactions', requireAuth(), requireFinance(), async (c) => {
+    const db = drizzle(c.env.DB);
+    const startParam = c.req.query('start');
+    const endParam = c.req.query('end');
+    const categoryParam = c.req.query('category');
+
+    const now = new Date();
+    const start = startParam ? new Date(startParam) : new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const end = endParam ? new Date(endParam) : now;
+    end.setHours(23, 59, 59, 999); // make the end date boundary inclusive of the whole day
+
+    const category = categoryParam === 'dues' || categoryParam === 'security' ? categoryParam : null;
+    const categoryProductTypes = category
+        ? (Object.keys(PRODUCT_CATEGORY) as ProductType[]).filter((type) => PRODUCT_CATEGORY[type] === category)
+        : null;
+
+    const conditions = [gte(payments.createdAt, start), lte(payments.createdAt, end)];
+    if (categoryProductTypes) conditions.push(inArray(payments.productType, categoryProductTypes));
+
+    const rows = await db.select({
+        transactionDate: payments.createdAt,
+        productType: payments.productType,
+        amountCents: payments.amountCents,
+        feeCents: payments.feeCents,
+        householdId: payments.householdId,
+    }).from(payments).where(and(...conditions)).orderBy(desc(payments.createdAt)).all();
+
+    const householdIds = [...new Set(rows.map((row) => row.householdId))];
+    const [householdRows, residentRows] = await Promise.all([
+        householdIds.length
+            ? db.select({ id: households.id, streetAddress: households.streetAddress }).from(households).where(inArray(households.id, householdIds)).all()
+            : [],
+        householdIds.length
+            ? db.select({ householdId: residents.householdId, firstName: residents.firstName, lastName: residents.lastName, isPrimaryContact: residents.isPrimaryContact })
+                .from(residents).where(inArray(residents.householdId, householdIds)).all()
+            : [],
+    ]);
+    const streetAddressByHousehold = new Map(householdRows.map((household) => [household.id, household.streetAddress]));
+    const residentsByHousehold = new Map<number, typeof residentRows>();
+    for (const resident of residentRows) {
+        residentsByHousehold.set(resident.householdId, [...(residentsByHousehold.get(resident.householdId) ?? []), resident]);
+    }
+
+    const result = rows.map((row) => {
+        const householdResidents = residentsByHousehold.get(row.householdId) ?? [];
+        const primary = householdResidents.find((resident) => resident.isPrimaryContact) ?? householdResidents[0] ?? null;
+        const feeCents = row.feeCents ?? 0;
+        return {
+            transactionDate: row.transactionDate,
+            productType: row.productType,
+            amountCents: row.amountCents,
+            feeCents,
+            totalCents: row.amountCents - feeCents,
+            streetAddress: streetAddressByHousehold.get(row.householdId) ?? '',
+            primaryResidentName: primary ? `${primary.firstName} ${primary.lastName}` : '',
+        };
+    });
+
+    return c.json(result);
 });
 
 app.post('/api/admin/households/:householdId/archive-household', requireAuth(), requireDirectoryEditor(), async (c) => {

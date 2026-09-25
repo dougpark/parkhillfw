@@ -2,8 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { DollarSign } from 'lucide-vue-next';
 import ModalShell from '../components/ui/ModalShell.vue';
-
-type ProductType = 'regular_annual' | 'pacesetter_annual' | 'security_annual' | 'security_quarterly';
+import { PRODUCT_LABELS, type ProductType } from '../lib/product-catalog';
 
 interface Household {
   id: number;
@@ -37,12 +36,6 @@ interface Row {
   payments: Payment[];
 }
 
-const PRODUCT_LABELS: Record<ProductType, string> = {
-  regular_annual: 'Regular Annual Dues',
-  pacesetter_annual: 'Pacesetter Annual Dues',
-  security_annual: 'Security Annual',
-  security_quarterly: 'Security Quarterly',
-};
 const DUES_PRODUCTS: ProductType[] = ['regular_annual', 'pacesetter_annual'];
 const SECURITY_PRODUCTS: ProductType[] = ['security_annual', 'security_quarterly'];
 

@@ -303,6 +303,8 @@ export const payments = sqliteTable(
             enum: ['regular_annual', 'pacesetter_annual', 'security_annual', 'security_quarterly'],
         }).notNull(),
         amountCents: integer('amount_cents').notNull(),
+        // Stripe processing fee, when known — null for pre-fee-tracking historical rows.
+        feeCents: integer('fee_cents'),
         source: text('source', { enum: ['stripe', 'manual'] }).notNull(),
         stripeInvoiceId: text('stripe_invoice_id'),
         stripeSubscriptionId: text('stripe_subscription_id'),

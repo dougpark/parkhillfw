@@ -325,6 +325,9 @@ export const payments = sqliteTable(
     },
     (table) => [
         index('idx_payments_household').on(table.householdId),
+        // Stripe fires invoice.payment_succeeded and invoice.paid for the same invoice; without
+        // this constraint a race between the two deliveries can insert the payment row twice.
+        uniqueIndex('idx_payments_stripe_invoice_id_unique').on(table.stripeInvoiceId),
     ]
 );
 

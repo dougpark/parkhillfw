@@ -842,7 +842,9 @@ app.post('/api/webhooks/stripe', async (c) => {
             paymentMethod: paymentMethodType === 'us_bank_account' ? 'us_bank_account' : 'card',
             periodStart: line?.period?.start ? new Date(line.period.start * 1000) : null,
             periodEnd: line?.period?.end ? new Date(line.period.end * 1000) : null,
-        });
+            // Stripe delivers invoice.payment_succeeded and invoice.paid for the same invoice;
+            // the alreadyRecorded check above isn't atomic, so this is the real duplicate guard.
+        }).onConflictDoNothing();
     }
 
     switch (event.type) {

@@ -13,9 +13,29 @@ interface TransactionRow {
   totalCents: number;
   streetAddress: string;
   primaryResidentName: string;
+  householdCompositeId: string;
+  incomeAccount: string;
+  transactionId: string | null;
+  payoutId: string | null;
+  status: 'succeeded' | 'refunded' | 'partially_refunded' | 'disputed';
+  paymentMethod: 'card' | 'us_bank_account' | 'check' | 'cash' | null;
+  periodStart: string | null;
+  periodEnd: string | null;
 }
 
 const CATEGORY_LABELS: Record<ProductCategory, string> = { dues: 'Dues', security: 'Security' };
+const PAYMENT_METHOD_LABELS: Record<NonNullable<TransactionRow['paymentMethod']>, string> = {
+  card: 'Card',
+  us_bank_account: 'ACH',
+  check: 'Check',
+  cash: 'Cash',
+};
+const STATUS_LABELS: Record<TransactionRow['status'], string> = {
+  succeeded: 'Succeeded',
+  refunded: 'Refunded',
+  partially_refunded: 'Partially Refunded',
+  disputed: 'Disputed',
+};
 
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -83,18 +103,40 @@ async function loadRows() {
   }
 }
 
+function isoDateOnly(value: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+}
+
 function downloadCsv() {
-  const header = ['Transaction Date', 'Product Category', 'Product Name', 'Amount Paid', 'Fees Paid', 'Net', 'Household Address', 'Primary Resident Name'];
-  const lines = rows.value.map((row) => [
-    formatDate(row.transactionDate),
-    CATEGORY_LABELS[PRODUCT_CATEGORY[row.productType]],
-    PRODUCT_LABELS[row.productType],
-    (row.amountCents / 100).toFixed(2),
-    (row.feeCents / 100).toFixed(2),
-    (row.totalCents / 100).toFixed(2),
-    row.streetAddress,
-    row.primaryResidentName,
-  ].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(','));
+  const header = [
+    'Transaction_ID', 'Date', 'Customer_Name', 'Household_ID', 'Address', 'Income_Account',
+    'Product_Category', 'Product_Description', 'Gross_Amount', 'Fee_Amount', 'Net_Amount',
+    'Payment_Method', 'Payout_ID', 'Transaction Status', 'Coverage_Period',
+  ];
+  const lines = rows.value.map((row) => {
+    const coveragePeriod = row.periodStart && row.periodEnd
+      ? `${isoDateOnly(row.periodStart)} to ${isoDateOnly(row.periodEnd)}`
+      : '';
+    return [
+      row.transactionId ?? '',
+      isoDateOnly(row.transactionDate),
+      row.primaryResidentName,
+      row.householdCompositeId,
+      row.streetAddress,
+      row.incomeAccount,
+      CATEGORY_LABELS[PRODUCT_CATEGORY[row.productType]],
+      PRODUCT_LABELS[row.productType],
+      (row.amountCents / 100).toFixed(2),
+      (row.feeCents / 100).toFixed(2),
+      (row.totalCents / 100).toFixed(2),
+      row.paymentMethod ? PAYMENT_METHOD_LABELS[row.paymentMethod] : '',
+      row.payoutId ?? '',
+      STATUS_LABELS[row.status],
+      coveragePeriod,
+    ].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(',');
+  });
   const csv = [header.join(','), ...lines].join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv' });

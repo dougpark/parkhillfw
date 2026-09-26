@@ -19,3 +19,9 @@ export const PRODUCT_LABELS: Record<ProductType, string> = {
     security_annual: 'Security Annual',
     security_quarterly: 'Security Quarterly',
 };
+
+// QuickBooks GL income account code per category, for accounting export line-item labeling.
+export const INCOME_ACCOUNT_BY_CATEGORY: Record<ProductCategory, string> = {
+    dues: '4000 - Annual Dues Revenue',
+    security: '4100 - Security Patrol Dues',
+};

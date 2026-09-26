@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import type { AppBindings } from '../middleware/auth';
 
 export type { ProductType, ProductCategory } from './product-catalog';
-export { PRODUCT_CATEGORY, PRODUCT_LABELS } from './product-catalog';
+export { PRODUCT_CATEGORY, PRODUCT_LABELS, INCOME_ACCOUNT_BY_CATEGORY } from './product-catalog';
 import type { ProductType } from './product-catalog';
 
 export function priceIdForProduct(env: AppBindings, productType: ProductType): string {

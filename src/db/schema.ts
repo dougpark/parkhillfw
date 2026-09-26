@@ -308,7 +308,15 @@ export const payments = sqliteTable(
         source: text('source', { enum: ['stripe', 'manual'] }).notNull(),
         stripeInvoiceId: text('stripe_invoice_id'),
         stripeSubscriptionId: text('stripe_subscription_id'),
-        paymentMethod: text('payment_method', { enum: ['card', 'check', 'cash'] }),
+        // Stripe Charge ID — the QuickBooks-facing Transaction_ID, and the join key used to
+        // apply later charge.refunded/dispute webhooks and payout reconciliation to this row.
+        stripeChargeId: text('stripe_charge_id'),
+        // Stripe Payout ID this charge was batched into for bank-statement matching; populated
+        // asynchronously by the payout.paid webhook handler, so it's null until Stripe pays out.
+        payoutId: text('payout_id'),
+        status: text('status', { enum: ['succeeded', 'refunded', 'partially_refunded', 'disputed'] })
+            .notNull().default('succeeded'),
+        paymentMethod: text('payment_method', { enum: ['card', 'us_bank_account', 'check', 'cash'] }),
         periodStart: integer('period_start', { mode: 'timestamp' }),
         periodEnd: integer('period_end', { mode: 'timestamp' }),
         note: text('note'),

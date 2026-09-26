@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { Banknote, ExternalLink, Shield, ShieldAlert } from 'lucide-vue-next';
+import { HouseHeart, ExternalLink, Shield, ShieldAlert } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 
 type ProductType = 'regular_annual' | 'pacesetter_annual' | 'security_annual' | 'security_quarterly';
@@ -147,7 +147,7 @@ onMounted(async () => {
       <div class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm">
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-3">
-            <Banknote class="h-6 w-6 text-accent" />
+            <HouseHeart class="h-6 w-6 text-accent" />
             <h3 class="text-lg font-semibold text-content">Annual Dues</h3>
           </div>
           <span v-if="duesHasActive" class="text-lg font-bold text-success">Thank You!</span>

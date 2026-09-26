@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Clock } from 'lucide-vue-next';
+import { CreditCard, ExternalLink } from 'lucide-vue-next';
 </script>
 
 <template>
@@ -9,12 +9,24 @@ import { Clock } from 'lucide-vue-next';
       <p class="mt-2 text-content-muted">Manage payment processors, dues pricing &amp; reports</p>
     </div>
 
-    <div class="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-theme-border bg-surface-subtle py-16 text-center">
-      <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-        <Clock class="h-7 w-7" />
-      </div>
-      <h3 class="text-xl font-semibold text-content">Coming Soon</h3>
-      <p class="max-w-md text-content-muted">Payment processor configuration isn't available yet. Check back soon.</p>
+    <div class="space-y-3">
+      <a
+        href="https://dashboard.stripe.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex w-full items-center gap-4 rounded-2xl border border-theme-border bg-surface p-5 text-left shadow-sm transition-colors hover:bg-app-bg"
+      >
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+          <CreditCard class="h-5 w-5" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-medium text-content">Stripe Dashboard</span>
+          <span class="mt-0.5 block text-xs text-content-muted">Login with your Stripe administrator email</span>
+        </span>
+        <ExternalLink class="h-5 w-5 shrink-0 text-content-muted" />
+      </a>
     </div>
+
+    <p class="text-xs text-content-muted">Additional link and info cards will be added in the future.</p>
   </section>
 </template>

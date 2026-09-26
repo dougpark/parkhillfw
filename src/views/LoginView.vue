@@ -108,8 +108,8 @@ onMounted(loadSiteSettings);
             maxlength="6"
             required
             autofocus
-            class="mt-2 w-full rounded-xl border border-theme-border px-4 py-3 text-center text-2xl tracking-[0.5em] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-            placeholder="000000"
+            class="mt-2 w-full rounded-xl border border-theme-border px-4 py-3 text-center text-2xl tracking-[0.5em] placeholder:text-content-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+            placeholder="------"
           />
         </label>
         <button

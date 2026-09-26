@@ -842,8 +842,8 @@ app.post('/api/webhooks/stripe', async (c) => {
             paymentMethod: paymentMethodType === 'us_bank_account' ? 'us_bank_account' : 'card',
             periodStart: line?.period?.start ? new Date(line.period.start * 1000) : null,
             periodEnd: line?.period?.end ? new Date(line.period.end * 1000) : null,
-            // Stripe delivers invoice.payment_succeeded and invoice.paid for the same invoice;
-            // the alreadyRecorded check above isn't atomic, so this is the real duplicate guard.
+            // Stripe's at-least-once delivery can redeliver invoice.paid; the alreadyRecorded
+            // check above isn't atomic, so this unique-index conflict is the real duplicate guard.
         }).onConflictDoNothing();
     }
 
@@ -867,7 +867,9 @@ app.post('/api/webhooks/stripe', async (c) => {
                 .where(eq(subscriptions.stripeSubscriptionId, subscription.id));
             break;
         }
-        case 'invoice.payment_succeeded':
+        // invoice.paid is the broader "this invoice is now paid" event (also covers out-of-band/
+        // manual marks); invoice.payment_succeeded fires for the same charge and adds nothing we
+        // don't already re-fetch from the API, so only one is needed.
         case 'invoice.paid':
             await recordInvoicePayment(event.data.object as Stripe.Invoice);
             break;

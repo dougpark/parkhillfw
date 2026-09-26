@@ -142,6 +142,42 @@ migrate-local:
 dev: build
     bunx wrangler dev
 
+## Wipes all "Pay Dues" test data for LOCAL DEV ONLY: deletes every Stripe customer
+## referenced by a local household (deleting a Stripe customer cascades to cancel
+## their subscriptions too), then clears the local subscriptions/payments tables and
+## unlinks households.stripe_customer_id so the Pay Dues flow starts fresh for every
+## household. Only touches customer IDs recorded in the LOCAL dev D1 — dev and staging
+## share one Stripe sandbox, but staging's own test customers/subscriptions live under
+## different IDs recorded in staging's D1, so this cannot affect staging.
+reset-dues-local:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    STRIPE_SECRET_KEY=$(grep '^STRIPE_SECRET_KEY=' .dev.vars | cut -d= -f2-)
+    if [ -z "$STRIPE_SECRET_KEY" ]; then
+        echo "❌ STRIPE_SECRET_KEY not found in .dev.vars"; exit 1
+    fi
+
+    echo "🔎 Finding Stripe customers referenced by local dev households..."
+    CUSTOMER_IDS=$(bunx wrangler d1 execute DB --local -y --json \
+        --command "SELECT stripe_customer_id FROM households WHERE stripe_customer_id IS NOT NULL;" \
+        | bun -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); console.log(data[0].results.map((r) => r.stripe_customer_id).join("\n"));')
+
+    if [ -z "$CUSTOMER_IDS" ]; then
+        echo "ℹ️  No Stripe customers found on local households — nothing to delete on Stripe's side."
+    else
+        echo "🗑️  Deleting Stripe customers (this cascades to cancel their subscriptions)..."
+        for id in $CUSTOMER_IDS; do
+            echo "   - $id"
+            stripe customers delete "$id" --api-key "$STRIPE_SECRET_KEY" --confirm || echo "     (already gone, skipping)"
+        done
+    fi
+
+    echo "🧹 Clearing local dev subscriptions/payments and unlinking households..."
+    bunx wrangler d1 execute DB --local -y --command \
+        "DELETE FROM payments; DELETE FROM subscriptions; UPDATE households SET stripe_customer_id = NULL;"
+
+    echo "✅ Local dev Pay Dues test data cleared — households now look brand-new to Stripe."
+
 # ------------------------------------------------------------------------------
 # Staging Commands
 # ------------------------------------------------------------------------------
@@ -159,6 +195,41 @@ deploy-staging: build
 # Tail live log stream from Staging
 logs-staging:
     bunx wrangler tail --env staging
+
+## Wipes all "Pay Dues" test data for STAGING ONLY: deletes every Stripe customer
+## referenced by a staging household (deleting a Stripe customer cascades to cancel
+## their subscriptions too), then clears staging's subscriptions/payments tables and
+## unlinks households.stripe_customer_id. WARNING: runs against the remote staging
+## D1 database and the shared Stripe sandbox — only touches customer IDs recorded in
+## staging's own D1, so local dev's test data is untouched.
+reset-dues-staging:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    STRIPE_SECRET_KEY=$(grep '^STRIPE_SECRET_KEY=' .dev.vars | cut -d= -f2-)
+    if [ -z "$STRIPE_SECRET_KEY" ]; then
+        echo "❌ STRIPE_SECRET_KEY not found in .dev.vars"; exit 1
+    fi
+
+    echo "🔎 Finding Stripe customers referenced by staging households..."
+    CUSTOMER_IDS=$(bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --json \
+        --command "SELECT stripe_customer_id FROM households WHERE stripe_customer_id IS NOT NULL;" \
+        | bun -e 'const data = JSON.parse(require("fs").readFileSync(0, "utf8")); console.log(data[0].results.map((r) => r.stripe_customer_id).join("\n"));')
+
+    if [ -z "$CUSTOMER_IDS" ]; then
+        echo "ℹ️  No Stripe customers found on staging households — nothing to delete on Stripe's side."
+    else
+        echo "🗑️  Deleting Stripe customers (this cascades to cancel their subscriptions)..."
+        for id in $CUSTOMER_IDS; do
+            echo "   - $id"
+            stripe customers delete "$id" --api-key "$STRIPE_SECRET_KEY" --confirm || echo "     (already gone, skipping)"
+        done
+    fi
+
+    echo "🧹 Clearing staging subscriptions/payments and unlinking households..."
+    bunx wrangler d1 execute parkhillfw-db-staging --env staging --remote -y --command \
+        "DELETE FROM payments; DELETE FROM subscriptions; UPDATE households SET stripe_customer_id = NULL;"
+
+    echo "✅ Staging Pay Dues test data cleared — households now look brand-new to Stripe."
 
 # ------------------------------------------------------------------------------
 # Production Commands

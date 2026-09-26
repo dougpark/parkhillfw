@@ -61,6 +61,12 @@ function setQuarterRange() {
   endDate.value = isoDate(new Date(now.getFullYear(), quarterStartMonth + 3, 0));
 }
 
+function setYearRange() {
+  const now = new Date();
+  startDate.value = isoDate(new Date(now.getFullYear(), 0, 1));
+  endDate.value = isoDate(new Date(now.getFullYear(), 11, 31));
+}
+
 async function loadRows() {
   isLoading.value = true;
   error.value = '';
@@ -131,6 +137,7 @@ onMounted(loadRows);
       <div class="flex h-10 items-center gap-2">
         <button type="button" class="rounded-full border border-theme-border px-3 text-xs font-medium text-content-muted transition-colors hover:bg-app-bg h-full" @click="setMonthRange">Month</button>
         <button type="button" class="rounded-full border border-theme-border px-3 text-xs font-medium text-content-muted transition-colors hover:bg-app-bg h-full" @click="setQuarterRange">Quarter</button>
+        <button type="button" class="rounded-full border border-theme-border px-3 text-xs font-medium text-content-muted transition-colors hover:bg-app-bg h-full" @click="setYearRange">Year</button>
       </div>
       <div>
         <label class="mb-1 block text-sm font-medium text-content">Category</label>

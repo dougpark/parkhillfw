@@ -30,7 +30,16 @@ import {
 import { approvalLinkLifetimeMinutes, completeLogin, createMagicLinkToken, expiredSessionCookie, findUserBySession, hashToken, normalizeEmail, sessionCookie, SESSION_COOKIE, verifyCodeAndConsume } from './lib/auth';
 import { sendAccessRequestAdminNotificationEmail, sendAccessRequestOutcomeEmail, sendMagicLinkEmail } from './lib/email';
 import { getSetting, setSetting } from './lib/settings';
-import { getStripe, priceIdForProduct, productTypeForPriceId, PRODUCT_CATEGORY, INCOME_ACCOUNT_BY_CATEGORY, type ProductType } from './lib/stripe';
+import { getStripe, priceIdForProduct, PRODUCT_CATEGORY, INCOME_ACCOUNT_BY_CATEGORY, type ProductType } from './lib/stripe';
+import {
+    buildSubscriptionUpsertValues,
+    chargeIdFromDispute,
+    chargeIdsFromBalanceTransactions,
+    disputeCloseStatus,
+    extractChargeDetails,
+    refundStatusForCharge,
+} from './lib/stripe-webhooks';
+import { buildHouseholdCompositeId } from './lib/finance-report';
 
 const DEFAULT_ADMIN_EMAIL = 'admin@parkhillfw.com';
 const DEFAULT_SITE_NAME = 'Park Hill Directory';
@@ -766,29 +775,14 @@ app.post('/api/webhooks/stripe', async (c) => {
     const db = drizzle(c.env.DB);
 
     async function upsertSubscriptionFromStripe(subscription: Stripe.Subscription) {
-        const item = subscription.items.data[0];
-        const priceId = item?.price?.id;
-        const metadataProductType = subscription.metadata?.product_type as ProductType | undefined;
-        const productType = (metadataProductType && metadataProductType in PRODUCT_CATEGORY)
-            ? metadataProductType
-            : (priceId ? productTypeForPriceId(c.env, priceId) : null);
-        const householdId = Number(subscription.metadata?.household_id);
-        if (!productType || !priceId || !Number.isInteger(householdId)) return;
-
-        const status = subscription.status === 'active' || subscription.status === 'trialing' ? 'active' as const
-            : subscription.status === 'past_due' ? 'past_due' as const
-                : subscription.status === 'incomplete' || subscription.status === 'incomplete_expired' ? 'incomplete' as const
-                    : 'canceled' as const;
-        const currentPeriodEnd = item?.current_period_end ? new Date(item.current_period_end * 1000) : null;
+        const values = buildSubscriptionUpsertValues(subscription, c.env);
+        if (!values) return;
 
         const existing = await db.select({ id: subscriptions.id }).from(subscriptions)
             .where(eq(subscriptions.stripeSubscriptionId, subscription.id)).get();
-        const values = {
-            householdId, productType, stripePriceId: priceId, status, currentPeriodEnd,
-            cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), updatedAt: new Date(),
-        };
-        if (existing) await db.update(subscriptions).set(values).where(eq(subscriptions.id, existing.id));
-        else await db.insert(subscriptions).values({ stripeSubscriptionId: subscription.id, ...values });
+        const row = { ...values, updatedAt: new Date() };
+        if (existing) await db.update(subscriptions).set(row).where(eq(subscriptions.id, existing.id));
+        else await db.insert(subscriptions).values({ stripeSubscriptionId: subscription.id, ...row });
     }
 
     // Invoices don't carry the processing fee, charge ID, or payment method type directly —
@@ -806,9 +800,7 @@ app.post('/api/webhooks/stripe', async (c) => {
             const chargeRef = paymentIntent?.latest_charge;
             if (!chargeRef) return empty;
             const charge = typeof chargeRef === 'string' ? await stripe.charges.retrieve(chargeRef, { expand: ['balance_transaction'] }) : chargeRef;
-            const balanceTransaction = charge.balance_transaction;
-            const feeCents = balanceTransaction && typeof balanceTransaction !== 'string' ? balanceTransaction.fee : null;
-            return { feeCents, chargeId: charge.id, paymentMethodType: charge.payment_method_details?.type ?? null };
+            return extractChargeDetails(charge);
         } catch (error) {
             console.error('Failed to fetch Stripe charge details for invoice', { invoiceId: invoice.id, error });
             return empty;
@@ -883,9 +875,7 @@ app.post('/api/webhooks/stripe', async (c) => {
         case 'payout.paid': {
             const payout = event.data.object as Stripe.Payout;
             const balanceTransactions = await stripe.balanceTransactions.list({ payout: payout.id, limit: 100 });
-            const chargeIds = balanceTransactions.data
-                .map((transaction) => (typeof transaction.source === 'string' ? transaction.source : transaction.source?.id))
-                .filter((id): id is string => Boolean(id?.startsWith('ch_')));
+            const chargeIds = chargeIdsFromBalanceTransactions(balanceTransactions.data);
             if (chargeIds.length) {
                 await db.update(payments).set({ payoutId: payout.id }).where(inArray(payments.stripeChargeId, chargeIds));
             }
@@ -893,21 +883,19 @@ app.post('/api/webhooks/stripe', async (c) => {
         }
         case 'charge.refunded': {
             const charge = event.data.object as Stripe.Charge;
-            const status = charge.amount_refunded >= charge.amount ? 'refunded' as const : 'partially_refunded' as const;
-            await db.update(payments).set({ status }).where(eq(payments.stripeChargeId, charge.id));
+            await db.update(payments).set({ status: refundStatusForCharge(charge) }).where(eq(payments.stripeChargeId, charge.id));
             break;
         }
         case 'charge.dispute.created': {
             const dispute = event.data.object as Stripe.Dispute;
-            const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id;
-            await db.update(payments).set({ status: 'disputed' }).where(eq(payments.stripeChargeId, chargeId));
+            await db.update(payments).set({ status: 'disputed' }).where(eq(payments.stripeChargeId, chargeIdFromDispute(dispute)));
             break;
         }
         case 'charge.dispute.closed': {
             const dispute = event.data.object as Stripe.Dispute;
-            const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge.id;
-            if (dispute.status === 'won') {
-                await db.update(payments).set({ status: 'succeeded' }).where(eq(payments.stripeChargeId, chargeId));
+            const newStatus = disputeCloseStatus(dispute);
+            if (newStatus) {
+                await db.update(payments).set({ status: newStatus }).where(eq(payments.stripeChargeId, chargeIdFromDispute(dispute)));
             }
             break;
         }
@@ -1017,14 +1005,6 @@ app.get('/api/admin/finance/transactions', requireAuth(), requireFinance(), asyn
     const residentsByHousehold = new Map<number, typeof residentRows>();
     for (const resident of residentRows) {
         residentsByHousehold.set(resident.householdId, [...(residentsByHousehold.get(resident.householdId) ?? []), resident]);
-    }
-
-    // Composite QuickBooks Household_ID: [street number][street-word initials]-[first]-[last],
-    // e.g. "2345 Lofton Terrace" + "Doug Park" -> "2345LT-Doug-Park".
-    function buildHouseholdCompositeId(streetAddress: string, firstName: string, lastName: string): string {
-        const [numberPart, ...words] = streetAddress.trim().split(/\s+/).filter(Boolean);
-        const initials = words.map((word) => word[0]?.toUpperCase() ?? '').join('');
-        return [`${numberPart ?? ''}${initials}`, firstName, lastName].filter(Boolean).join('-');
     }
 
     const result = rows.map((row) => {

@@ -7,6 +7,7 @@ import AdminAccessRequestsView from './AdminAccessRequestsView.vue';
 import AdminArchiveBrowserView from './AdminArchiveBrowserView.vue';
 import AdminFinanceDuesView from './AdminFinanceDuesView.vue';
 import AdminFinancePaymentProcessorView from './AdminFinancePaymentProcessorView.vue';
+import AdminFinanceReportsView from './AdminFinanceReportsView.vue';
 import AdminFinanceTransactionReportView from './AdminFinanceTransactionReportView.vue';
 import AdminLastSeenView from './AdminLastSeenView.vue';
 import AdminLogsView from './AdminLogsView.vue';
@@ -33,6 +34,8 @@ interface AdminFeature {
   description: string;
   icon: unknown;
   role: Role;
+  // Valid navigation target, but not rendered as its own sidebar row (e.g. reached via a report list panel).
+  hidden?: boolean;
 }
 
 interface AdminMenuSection {
@@ -97,7 +100,8 @@ const adminMenuSections: AdminMenuSection[] = [
     role: 'finance',
     children: [
       { label: 'Dues & Subscriptions', description: 'Review household dues/security status and record manual payments.', icon: DollarSign, role: 'finance' },
-      { label: 'Transaction Report', description: 'Search and export payment transactions by date range and category.', icon: Receipt, role: 'finance' },
+      { label: 'Reports', description: 'Browse and export finance reports.', icon: Receipt, role: 'finance' },
+      { label: 'Transaction Report', description: 'Search and export payment transactions by date range and category.', icon: Receipt, role: 'finance', hidden: true },
       { label: 'Payment Processor', description: 'Configure payment processor settings.', icon: DollarSign, role: 'finance' },
     ],
   },
@@ -302,7 +306,7 @@ function handleCrumbClick(index: number) {
               class="mt-1 space-y-1 pb-1 pl-8"
             >
               <button
-                v-for="child in section.children"
+                v-for="child in section.children.filter((c) => !c.hidden)"
                 :key="child.label"
                 type="button"
                 class="block w-full truncate rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors"
@@ -346,8 +350,10 @@ function handleCrumbClick(index: number) {
         <AdminAccessControlView @exit="selectedFeature = 'Status'" />
       </div>      <div v-else-if="selectedFeature === 'Dues & Subscriptions'" class="min-w-0 p-6 sm:p-8">
         <AdminFinanceDuesView />
+      </div>      <div v-else-if="selectedFeature === 'Reports'" class="min-w-0 p-6 sm:p-8">
+        <AdminFinanceReportsView @select="selectedFeature = $event" />
       </div>      <div v-else-if="selectedFeature === 'Transaction Report'" class="min-w-0 p-6 sm:p-8">
-        <AdminFinanceTransactionReportView @exit="selectedFeature = 'Status'" />
+        <AdminFinanceTransactionReportView @exit="selectedFeature = 'Reports'" />
       </div>      <div v-else-if="selectedFeature === 'Payment Processor'" class="min-w-0 p-6 sm:p-8">
         <AdminFinancePaymentProcessorView />
       </div>      <div v-else-if="selectedFeature === 'Logs'" class="min-w-0 p-6 sm:p-8">

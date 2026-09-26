@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { CheckCircle2, ExternalLink, Shield, ShieldAlert } from 'lucide-vue-next';
+import { Banknote, ExternalLink, Shield, ShieldAlert } from 'lucide-vue-next';
 import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 
 type ProductType = 'regular_annual' | 'pacesetter_annual' | 'security_annual' | 'security_quarterly';
@@ -60,6 +60,11 @@ function categoryHasActive(products: ProductType[]) {
   return Boolean(activeSubscriptionFor(products));
 }
 
+function activePlanLabel(products: ProductType[], plans: Plan[]) {
+  const active = activeSubscriptionFor(products);
+  return active ? plans.find((plan) => plan.productType === active.productType)?.label ?? '' : '';
+}
+
 const duesHasActive = computed(() => categoryHasActive(DUES_PLANS.map((plan) => plan.productType)));
 const securityHasActive = computed(() => categoryHasActive(SECURITY_PLANS.map((plan) => plan.productType)));
 
@@ -116,6 +121,11 @@ onMounted(async () => {
   const params = new URLSearchParams(window.location.search);
   if (params.get('checkout') === 'success') notice.value = 'Thanks! Your payment is being processed and this page will update shortly.';
   else if (params.get('checkout') === 'canceled') notice.value = 'Checkout was canceled.';
+  if (params.has('checkout')) {
+    // Drop the query param so refreshing the page doesn't re-show a stale notice.
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+  if (notice.value) setTimeout(() => { notice.value = ''; }, 8000);
   await loadStatus();
 });
 </script>
@@ -135,13 +145,16 @@ onMounted(async () => {
 
     <template v-else>
       <div class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm">
-        <div class="flex items-center gap-3">
-          <CheckCircle2 class="h-6 w-6 text-accent" />
-          <h3 class="text-lg font-semibold text-content">Annual Dues</h3>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <Banknote class="h-6 w-6 text-accent" />
+            <h3 class="text-lg font-semibold text-content">Annual Dues</h3>
+          </div>
+          <span v-if="duesHasActive" class="text-lg font-bold text-success">Thank You!</span>
         </div>
-        <p class="mt-2 text-sm text-content-muted">Select a membership tier below to complete payment for annual dues.</p>
+        <p v-if="!duesHasActive" class="mt-2 text-sm text-content-muted">Select a membership tier below to complete payment for annual dues.</p>
         <p v-if="duesHasActive" class="mt-3 text-sm text-content-muted">
-          Active: {{ activeSubscriptionFor(DUES_PLANS.map((plan) => plan.productType))?.currentPeriodEnd ? `renews ${formatDate(activeSubscriptionFor(DUES_PLANS.map((plan) => plan.productType))!.currentPeriodEnd)}` : 'subscription active' }}
+          Active: {{ activePlanLabel(DUES_PLANS.map((plan) => plan.productType), DUES_PLANS) }} — {{ activeSubscriptionFor(DUES_PLANS.map((plan) => plan.productType))?.currentPeriodEnd ? `renews ${formatDate(activeSubscriptionFor(DUES_PLANS.map((plan) => plan.productType))!.currentPeriodEnd)}` : 'subscription active' }}
         </p>
         <p v-else class="mt-3 text-sm text-content-muted">No active dues subscription.</p>
         <div v-if="!duesHasActive" class="mt-4 grid gap-3 sm:grid-cols-2">
@@ -161,13 +174,16 @@ onMounted(async () => {
       </div>
 
       <div class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm">
-        <div class="flex items-center gap-3">
-          <Shield class="h-6 w-6 text-accent" />
-          <h3 class="text-lg font-semibold text-content">Security Patrols</h3>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <Shield class="h-6 w-6 text-accent" />
+            <h3 class="text-lg font-semibold text-content">Security Patrols</h3>
+          </div>
+          <span v-if="securityHasActive" class="text-lg font-bold text-success">Thank You!</span>
         </div>
-        <p class="mt-2 text-sm text-content-muted">Select a billing schedule below to support neighborhood security patrols.</p>
+        <p v-if="!securityHasActive" class="mt-2 text-sm text-content-muted">Select a billing schedule below to support neighborhood security patrols.</p>
         <p v-if="securityHasActive" class="mt-3 text-sm text-content-muted">
-          Active: {{ activeSubscriptionFor(SECURITY_PLANS.map((plan) => plan.productType))?.currentPeriodEnd ? `renews ${formatDate(activeSubscriptionFor(SECURITY_PLANS.map((plan) => plan.productType))!.currentPeriodEnd)}` : 'subscription active' }}
+          Active: {{ activePlanLabel(SECURITY_PLANS.map((plan) => plan.productType), SECURITY_PLANS) }} — {{ activeSubscriptionFor(SECURITY_PLANS.map((plan) => plan.productType))?.currentPeriodEnd ? `renews ${formatDate(activeSubscriptionFor(SECURITY_PLANS.map((plan) => plan.productType))!.currentPeriodEnd)}` : 'subscription active' }}
         </p>
         <p v-else class="mt-3 flex items-center gap-2 text-sm text-content-muted"><ShieldAlert class="h-4 w-4" /> No active security subscription.</p>
         <div v-if="!securityHasActive" class="mt-4 grid gap-3 sm:grid-cols-2">

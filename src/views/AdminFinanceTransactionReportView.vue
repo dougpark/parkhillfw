@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { Download } from 'lucide-vue-next';
 import { PRODUCT_CATEGORY, PRODUCT_LABELS, type ProductCategory, type ProductType } from '../lib/product-catalog';
 
@@ -42,6 +42,25 @@ function formatCents(cents: number) {
   return (cents / 100).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 }
 
+const totals = computed(() => rows.value.reduce((acc, row) => ({
+  amountCents: acc.amountCents + row.amountCents,
+  feeCents: acc.feeCents + row.feeCents,
+  totalCents: acc.totalCents + row.totalCents,
+}), { amountCents: 0, feeCents: 0, totalCents: 0 }));
+
+function setMonthRange() {
+  const now = new Date();
+  startDate.value = isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  endDate.value = isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+}
+
+function setQuarterRange() {
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  startDate.value = isoDate(new Date(now.getFullYear(), quarterStartMonth, 1));
+  endDate.value = isoDate(new Date(now.getFullYear(), quarterStartMonth + 3, 0));
+}
+
 async function loadRows() {
   isLoading.value = true;
   error.value = '';
@@ -59,7 +78,7 @@ async function loadRows() {
 }
 
 function downloadCsv() {
-  const header = ['Transaction Date', 'Product Category', 'Product Name', 'Amount Paid', 'Fees Paid', 'Total', 'Household Address', 'Primary Resident Name'];
+  const header = ['Transaction Date', 'Product Category', 'Product Name', 'Amount Paid', 'Fees Paid', 'Net', 'Household Address', 'Primary Resident Name'];
   const lines = rows.value.map((row) => [
     formatDate(row.transactionDate),
     CATEGORY_LABELS[PRODUCT_CATEGORY[row.productType]],
@@ -109,6 +128,10 @@ onMounted(loadRows);
         <label class="mb-1 block text-sm font-medium text-content">End date</label>
         <input v-model="endDate" type="date" class="h-10 rounded-xl border border-theme-border bg-surface px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30" />
       </div>
+      <div class="flex h-10 items-center gap-2">
+        <button type="button" class="rounded-full border border-theme-border px-3 text-xs font-medium text-content-muted transition-colors hover:bg-app-bg h-full" @click="setMonthRange">Month</button>
+        <button type="button" class="rounded-full border border-theme-border px-3 text-xs font-medium text-content-muted transition-colors hover:bg-app-bg h-full" @click="setQuarterRange">Quarter</button>
+      </div>
       <div>
         <label class="mb-1 block text-sm font-medium text-content">Category</label>
         <select v-model="category" class="h-10 rounded-xl border border-theme-border bg-surface px-3 text-sm focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30">
@@ -135,7 +158,7 @@ onMounted(loadRows);
             <th class="px-4 py-3">Product</th>
             <th class="px-4 py-3">Amount Paid</th>
             <th class="px-4 py-3">Fees Paid</th>
-            <th class="px-4 py-3">Total</th>
+            <th class="px-4 py-3">Net</th>
             <th class="px-4 py-3">Household Address</th>
             <th class="px-4 py-3">Primary Resident</th>
           </tr>
@@ -152,6 +175,15 @@ onMounted(loadRows);
             <td class="px-4 py-3">{{ row.primaryResidentName }}</td>
           </tr>
         </tbody>
+        <tfoot>
+          <tr class="border-t-2 border-theme-border font-semibold">
+            <td colspan="3" class="px-4 py-3 text-right">Totals</td>
+            <td class="px-4 py-3">{{ formatCents(totals.amountCents) }}</td>
+            <td class="px-4 py-3">{{ formatCents(totals.feeCents) }}</td>
+            <td class="px-4 py-3">{{ formatCents(totals.totalCents) }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </section>

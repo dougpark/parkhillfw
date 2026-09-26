@@ -126,7 +126,7 @@ onMounted(async () => {
 
     <div>
       <h2 class="text-2xl font-semibold tracking-tight">Pay Dues</h2>
-      <p class="mt-2 text-content-muted">Subscribe to annual dues and neighborhood security, or manage your existing billing.</p>
+      <p class="mt-2 text-content-muted">Support our neighborhood by subscribing to Dues, Security, or both. Annual Dues and Security Patrol are separate subscriptions processed securely through Stripe.</p>
     </div>
 
     <p v-if="notice" class="rounded-xl bg-success-subtle p-3 text-sm text-success">{{ notice }}</p>
@@ -137,8 +137,9 @@ onMounted(async () => {
       <div class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm">
         <div class="flex items-center gap-3">
           <CheckCircle2 class="h-6 w-6 text-accent" />
-          <h3 class="text-lg font-semibold text-content">Dues</h3>
+          <h3 class="text-lg font-semibold text-content">Annual Dues</h3>
         </div>
+        <p class="mt-2 text-sm text-content-muted">Select a membership tier below to complete payment for annual dues.</p>
         <p v-if="duesHasActive" class="mt-3 text-sm text-content-muted">
           Active: {{ activeSubscriptionFor(DUES_PLANS.map((plan) => plan.productType))?.currentPeriodEnd ? `renews ${formatDate(activeSubscriptionFor(DUES_PLANS.map((plan) => plan.productType))!.currentPeriodEnd)}` : 'subscription active' }}
         </p>
@@ -153,7 +154,7 @@ onMounted(async () => {
               class="mt-3 w-full rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60"
               @click="subscribe(plan.productType)"
             >
-              {{ pendingProductType === plan.productType ? 'Starting checkout...' : 'Subscribe' }}
+              {{ pendingProductType === plan.productType ? 'Starting checkout...' : 'Proceed to Checkout' }}
             </button>
           </div>
         </div>
@@ -162,8 +163,9 @@ onMounted(async () => {
       <div class="rounded-3xl border border-theme-border bg-surface p-6 shadow-sm">
         <div class="flex items-center gap-3">
           <Shield class="h-6 w-6 text-accent" />
-          <h3 class="text-lg font-semibold text-content">Security</h3>
+          <h3 class="text-lg font-semibold text-content">Security Patrols</h3>
         </div>
+        <p class="mt-2 text-sm text-content-muted">Select a billing schedule below to support neighborhood security patrols.</p>
         <p v-if="securityHasActive" class="mt-3 text-sm text-content-muted">
           Active: {{ activeSubscriptionFor(SECURITY_PLANS.map((plan) => plan.productType))?.currentPeriodEnd ? `renews ${formatDate(activeSubscriptionFor(SECURITY_PLANS.map((plan) => plan.productType))!.currentPeriodEnd)}` : 'subscription active' }}
         </p>
@@ -178,7 +180,7 @@ onMounted(async () => {
               class="mt-3 w-full rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60"
               @click="subscribe(plan.productType)"
             >
-              {{ pendingProductType === plan.productType ? 'Starting checkout...' : 'Subscribe' }}
+              {{ pendingProductType === plan.productType ? 'Starting checkout...' : 'Proceed to Checkout' }}
             </button>
           </div>
         </div>

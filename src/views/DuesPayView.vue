@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { CheckCircle2, ExternalLink, Shield, ShieldAlert } from 'lucide-vue-next';
+import BreadcrumbNav from '../components/common/BreadcrumbNav.vue';
 
 type ProductType = 'regular_annual' | 'pacesetter_annual' | 'security_annual' | 'security_quarterly';
 
@@ -121,6 +122,8 @@ onMounted(async () => {
 
 <template>
   <section class="mx-auto max-w-3xl space-y-8">
+    <BreadcrumbNav current="Pay Dues" />
+
     <div>
       <h2 class="text-2xl font-semibold tracking-tight">Pay Dues</h2>
       <p class="mt-2 text-content-muted">Subscribe to annual dues and neighborhood security, or manage your existing billing.</p>
